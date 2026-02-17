@@ -653,60 +653,6 @@ def crear_pedido():
         print("❌ ERROR crear_pedido:", e)
         return jsonify({"error": str(e)}), 500
 
-
-@app.route("/marcar_entregado", methods=["POST"])
-def marcar_entregado():
-    try:
-        data = request.get_json()
-        pedido_id = data.get("pedido_id")
-
-        pedido_res = supabase.table("pedidos") \
-            .select("*, usuarios(*)") \
-            .eq("id", pedido_id) \
-            .execute()
-
-        if not pedido_res.data:
-            return jsonify({"error": "Pedido no encontrado"}), 404
-
-        pedido = pedido_res.data[0]
-
-        supabase.table("pedidos").update({
-            "estado": "entregado",
-            "fecha_respuesta": datetime.now().isoformat()
-        }).eq("id", pedido_id).execute()
-
-        telegram_id = pedido["usuarios"]["telegram_id"]
-
-        bot.send_message(
-            telegram_id,
-            f"🎉 Tu pedido ya está disponible:\n\n"
-            f"🎬 {pedido['titulo_pedido']}"
-        )
-
-        return jsonify({"success": True}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-def limpiar_membresias_vencidas():
-    ahora = datetime.now().isoformat()
-
-    usuarios = supabase.table("usuarios") \
-        .select("*") \
-        .eq("membresia_activa", True) \
-        .lt("fecha_vencimiento", ahora) \
-        .execute()
-
-    for u in usuarios.data:
-        supabase.table("usuarios").update({
-            "membresia_activa": False
-        }).eq("id", u["id"]).execute()
-
-        bot.send_message(
-            u["telegram_id"],
-            "⚠️ Tu membresía ha vencido."
-        )
-
 @app.route("/admin_pedidos", methods=["POST", "OPTIONS"])
 def admin_pedidos():
     # Manejar preflight CORS
