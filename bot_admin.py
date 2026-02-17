@@ -706,6 +706,129 @@ def limpiar_membresias_vencidas():
             u["telegram_id"],
             "⚠️ Tu membresía ha vencido."
         )
+
+@app.route("/admin_pedidos", methods=["POST", "OPTIONS"])
+def admin_pedidos():
+    # Manejar preflight CORS
+    if request.method == "OPTIONS":
+        response = jsonify({"success": True})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        admin_id = data.get("admin_id")
+
+        # Verificar que es el admin
+        if admin_id != ADMIN_ID:
+            response = jsonify({"error": "No autorizado"})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 403
+
+        # Obtener TODOS los pedidos con información del usuario
+        pedidos_res = supabase.table("pedidos") \
+            .select("*, usuarios!inner(*)") \
+            .order("fecha_pedido", desc=True) \
+            .execute()
+
+        pedidos = []
+        for p in pedidos_res.data:
+            pedidos.append({
+                "id": p["id"],
+                "pedido_id": p["id"],
+                "titulo": p["titulo_pedido"],
+                "tipo": p.get("tipo", "pelicula"),
+                "estado": p["estado"],
+                "fecha": datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M"),
+                "usuario": {
+                    "telegram_id": p["usuarios"]["telegram_id"],
+                    "nombre": p["usuarios"].get("nombre", "Desconocido"),
+                    "membresia": p["usuarios"].get("membresia_tipo", "Ninguna")
+                }
+            })
+
+        response = jsonify({
+            "pedidos": pedidos,
+            "total": len(pedidos),
+            "pendientes": len([p for p in pedidos if p["estado"] == "pendiente"])
+        })
+        
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 200
+
+    except Exception as e:
+        print("❌ ERROR en admin_pedidos:", e)
+        response = jsonify({"error": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 500
+
+#  IMPORTANTE: Este decorador NO debe estar indentado
+@app.route("/marcar_entregado", methods=["POST", "OPTIONS"])
+def marcar_entregado():
+    # Manejar preflight CORS
+    if request.method == "OPTIONS":
+        response = jsonify({"success": True})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        pedido_id = data.get("pedido_id")
+        admin_id = data.get("admin_id")
+
+        # Verificar que es el admin
+        if admin_id != ADMIN_ID:
+            response = jsonify({"error": "No autorizado"})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 403
+
+        # Obtener pedido con información del usuario
+        pedido_res = supabase.table("pedidos") \
+            .select("*, usuarios!inner(*)") \
+            .eq("id", pedido_id) \
+            .execute()
+
+        if not pedido_res.data:
+            response = jsonify({"error": "Pedido no encontrado"})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 404
+
+        pedido = pedido_res.data[0]
+
+        # Actualizar estado del pedido
+        supabase.table("pedidos").update({
+            "estado": "entregado",
+            "fecha_respuesta": datetime.now().isoformat()
+        }).eq("id", pedido_id).execute()
+
+        telegram_id = pedido["usuarios"]["telegram_id"]
+
+        # Notificar al usuario
+        try:
+            bot.send_message(
+                telegram_id,
+                f"✅ ¡Tu pedido ya está disponible!\n\n"
+                f"🎬 *{pedido['titulo_pedido']}*\n\n"
+                f"Ya puedes verlo en los canales.",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            print(f"⚠️ No se pudo notificar al usuario: {e}")
+
+        response = jsonify({"success": True})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 200
+
+    except Exception as e:
+        print("❌ ERROR en marcar_entregado:", e)
+        response = jsonify({"error": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 500
+
 @app.route("/mis_pedidos", methods=["POST", "OPTIONS"])
 def mis_pedidos():
     # Manejar preflight CORS
