@@ -14,8 +14,6 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 # ============ CANALES PRIVADOS ============
 CANAL_PELICULAS_ID = -1003890553566
 CANAL_SERIES_ID = -1003879512007
-# ============ GRUPO DE COMANDOS ============
-GRUPO_COMANDOS_ID = -1003871199698
 
 # Inicializar
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -550,6 +548,157 @@ def aprobar_pago():
     except Exception as e:
         print("❌ ERROR aprobar_pago:", e)
         return jsonify({"error": str(e)}), 500
+
+from flask import jsonify
+
+@app.route("/crear_pedido", methods=["POST"])
+def crear_pedido():
+
+    limpiar_membresias_vencidas()  # 🔥 Limpia vencidas antes de validar
+    
+    try:
+        data = request.get_json()
+        telegram_id = data.get("telegram_id")
+        titulo = data.get("titulo")
+        tipo = data.get("tipo")
+
+        if not telegram_id or not titulo:
+            return jsonify({"error": "Datos incompletos"}), 400
+
+        # 1️⃣ Buscar usuario
+        usuario_res = supabase.table("usuarios") \
+            .select("*") \
+            .eq("telegram_id", telegram_id) \
+            .execute()
+
+        if not usuario_res.data:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        usuario = usuario_res.data[0]
+
+        # 2️⃣ Verificar membresía activa
+        if not usuario.get("membresia_activa"):
+            return jsonify({"error": "No tienes membresía activa"}), 403
+
+        fecha_vencimiento = datetime.fromisoformat(usuario["fecha_vencimiento"])
+
+        if datetime.now() > fecha_vencimiento:
+            return jsonify({"error": "Tu membresía ha vencido"}), 403
+
+        # 3️⃣ Obtener plan
+        plan_res = supabase.table("membresias_planes") \
+            .select("*") \
+            .eq("nombre", usuario["membresia_tipo"]) \
+            .execute()
+
+        if not plan_res.data:
+            return jsonify({"error": "Plan no encontrado"}), 404
+
+        plan = plan_res.data[0]
+
+        # 4️⃣ Bloquear Copper
+        if plan["pedidos_por_mes"] == 0:
+            return jsonify({"error": "Tu plan no incluye pedidos. Mejora tu membresía."}), 403
+
+        # 5️⃣ Contar pedidos en período actual
+        pedidos_res = supabase.table("pedidos") \
+            .select("*") \
+            .eq("usuario_id", usuario["id"]) \
+            .gte("fecha_pedido", usuario["fecha_inicio"]) \
+            .lte("fecha_pedido", usuario["fecha_vencimiento"]) \
+            .execute()
+
+        pedidos_actuales = len(pedidos_res.data)
+
+        if pedidos_actuales >= plan["pedidos_por_mes"]:
+            return jsonify({"error": "Has alcanzado el límite de tu plan"}), 403
+
+        # 6️⃣ Insertar pedido
+        supabase.table("pedidos").insert({
+            "usuario_id": usuario["id"],
+            "titulo_pedido": titulo,
+            "tipo": tipo,
+            "estado": "pendiente",
+            "fecha_pedido": datetime.now().isoformat()
+        }).execute()
+
+        restantes = plan["pedidos_por_mes"] - (pedidos_actuales + 1)
+
+        # 🔔 Notificar ADMIN
+        bot.send_message(
+            ADMIN_ID,
+            f"📥 NUEVO PEDIDO\n\n"
+            f"👤 Usuario: {telegram_id}\n"
+            f"🎬 Título: {titulo}\n"
+            f"📦 Plan: {usuario['membresia_tipo']}\n"
+            f"📊 Restantes: {restantes}"
+        )
+
+        # 🔔 Confirmar usuario
+        bot.send_message(
+            telegram_id,
+            f"✅ Pedido enviado correctamente.\n\n"
+            f"📦 Te quedan {restantes} pedidos disponibles."
+        )
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        print("❌ ERROR crear_pedido:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/marcar_entregado", methods=["POST"])
+def marcar_entregado():
+    try:
+        data = request.get_json()
+        pedido_id = data.get("pedido_id")
+
+        pedido_res = supabase.table("pedidos") \
+            .select("*, usuarios(*)") \
+            .eq("id", pedido_id) \
+            .execute()
+
+        if not pedido_res.data:
+            return jsonify({"error": "Pedido no encontrado"}), 404
+
+        pedido = pedido_res.data[0]
+
+        supabase.table("pedidos").update({
+            "estado": "entregado",
+            "fecha_respuesta": datetime.now().isoformat()
+        }).eq("id", pedido_id).execute()
+
+        telegram_id = pedido["usuarios"]["telegram_id"]
+
+        bot.send_message(
+            telegram_id,
+            f"🎉 Tu pedido ya está disponible:\n\n"
+            f"🎬 {pedido['titulo_pedido']}"
+        )
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def limpiar_membresias_vencidas():
+    ahora = datetime.now().isoformat()
+
+    usuarios = supabase.table("usuarios") \
+        .select("*") \
+        .eq("membresia_activa", True) \
+        .lt("fecha_vencimiento", ahora) \
+        .execute()
+
+    for u in usuarios.data:
+        supabase.table("usuarios").update({
+            "membresia_activa": False
+        }).eq("id", u["id"]).execute()
+
+        bot.send_message(
+            u["telegram_id"],
+            "⚠️ Tu membresía ha vencido."
+        )
 
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
