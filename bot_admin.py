@@ -501,6 +501,53 @@ def webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
+from flask import jsonify
+
+@app.route("/aprobar_pago", methods=["POST"])
+def aprobar_pago():
+    try:
+        data = request.get_json()
+        pago_id = data.get("pagoId")
+
+        if not pago_id:
+            return jsonify({"error": "pagoId requerido"}), 400
+
+        # 1️⃣ Obtener pago
+        pago_res = supabase.table("pagos_manuales").select("*").eq("id", pago_id).execute()
+        if not pago_res.data:
+            return jsonify({"error": "Pago no encontrado"}), 404
+
+        pago = pago_res.data[0]
+
+        # 2️⃣ Obtener usuario
+        usuario_res = supabase.table("usuarios").select("*").eq("telegram_id", pago["usuario_id"]).execute()
+        if not usuario_res.data:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        usuario = usuario_res.data[0]
+
+        # 3️⃣ Activar membresía usando tu función existente
+        activado = activar_usuario(
+            pago["usuario_id"],
+            pago["membresia_comprada"].lower(),
+            ADMIN_ID
+        )
+
+        if not activado:
+            return jsonify({"error": "Error activando membresía"}), 500
+
+        # 4️⃣ Marcar pago como aprobado
+        supabase.table("pagos_manuales").update({
+            "estado": "aprobado",
+            "activado": True
+        }).eq("id", pago_id).execute()
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        print("❌ ERROR aprobar_pago:", e)
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
 
