@@ -553,9 +553,8 @@ from flask import jsonify
 
 @app.route("/crear_pedido", methods=["POST"])
 def crear_pedido():
+    limpiar_membresias_vencidas()  # Limpia vencidas antes de validar
 
-    limpiar_membresias_vencidas()  # 🔥 Limpia vencidas antes de validar
-    
     try:
         data = request.get_json()
         telegram_id = data.get("telegram_id")
@@ -575,49 +574,46 @@ def crear_pedido():
             return jsonify({"error": "Usuario no encontrado"}), 404
 
         usuario = usuario_res.data[0]
-        usuario_id = usuario["id"]  # 🔥 ID interno real
 
         # 2️⃣ Verificar membresía activa
         if not usuario.get("membresia_activa"):
             return jsonify({"error": "No tienes membresía activa"}), 403
 
-        fecha_vencimiento = datetime.fromisoformat(usuario["fecha_vencimiento"])
-
-        if datetime.now() > fecha_vencimiento:
-            return jsonify({"error": "Tu membresía ha vencido"}), 403
-
-        # 3️⃣ Obtener plan actual
-        plan_res = supabase.table("membresias_planes") \
-            .select("*") \
-            .eq("nombre", usuario["membresia_tipo"]) \
+        # 3️⃣ Obtener la membresía activa actual desde membresias_activas
+        hoy = datetime.now().isoformat()
+        membresia_activa_res = supabase.table("membresias_activas") \
+            .select("*, membresias_planes(*)") \
+            .eq("usuario_id", usuario["id"]) \
+            .eq("estado", "activa") \
+            .gte("fecha_fin", hoy) \
+            .order("fecha_fin", desc=True) \
+            .limit(1) \
             .execute()
 
-        if not plan_res.data:
-            return jsonify({"error": "Plan no encontrado"}), 404
+        if not membresia_activa_res.data:
+            # Esto no debería pasar si membresia_activa es true, pero por si acaso
+            return jsonify({"error": "No se encontró membresía activa válida"}), 403
 
-        plan = plan_res.data[0]
+        membresia_activa = membresia_activa_res.data[0]
+        plan = membresia_activa["membresias_planes"]
 
-        # 4️⃣ Bloquear Copper (0 pedidos)
+        # 4️⃣ Validar que el plan permita pedidos
         if plan["pedidos_por_mes"] == 0:
-            return jsonify({
-                "error": "Tu plan no incluye pedidos. Mejora tu membresía."
-            }), 403
+            return jsonify({"error": "Tu plan no incluye pedidos. Mejora tu membresía."}), 403
 
-        # 5️⃣ Contar pedidos en el período actual
+        # 5️⃣ Contar pedidos en el período de esta membresía activa
         pedidos_res = supabase.table("pedidos") \
             .select("*") \
             .eq("usuario_id", telegram_id) \
-            .gte("fecha_pedido", usuario["fecha_inicio"]) \
-            .lte("fecha_pedido", usuario["fecha_vencimiento"]) \
+            .gte("fecha_pedido", membresia_activa["fecha_inicio"]) \
+            .lte("fecha_pedido", membresia_activa["fecha_fin"]) \
             .execute()
 
         pedidos_actuales = len(pedidos_res.data)
         limite = plan["pedidos_por_mes"]
 
         if pedidos_actuales >= limite:
-            return jsonify({
-                "error": "Has alcanzado el límite de tu plan"
-            }), 403
+            return jsonify({"error": "Has alcanzado el límite de tu plan"}), 403
 
         # 6️⃣ Insertar pedido
         supabase.table("pedidos").insert({
@@ -636,7 +632,7 @@ def crear_pedido():
             f"📥 NUEVO PEDIDO\n\n"
             f"👤 Usuario: {telegram_id}\n"
             f"🎬 Título: {titulo}\n"
-            f"📦 Plan: {usuario['membresia_tipo']}\n"
+            f"📦 Plan: {plan['nombre']}\n"
             f"📊 Restantes: {restantes}"
         )
 
@@ -650,8 +646,9 @@ def crear_pedido():
         return jsonify({"success": True}), 200
 
     except Exception as e:
-        print("❌ ERROR crear_pedido:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ ERROR crear_pedido:", str(e))
+        # Devuelve el error específico para depuración (en producción puedes ocultarlo)
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 @app.route("/admin_pedidos", methods=["POST", "OPTIONS"])
 def admin_pedidos():
