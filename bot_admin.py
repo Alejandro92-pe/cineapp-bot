@@ -551,6 +551,39 @@ def aprobar_pago():
 
 from flask import jsonify
 
+def limpiar_membresias_vencidas():
+    """Revisa membresías vencidas y actualiza el estado en usuarios."""
+    ahora = datetime.now().isoformat()
+
+    # Buscar usuarios con membresía activa pero fecha vencida
+    usuarios = supabase.table("usuarios") \
+        .select("*") \
+        .eq("membresia_activa", True) \
+        .lt("fecha_vencimiento", ahora) \
+        .execute()
+
+    for u in usuarios.data:
+        # Desactivar membresía en usuarios
+        supabase.table("usuarios").update({
+            "membresia_activa": False
+        }).eq("id", u["id"]).execute()
+
+        # Opcional: también podrías desactivar el registro en membresias_activas
+        supabase.table("membresias_activas").update({
+            "estado": "inactiva"
+        }).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
+
+        # Notificar al usuario (opcional, pero recomendado)
+        try:
+            bot.send_message(
+                u["telegram_id"],
+                "⚠️ Tu membresía ha vencido. Renueva para seguir disfrutando."
+            )
+        except:
+            pass
+
+        print(f"✅ Membresía vencida desactivada para usuario {u['telegram_id']}")
+
 @app.route("/crear_pedido", methods=["POST"])
 def crear_pedido():
     limpiar_membresias_vencidas()  # Limpia vencidas antes de validar
