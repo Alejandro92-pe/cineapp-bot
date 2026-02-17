@@ -606,7 +606,7 @@ def crear_pedido():
         # 5️⃣ Contar pedidos en el período actual
         pedidos_res = supabase.table("pedidos") \
             .select("*") \
-            .eq("usuario_id", usuario_id) \
+            .eq("usuario_id", telegram_id) \
             .gte("fecha_pedido", usuario["fecha_inicio"]) \
             .lte("fecha_pedido", usuario["fecha_vencimiento"]) \
             .execute()
@@ -621,7 +621,7 @@ def crear_pedido():
 
         # 6️⃣ Insertar pedido
         supabase.table("pedidos").insert({
-            "usuario_id": usuario_id,
+            "usuario_id": telegram_id,
             "titulo_pedido": titulo,
             "tipo": tipo,
             "estado": "pendiente",
