@@ -488,6 +488,29 @@ def get_id(message):
     bot.reply_to(message, f"Chat ID: {message.chat.id}")
 
 
-# ============ INICIAR ============
-print("Bot iniciado...")
-bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+# ============ WEBHOOK PARA RENDER ============
+
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    json_str = request.get_data().decode("UTF-8")
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return "OK", 200
+
+if __name__ == "__main__":
+    print("🚀 Bot iniciado con Webhook...")
+
+    bot.remove_webhook()
+
+    bot.set_webhook(
+        url=os.getenv("RENDER_EXTERNAL_URL") + f"/{BOT_TOKEN}"
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000))
+    )
