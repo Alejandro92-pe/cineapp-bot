@@ -1,3 +1,5 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
@@ -493,6 +495,7 @@ def get_id(message):
 from flask import Flask, request
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():

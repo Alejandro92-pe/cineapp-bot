@@ -1,4 +1,6 @@
 pyTelegramBotAPI
 supabase
 flask
+pip freeze > requirements.txt
+
 
