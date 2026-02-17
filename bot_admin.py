@@ -565,7 +565,7 @@ def crear_pedido():
         if not telegram_id or not titulo:
             return jsonify({"error": "Datos incompletos"}), 400
 
-        # 1️⃣ Buscar usuario
+        # 1️⃣ Buscar usuario por telegram_id
         usuario_res = supabase.table("usuarios") \
             .select("*") \
             .eq("telegram_id", telegram_id) \
@@ -575,6 +575,7 @@ def crear_pedido():
             return jsonify({"error": "Usuario no encontrado"}), 404
 
         usuario = usuario_res.data[0]
+        usuario_id = usuario["id"]  # 🔥 ID interno real
 
         # 2️⃣ Verificar membresía activa
         if not usuario.get("membresia_activa"):
@@ -585,7 +586,7 @@ def crear_pedido():
         if datetime.now() > fecha_vencimiento:
             return jsonify({"error": "Tu membresía ha vencido"}), 403
 
-        # 3️⃣ Obtener plan
+        # 3️⃣ Obtener plan actual
         plan_res = supabase.table("membresias_planes") \
             .select("*") \
             .eq("nombre", usuario["membresia_tipo"]) \
@@ -596,33 +597,38 @@ def crear_pedido():
 
         plan = plan_res.data[0]
 
-        # 4️⃣ Bloquear Copper
+        # 4️⃣ Bloquear Copper (0 pedidos)
         if plan["pedidos_por_mes"] == 0:
-            return jsonify({"error": "Tu plan no incluye pedidos. Mejora tu membresía."}), 403
+            return jsonify({
+                "error": "Tu plan no incluye pedidos. Mejora tu membresía."
+            }), 403
 
-        # 5️⃣ Contar pedidos en período actual
+        # 5️⃣ Contar pedidos en el período actual
         pedidos_res = supabase.table("pedidos") \
             .select("*") \
-            .eq("usuario_id", usuario["id"]) \
+            .eq("usuario_id", usuario_id) \
             .gte("fecha_pedido", usuario["fecha_inicio"]) \
             .lte("fecha_pedido", usuario["fecha_vencimiento"]) \
             .execute()
 
         pedidos_actuales = len(pedidos_res.data)
+        limite = plan["pedidos_por_mes"]
 
-        if pedidos_actuales >= plan["pedidos_por_mes"]:
-            return jsonify({"error": "Has alcanzado el límite de tu plan"}), 403
+        if pedidos_actuales >= limite:
+            return jsonify({
+                "error": "Has alcanzado el límite de tu plan"
+            }), 403
 
         # 6️⃣ Insertar pedido
         supabase.table("pedidos").insert({
-            "usuario_id": usuario["id"],
+            "usuario_id": usuario_id,
             "titulo_pedido": titulo,
             "tipo": tipo,
             "estado": "pendiente",
             "fecha_pedido": datetime.now().isoformat()
         }).execute()
 
-        restantes = plan["pedidos_por_mes"] - (pedidos_actuales + 1)
+        restantes = limite - (pedidos_actuales + 1)
 
         # 🔔 Notificar ADMIN
         bot.send_message(
@@ -646,6 +652,7 @@ def crear_pedido():
     except Exception as e:
         print("❌ ERROR crear_pedido:", e)
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/marcar_entregado", methods=["POST"])
 def marcar_entregado():
