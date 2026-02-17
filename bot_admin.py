@@ -1,4 +1,9 @@
-	import os
+import os
+import telebot
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from supabase import create_client
+from datetime import datetime, timedelta
+import time
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
