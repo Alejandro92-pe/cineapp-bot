@@ -706,6 +706,61 @@ def limpiar_membresias_vencidas():
             u["telegram_id"],
             "⚠️ Tu membresía ha vencido."
         )
+@app.route("/mis_pedidos", methods=["POST", "OPTIONS"])
+def mis_pedidos():
+    # Manejar preflight CORS
+    if request.method == "OPTIONS":
+        response = jsonify({"success": True})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        telegram_id = data.get("telegram_id")
+
+        if not telegram_id:
+            return jsonify({"error": "telegram_id requerido"}), 400
+
+        # Buscar pedidos del usuario
+        pedidos_res = supabase.table("pedidos") \
+            .select("*") \
+            .eq("usuario_id", telegram_id) \
+            .order("fecha_pedido", desc=True) \
+            .execute()
+
+        # Formatear pedidos para la respuesta
+        pedidos = []
+        for p in pedidos_res.data:
+            pedidos.append({
+                "id": p["id"],
+                "titulo": p["titulo_pedido"],
+                "tipo": p.get("tipo", "pelicula"),
+                "estado": p["estado"],
+                "fecha": datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M")
+            })
+
+        # También obtener info del usuario para mostrar membresía
+        usuario_res = supabase.table("usuarios") \
+            .select("membresia_tipo, membresia_activa") \
+            .eq("telegram_id", telegram_id) \
+            .execute()
+
+        response = jsonify({
+            "pedidos": pedidos,
+            "total": len(pedidos),
+            "usuario": usuario_res.data[0] if usuario_res.data else None
+        })
+        
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 200
+
+    except Exception as e:
+        print("❌ ERROR en mis_pedidos:", e)
+        response = jsonify({"error": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 500
 
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
