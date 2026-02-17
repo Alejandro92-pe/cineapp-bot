@@ -1,6 +1,4 @@
 pyTelegramBotAPI
 supabase
 flask
-pip freeze > requirements.txt
-
-
+flask-cors
