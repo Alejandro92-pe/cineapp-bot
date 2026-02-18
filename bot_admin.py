@@ -183,33 +183,58 @@ def activar_usuario(user_id, membresia, chat_id_admin):
 
         plan_data = plan_result.data[0]
         duracion_plan = plan_data['duracion_dias']
-        limite_pedidos = plan_data['pedidos_por_mes']
+        limite_pedidos_nuevo = plan_data['pedidos_por_mes']
 
-        # Obtener usuario actual (si existe)
-        usuario_actual = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        # Variables para mejora
         es_mejora = False
-        pedidos_usados = 0
-        plan_anterior_nombre = None
         dias_extra = 0
+        pedidos_extra = 0
+        plan_anterior_nombre = None
 
-        if usuario_actual.data and usuario_actual.data[0].get('membresia_activa'):
+        # Verificar si ya tiene membresía activa
+        usuario_actual = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        tiene_membresia_activa = usuario_actual.data and usuario_actual.data[0].get('membresia_activa')
+
+        if tiene_membresia_activa:
             usuario = usuario_actual.data[0]
-            # Calcular días restantes de la membresía anterior
             fecha_vencimiento_actual = datetime.fromisoformat(usuario['fecha_vencimiento'])
             dias_restantes = (fecha_vencimiento_actual - datetime.now()).days
             if dias_restantes > 0:
                 es_mejora = True
                 dias_extra = dias_restantes
-                plan_anterior_nombre = usuario.get('membresia_tipo')
-                # Obtener pedidos usados en el período anterior (desde fecha_inicio hasta hoy)
-                # Pero como vamos a usar pedidos_mes, podemos tomar el valor actual de pedidos_mes del usuario
-                pedidos_usados = usuario.get('pedidos_mes', 0)
+                plan_anterior_nombre = usuario.get('membresia_tipo', 'anterior')
+
+                # Obtener membresía activa anterior para calcular pedidos usados
+                mem_ant = supabase.table('membresias_activas') \
+                    .select('fecha_inicio, plan_id') \
+                    .eq('usuario_id', usuario['id']) \
+                    .eq('estado', 'activa') \
+                    .execute()
+                if mem_ant.data:
+                    fecha_inicio_ant = datetime.fromisoformat(mem_ant.data[0]['fecha_inicio'])
+                    # Contar pedidos usados en ese período
+                    pedidos_usados = supabase.table('pedidos') \
+                        .select('*', count='exact') \
+                        .eq('usuario_id', user_id) \
+                        .gte('fecha_pedido', fecha_inicio_ant.isoformat()) \
+                        .lte('fecha_pedido', datetime.now().isoformat()) \
+                        .execute()
+                    usados = pedidos_usados.count if hasattr(pedidos_usados, 'count') else len(pedidos_usados.data)
+
+                    # Límite del plan anterior
+                    plan_ant = supabase.table('membresias_planes').select('pedidos_por_mes').eq('id', mem_ant.data[0]['plan_id']).execute()
+                    limite_anterior = plan_ant.data[0]['pedidos_por_mes'] if plan_ant.data else 0
+                    pedidos_extra = max(0, limite_anterior - usados)
 
         # Calcular nueva fecha de vencimiento
         fecha_vencimiento = datetime.now() + timedelta(days=duracion_plan + dias_extra)
 
         # Preparar datos del usuario
-        nombre = usuario_actual.data[0].get('nombre', f"Usuario_{user_id}") if usuario_actual.data else f"Usuario_{user_id}"
+        if not usuario_actual.data:
+            nombre = f"Usuario_{user_id}"
+        else:
+            nombre = usuario_actual.data[0].get('nombre', f"Usuario_{user_id}")
+
         usuario_data = {
             "telegram_id": user_id,
             "nombre": nombre,
@@ -217,17 +242,17 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             "membresia_activa": True,
             "fecha_inicio": datetime.now().isoformat(),
             "fecha_vencimiento": fecha_vencimiento.isoformat(),
-            "pedidos_mes": pedidos_usados  # Mantener los pedidos ya usados
+            "pedidos_mes": 0
         }
         supabase.table('usuarios').upsert(usuario_data, on_conflict='telegram_id').execute()
 
-        # Obtener el id interno del usuario
+        # Obtener id del usuario
         usuario_id = supabase.table('usuarios').select('id').eq('telegram_id', user_id).execute().data[0]['id']
 
-        # Desactivar membresías activas anteriores
+        # Desactivar membresías anteriores
         supabase.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
 
-        # Insertar nueva membresía activa
+        # Insertar nueva membresía con pedidos_extra
         supabase.table('membresias_activas').insert({
             "usuario_id": usuario_id,
             "plan_id": plan_data['id'],
@@ -235,12 +260,12 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             "fecha_fin": fecha_vencimiento.isoformat(),
             "estado": "activa",
             "metodo_pago": "auto",
-            "monto": plan_data['precio_soles']
+            "monto": plan_data['precio_soles'],
+            "pedidos_extra": pedidos_extra
         }).execute()
 
         # Enviar enlaces solo si es primera activación
-        primera_activacion = not (usuario_actual.data and usuario_actual.data[0].get('membresia_activa'))
-        if primera_activacion:
+        if not tiene_membresia_activa:
             try:
                 invite_link_pelis = bot.create_chat_invite_link(
                     chat_id=CANAL_PELICULAS_ID,
@@ -266,24 +291,25 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                 bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
                 bot.send_message(user_id, f"🎉 Membresía activada. En breve recibirás los enlaces.")
         else:
-            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} mejoró a {membresia}")
+            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} mejoró a {membresia} (sin nuevos enlaces)")
 
         # Notificación al usuario
+        total_pedidos = limite_pedidos_nuevo + pedidos_extra
         if es_mejora:
-            pedidos_disponibles = limite_pedidos - pedidos_usados
             mensaje = (
                 f"🔄 *¡Mejoraste a {membresia.upper()}!*\n\n"
                 f"Hemos sumado los {dias_extra} días que te quedaban de tu plan {plan_anterior_nombre.capitalize()} "
-                f"a tu nueva membresía.\n"
+                f"y tus {pedidos_extra} pedidos no usados a tu nueva membresía.\n"
                 f"📅 *Nueva fecha de vencimiento:* {fecha_vencimiento.strftime('%d/%m/%Y')}\n"
-                f"🎟 *Pedidos disponibles este mes:* {pedidos_disponibles}\n\n"
+                f"🎟 *Pedidos disponibles en tu membresía actual:* {total_pedidos}\n\n"
                 f"¡Gracias por confiar en nosotros!"
             )
         else:
             mensaje = (
                 f"🎉 *¡Membresía Activada!*\n\n"
                 f"💎 Plan: {membresia.upper()}\n"
-                f"📅 Vence: {fecha_vencimiento.strftime('%d/%m/%Y')}"
+                f"📅 Vence: {fecha_vencimiento.strftime('%d/%m/%Y')}\n"
+                f"🎟 Pedidos por mes: {limite_pedidos_nuevo}"
             )
         bot.send_message(user_id, mensaje, parse_mode="Markdown")
 
