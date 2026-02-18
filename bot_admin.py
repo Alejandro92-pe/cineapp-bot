@@ -174,28 +174,62 @@ def planes(message):
     bot.send_message(message.chat.id, texto)
 
 # ============ FUNCIÓN DE ACTIVACIÓN REUTILIZABLE ============
-def activar_usuario(user_id, membresia, chat_id_admin):
+def activar_usuario(user_id, membresia, chat_id_admin, dias_extra=0):
     try:
-        # Verificar si el usuario ya tiene una membresía activa
-        usuario_actual = supabase.table("usuarios").select("*").eq("telegram_id", user_id).execute()
-        ya_activo = False
-        if usuario_actual.data and usuario_actual.data[0].get("membresia_activa"):
-            ya_activo = True
-
         plan_result = supabase.table('membresias_planes').select('*').eq('nombre', membresia).execute()
         if not plan_result.data:
             bot.send_message(chat_id_admin, "❌ Membresía no válida")
             return False
 
         plan_data = plan_result.data[0]
-        fecha_vencimiento = datetime.now() + timedelta(days=plan_data['duracion_dias'])
+        duracion_plan = plan_data['duracion_dias']
+        limite_pedidos_nuevo = plan_data['pedidos_por_mes']
 
+        # Variables para la notificación
+        es_mejora = False
+        dias_extra_total = dias_extra
+        pedidos_usados_anteriores = 0
+        plan_anterior_nombre = None
+        dias_restantes = 0
+
+        # Verificar si el usuario ya tiene una membresía activa
+        usuario_actual = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        if usuario_actual.data and usuario_actual.data[0].get('membresia_activa'):
+            usuario = usuario_actual.data[0]
+            fecha_vencimiento_actual = datetime.fromisoformat(usuario['fecha_vencimiento'])
+            dias_restantes = (fecha_vencimiento_actual - datetime.now()).days
+            if dias_restantes > 0:
+                es_mejora = True
+                dias_extra_total += dias_restantes
+                plan_anterior_nombre = usuario.get('membresia_tipo', 'anterior')
+                # Calcular pedidos usados en el período actual de la membresía anterior
+                # Obtener fecha_inicio de la membresía activa actual
+                mem_act = supabase.table('membresias_activas') \
+                    .select('fecha_inicio') \
+                    .eq('usuario_id', usuario['id']) \
+                    .eq('estado', 'activa') \
+                    .execute()
+                if mem_act.data:
+                    fecha_inicio_anterior = datetime.fromisoformat(mem_act.data[0]['fecha_inicio'])
+                    # Contar pedidos desde esa fecha hasta hoy
+                    pedidos_anteriores = supabase.table('pedidos') \
+                        .select('*') \
+                        .eq('usuario_id', user_id) \
+                        .gte('fecha_pedido', fecha_inicio_anterior.isoformat()) \
+                        .lte('fecha_pedido', datetime.now().isoformat()) \
+                        .execute()
+                    pedidos_usados_anteriores = len(pedidos_anteriores.data) if pedidos_anteriores.data else 0
+
+        # Calcular nueva fecha de vencimiento
+        fecha_vencimiento = datetime.now() + timedelta(days=duracion_plan + dias_extra_total)
+
+        # Obtener o crear nombre de usuario
         if not usuario_actual.data:
             nombre = f"Usuario_{user_id}"
         else:
             nombre = usuario_actual.data[0].get('nombre', f"Usuario_{user_id}")
 
-        # Actualizar tabla usuarios
+        # Datos para la tabla usuarios
         usuario_data = {
             "telegram_id": user_id,
             "nombre": nombre,
@@ -207,9 +241,10 @@ def activar_usuario(user_id, membresia, chat_id_admin):
         }
         supabase.table('usuarios').upsert(usuario_data, on_conflict='telegram_id').execute()
 
+        # Obtener el id del usuario
         usuario_id = supabase.table('usuarios').select('id').eq('telegram_id', user_id).execute().data[0]['id']
 
-        # Desactivar membresías activas anteriores
+        # Desactivar membresías activas anteriores en la tabla membresias_activas
         supabase.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
 
         # Insertar nueva membresía activa
@@ -223,52 +258,56 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             "monto": plan_data['precio_soles']
         }).execute()
 
-        # --- Lógica de enlaces ---
-        if ya_activo:
-            # Usuario ya estaba activo: NO enviar nuevos enlaces, pero podríamos revocar los anteriores
-            # Revocar enlaces anteriores (opcional)
-            try:
-                # No hay método directo para revocar enlaces antiguos, pero podemos ignorar
-                # Simplemente no enviamos nuevos
-                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} actualizado a {membresia} (sin nuevos enlaces, ya estaba en el canal)")
-                bot.send_message(user_id, f"🎉 ¡Membresía actualizada a {membresia.upper()}! Sigues teniendo acceso a los canales.")
-            except Exception as e:
-                print(f"Error notificando actualización: {e}")
-        else:
-            # Primera activación: enviar enlaces
-            try:
-                invite_link_pelis = bot.create_chat_invite_link(
-                    chat_id=CANAL_PELICULAS_ID,
-                    name=f"Usuario_{user_id}_pelis",
-                    member_limit=1,
-                    expire_date=int(time.time()) + 604800
-                )
-                invite_link_series = bot.create_chat_invite_link(
-                    chat_id=CANAL_SERIES_ID,
-                    name=f"Usuario_{user_id}_series",
-                    member_limit=1,
-                    expire_date=int(time.time()) + 604800
-                )
-                bot.send_message(
-                    user_id,
-                    f"🔐 *ACCESO A TUS CANALES*\n\n"
-                    f"🎬 *CANAL DE PELÍCULAS:*\n{invite_link_pelis.invite_link}\n\n"
-                    f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
-                    f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
-                )
-                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y enlaces enviados")
-            except Exception as e:
-                bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
-                bot.send_message(user_id, f"🎉 Membresía activada. En breve recibirás los enlaces.")
+        # Enviar enlaces de canales (solo si es primera vez o si se desea regenerar)
+        try:
+            invite_link_pelis = bot.create_chat_invite_link(
+                chat_id=CANAL_PELICULAS_ID,
+                name=f"Usuario_{user_id}_pelis",
+                member_limit=1,
+                expire_date=int(time.time()) + 604800
+            )
+            invite_link_series = bot.create_chat_invite_link(
+                chat_id=CANAL_SERIES_ID,
+                name=f"Usuario_{user_id}_series",
+                member_limit=1,
+                expire_date=int(time.time()) + 604800
+            )
 
-        # Mensaje de confirmación genérico
-        bot.send_message(
-            user_id,
-            f"🎉 *¡Membresía Activada!*\n\n"
-            f"💎 Plan: {membresia.upper()}\n"
-            f"📅 Vence: {fecha_vencimiento.strftime('%d/%m/%Y')}",
-            parse_mode="Markdown"
-        )
+            bot.send_message(
+                user_id,
+                f"🔐 *ACCESO A TUS CANALES*\n\n"
+                f"🎬 *CANAL DE PELÍCULAS:*\n{invite_link_pelis.invite_link}\n\n"
+                f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
+                f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días",
+                # SIN parse_mode para evitar errores con links
+            )
+
+            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y enlaces enviados")
+
+        except Exception as e:
+            bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
+            bot.send_message(user_id, f"🎉 Membresía activada. En breve recibirás los enlaces.")
+
+        # Enviar notificación final al usuario
+        if es_mejora:
+            pedidos_disponibles = max(0, limite_pedidos_nuevo - pedidos_usados_anteriores)
+            mensaje = (
+                f"🔄 *¡Mejoraste a {membresia.upper()}!*\n\n"
+                f"Hemos sumado los {dias_restantes} días que te quedaban de tu plan {plan_anterior_nombre.capitalize()} "
+                f"a tu nueva membresía.\n"
+                f"📅 *Nueva fecha de vencimiento:* {fecha_vencimiento.strftime('%d/%m/%Y')}\n"
+                f"🎟 *Pedidos disponibles este mes:* {pedidos_disponibles}\n\n"
+                f"¡Gracias por confiar en nosotros!"
+            )
+        else:
+            mensaje = (
+                f"🎉 *¡Membresía Activada!*\n\n"
+                f"💎 Plan: {membresia.upper()}\n"
+                f"📅 Vence: {fecha_vencimiento.strftime('%d/%m/%Y')}"
+            )
+
+        bot.send_message(user_id, mensaje, parse_mode="Markdown")
+
         return True
 
     except Exception as e:
@@ -967,13 +1006,14 @@ def verificar_vencimientos():
             )
         except:
             pass
+        
 @app.route("/webhook/buymeacoffee", methods=["POST"])
 def webhook_buymeacoffee():
-    # Verificar firma HMAC-SHA256
-    secret = os.getenv("BUY_ME_A_COFFEE_WEBHOOK_SECRET")
-    if not secret:
-        print("❌ BUY_ME_A_COFFEE_WEBHOOK_SECRET no está configurado")
-        return jsonify({"error": "Configuración incorrecta"}), 500
+    # 1. Verificar firma HMAC-SHA256 (seguridad)
+    webhook_secret = os.getenv("BUY_ME_A_COFFEE_WEBHOOK_SECRET")
+    if not webhook_secret:
+        print("❌ BUY_ME_A_COFFEE_WEBHOOK_SECRET no configurado")
+        return jsonify({"error": "Servidor mal configurado"}), 500
 
     signature_header = request.headers.get("x-signature-sha256")
     if not signature_header:
@@ -981,7 +1021,7 @@ def webhook_buymeacoffee():
 
     payload = request.get_data()
     expected_signature = hmac.new(
-        key=secret.encode('utf-8'),
+        key=webhook_secret.encode('utf-8'),
         msg=payload,
         digestmod=hashlib.sha256
     ).hexdigest()
@@ -989,35 +1029,24 @@ def webhook_buymeacoffee():
     if not hmac.compare_digest(f"sha256={expected_signature}", signature_header):
         return jsonify({"error": "Firma inválida"}), 403
 
-    # Procesar payload
+    # 2. Obtener datos del webhook
     data = request.get_json()
-    print("📩 Webhook recibido:", data)
+    print("📩 Webhook recibido:", data)  # Log imprescindible
 
-    # Identificar plan comprado
+    tipo_evento = data.get("tipo")  # Ej: "extra_purchase.created", "membership.started", etc.
+    datos = data.get("datos", {})
+
+    # 3. Inicializar variables
     plan_comprado = None
-    if data.get("type") == "membership.created":
-        nivel = data.get("data", {}).get("membership", {}).get("membership_level_name", "").lower()
-        if nivel in ["copper", "silver"]:
-            plan_comprado = nivel
-    elif data.get("type") == "extra_purchase.created":
-        product_id = data.get("data", {}).get("extra", {}).get("extra_id")
-        # Mapea los IDs reales de tus productos
-        product_to_plan = {
-            "510546": "gold",        # Reemplaza con el ID real de tu producto Gold
-            "510549": "platinum",      # ID de tu producto Platinum
-            "510552": "diamond"    # Reemplaza con el ID real de tu producto Diamond
-        }
-        plan_comprado = product_to_plan.get(str(product_id))
-
-    if not plan_comprado:
-        return jsonify({"error": "Plan no identificado"}), 400
-
-    # Extraer telegram_id del parámetro "ref"
     telegram_id = None
-    if data.get("data") and data["data"].get("checkout"):
-        telegram_id = data["data"]["checkout"].get("ref")
-    elif data.get("ref"):
-        telegram_id = data.get("ref")
+    accion = "activar"  # Por defecto, activar membresía
+
+    # 4. Extraer telegram_id del parámetro "ref" (viene en la URL original)
+    # Buscar en datos.get("checkout", {}).get("ref") o directamente en data.get("ref")
+    try:
+        telegram_id = datos.get("checkout", {}).get("ref") or data.get("ref")
+    except AttributeError:
+        telegram_id = None
 
     if not telegram_id:
         print("❌ No se encontró el parámetro 'ref' en el webhook")
@@ -1028,12 +1057,74 @@ def webhook_buymeacoffee():
     except ValueError:
         return jsonify({"error": "ref no es un número válido"}), 400
 
-    # Activar membresía
+    # 5. Identificar el plan según el tipo de evento
+    if tipo_evento == "extra_purchase.created":
+        # Producto digital (Gold, Platinum, Diamond)
+        extras = datos.get("extras", [])
+        if extras and len(extras) > 0:
+            product_id = str(extras[0].get("id"))
+            # Mapeo de IDs de productos a nombres de plan
+            product_to_plan = {
+                "510546": "gold",
+                "510549": "platinum",
+                "510552": "diamond"
+            }
+            plan_comprado = product_to_plan.get(product_id)
+            if not plan_comprado:
+                print(f"❌ ID de producto no reconocido: {product_id}")
+                return jsonify({"error": "Producto no reconocido"}), 400
+        else:
+            return jsonify({"error": "No se encontraron extras"}), 400
+
+    elif tipo_evento == "membership.started":
+        # Nueva membresía (Copper o Silver)
+        nivel = datos.get("nombre_de_nivel_de_membresía", "").lower()
+        if nivel in ["copper", "silver"]:
+            plan_comprado = nivel
+        else:
+            print(f"❌ Nivel de membresía no reconocido: {nivel}")
+            return jsonify({"error": "Nivel de membresía no reconocido"}), 400
+
+    elif tipo_evento == "membership.updated":
+        # Actualización de membresía (posible cancelación al final del período)
+        # Según tu ejemplo, puede incluir "cancel_at_period_end": "true"
+        cancel_at_period_end = datos.get("cancel_at_period_end") == "true"
+        if cancel_at_period_end:
+            # El usuario canceló pero seguirá activo hasta el fin del período
+            # No desactivamos inmediatamente, solo registramos
+            print(f"ℹ️ Usuario {telegram_id} canceló membresía (activa hasta fin de período)")
+            # Podrías guardar esta info en tu BD si quieres
+            return jsonify({"success": True, "message": "Cancelación programada"}), 200
+        else:
+            # Otros tipos de update (cambio de nivel, etc.) - por ahora ignoramos
+            return jsonify({"success": True, "message": "Update ignorado"}), 200
+
+    elif tipo_evento == "membership.cancelled":
+        # Cancelación inmediata (el usuario ya no pagará más)
+        # Según tu ejemplo, el estado pasa a "cancelado"
+        print(f"❌ Membresía cancelada para usuario {telegram_id}")
+        # Aquí deberías desactivar la membresía en tu sistema y expulsar de canales
+        # Pero como esto es un webhook, puedes llamar a una función que lo haga
+        # Por ahora, solo registramos y respondemos OK
+        # (Implementaremos la desactivación después)
+        return jsonify({"success": True, "message": "Cancelación registrada"}), 200
+
+    else:
+        print(f"⚠️ Tipo de evento no manejado: {tipo_evento}")
+        return jsonify({"success": True, "message": "Evento ignorado"}), 200
+
+    # 6. Si llegamos aquí, es una activación (nueva membresía o compra de producto)
+    if not plan_comprado:
+        return jsonify({"error": "No se pudo determinar el plan"}), 400
+
+    # 7. Llamar a la función de activación
     exito = activar_usuario(telegram_id, plan_comprado, ADMIN_ID)
 
     if exito:
+        print(f"✅ Membresía {plan_comprado} activada para usuario {telegram_id}")
         return jsonify({"success": True}), 200
     else:
+        print(f"❌ Error activando membresía para usuario {telegram_id}")
         return jsonify({"error": "Error al activar membresía"}), 500
 
 if __name__ == "__main__":
