@@ -929,15 +929,40 @@ def verificar_vencimientos():
         except Exception as e:
             print(f"Error notificando a {u['telegram_id']}: {e}")
 
-    # --- 3. Usuarios ya vencidos (limpiar y expulsar) ---
-    usuarios_vencidos = supabase_service.table("usuarios") \
+    # --- 3. Usuarios ya vencidos (fecha_vencimiento < hoy) ---
+usuarios_vencidos = supabase_service.table("usuarios") \
+    .select("*, membresias_activas!inner(*)") \
+    .eq("membresia_activa", True) \
+    .lt("fecha_vencimiento", hoy) \
+    .execute()
+
+for u in usuarios_vencidos.data:
+    # Obtener la membresía activa (la que está vencida)
+    mem_act = supabase_service.table("membresias_activas") \
         .select("*") \
-        .eq("membresia_activa", True) \
-        .lt("fecha_vencimiento", hoy) \
+        .eq("usuario_id", u["id"]) \
+        .eq("estado", "activa") \
+        .single() \
         .execute()
 
-    for u in usuarios_vencidos.data:
-        # Desactivar en BD
+    if mem_act.data and mem_act.data.get("plan_futuro"):
+        # Hay un cambio programado: activar el nuevo plan
+        nuevo_plan_id = mem_act.data["plan_futuro"]
+        plan_nuevo_res = supabase_service.table("membresias_planes").select("nombre").eq("id", nuevo_plan_id).execute()
+        if plan_nuevo_res.data:
+            nuevo_plan = plan_nuevo_res.data[0]["nombre"]
+            # Activar el nuevo plan (la función ya maneja que no envíe enlaces si ya tenía membresía)
+            activar_usuario(u["telegram_id"], nuevo_plan, ADMIN_ID)
+
+        # Limpiar el campo plan_futuro (ya se usó)
+        supabase_service.table("membresias_activas") \
+            .update({"plan_futuro": None}) \
+            .eq("id", mem_act.data["id"]) \
+            .execute()
+
+        # No desactivamos la membresía actual porque activar_usuario ya la desactivó y creó una nueva
+    else:
+        # No hay cambio programado: desactivar y expulsar normalmente
         supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
         supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
 
@@ -945,7 +970,6 @@ def verificar_vencimientos():
         try:
             bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
             bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
-            print(f"Usuario {u['telegram_id']} expulsado de canales por vencimiento")
         except Exception as e:
             print(f"Error expulsando a {u['telegram_id']}: {e}")
 
@@ -1130,6 +1154,67 @@ def api_mis_pedidos():
         p["fecha"] = datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M")
     
     return jsonify({"pedidos": pedidos.data})
+
+@app.route("/api/solicitar_cambio_plan", methods=["POST"])
+def solicitar_cambio_plan():
+    data = request.get_json()
+    telegram_id = data.get("telegram_id")
+    nuevo_plan_id = data.get("nuevo_plan_id")
+
+    if not telegram_id or not nuevo_plan_id:
+        return jsonify({"error": "Faltan datos"}), 400
+
+    # Obtener usuario
+    usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
+    if not usuario_res.data:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    usuario = usuario_res.data[0]
+
+    # Obtener membresía activa actual
+    hoy = datetime.now().isoformat()
+    mem_res = supabase_service.table("membresias_activas") \
+        .select("*, membresias_planes(*)") \
+        .eq("usuario_id", usuario["id"]) \
+        .eq("estado", "activa") \
+        .gte("fecha_fin", hoy) \
+        .execute()
+
+    if not mem_res.data:
+        return jsonify({"error": "No tienes una membresía activa"}), 400
+
+    membresia_actual = mem_res.data[0]
+    plan_actual = membresia_actual["membresias_planes"]
+
+    # Verificar que el nuevo plan sea realmente inferior (por ejemplo, menos pedidos o menor precio)
+
+    plan_nuevo_res = supabase_service.table("membresias_planes").select("*").eq("id", nuevo_plan_id).execute()
+    if not plan_nuevo_res.data:
+        return jsonify({"error": "Plan no válido"}), 400
+
+    plan_nuevo = plan_nuevo_res.data[0]
+    if plan_nuevo["pedidos_por_mes"] > plan_actual["pedidos_por_mes"]:
+        return jsonify({"error": "El plan seleccionado no es inferior al actual"}), 400
+
+    # Registrar el plan futuro en la membresía activa
+    supabase_service.table("membresias_activas") \
+        .update({"plan_futuro": nuevo_plan_id}) \
+        .eq("id", membresia_actual["id"]) \
+        .execute()
+
+    # Notificar al usuario
+    try:
+        bot.send_message(
+            telegram_id,
+            f"🔄 Has solicitado cambiar a *{plan_nuevo['nombre'].upper()}* al finalizar tu período actual.\n"
+            f"📅 Tu membresía actual vence el {datetime.fromisoformat(membresia_actual['fecha_fin']).strftime('%d/%m/%Y')}.\n"
+            f"Después de esa fecha, se activará tu nuevo plan.",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        print(f"Error notificando al usuario: {e}")
+
+    return jsonify({"success": True, "mensaje": "Cambio programado correctamente"})
 
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
