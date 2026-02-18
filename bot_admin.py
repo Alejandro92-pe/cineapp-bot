@@ -6,6 +6,8 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from supabase import create_client
 from datetime import datetime, timedelta
 import time
+import hmac
+import hashlib
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -174,6 +176,12 @@ def planes(message):
 # ============ FUNCIÓN DE ACTIVACIÓN REUTILIZABLE ============
 def activar_usuario(user_id, membresia, chat_id_admin):
     try:
+        # Verificar si el usuario ya tiene una membresía activa
+        usuario_actual = supabase.table("usuarios").select("*").eq("telegram_id", user_id).execute()
+        ya_activo = False
+        if usuario_actual.data and usuario_actual.data[0].get("membresia_activa"):
+            ya_activo = True
+
         plan_result = supabase.table('membresias_planes').select('*').eq('nombre', membresia).execute()
         if not plan_result.data:
             bot.send_message(chat_id_admin, "❌ Membresía no válida")
@@ -182,13 +190,12 @@ def activar_usuario(user_id, membresia, chat_id_admin):
         plan_data = plan_result.data[0]
         fecha_vencimiento = datetime.now() + timedelta(days=plan_data['duracion_dias'])
 
-        usuario_result = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
-
-        if not usuario_result.data:
+        if not usuario_actual.data:
             nombre = f"Usuario_{user_id}"
         else:
-            nombre = usuario_result.data[0].get('nombre', f"Usuario_{user_id}")
+            nombre = usuario_actual.data[0].get('nombre', f"Usuario_{user_id}")
 
+        # Actualizar tabla usuarios
         usuario_data = {
             "telegram_id": user_id,
             "nombre": nombre,
@@ -202,8 +209,10 @@ def activar_usuario(user_id, membresia, chat_id_admin):
 
         usuario_id = supabase.table('usuarios').select('id').eq('telegram_id', user_id).execute().data[0]['id']
 
+        # Desactivar membresías activas anteriores
         supabase.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
 
+        # Insertar nueva membresía activa
         supabase.table('membresias_activas').insert({
             "usuario_id": usuario_id,
             "plan_id": plan_data['id'],
@@ -214,36 +223,45 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             "monto": plan_data['precio_soles']
         }).execute()
 
-        try:
-            invite_link_pelis = bot.create_chat_invite_link(
-                chat_id=CANAL_PELICULAS_ID,
-                name=f"Usuario_{user_id}_pelis",
-                member_limit=1,
-                expire_date=int(time.time()) + 604800
-            )
+        # --- Lógica de enlaces ---
+        if ya_activo:
+            # Usuario ya estaba activo: NO enviar nuevos enlaces, pero podríamos revocar los anteriores
+            # Revocar enlaces anteriores (opcional)
+            try:
+                # No hay método directo para revocar enlaces antiguos, pero podemos ignorar
+                # Simplemente no enviamos nuevos
+                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} actualizado a {membresia} (sin nuevos enlaces, ya estaba en el canal)")
+                bot.send_message(user_id, f"🎉 ¡Membresía actualizada a {membresia.upper()}! Sigues teniendo acceso a los canales.")
+            except Exception as e:
+                print(f"Error notificando actualización: {e}")
+        else:
+            # Primera activación: enviar enlaces
+            try:
+                invite_link_pelis = bot.create_chat_invite_link(
+                    chat_id=CANAL_PELICULAS_ID,
+                    name=f"Usuario_{user_id}_pelis",
+                    member_limit=1,
+                    expire_date=int(time.time()) + 604800
+                )
+                invite_link_series = bot.create_chat_invite_link(
+                    chat_id=CANAL_SERIES_ID,
+                    name=f"Usuario_{user_id}_series",
+                    member_limit=1,
+                    expire_date=int(time.time()) + 604800
+                )
+                bot.send_message(
+                    user_id,
+                    f"🔐 *ACCESO A TUS CANALES*\n\n"
+                    f"🎬 *CANAL DE PELÍCULAS:*\n{invite_link_pelis.invite_link}\n\n"
+                    f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
+                    f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
+                )
+                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y enlaces enviados")
+            except Exception as e:
+                bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
+                bot.send_message(user_id, f"🎉 Membresía activada. En breve recibirás los enlaces.")
 
-            invite_link_series = bot.create_chat_invite_link(
-                chat_id=CANAL_SERIES_ID,
-                name=f"Usuario_{user_id}_series",
-                member_limit=1,
-                expire_date=int(time.time()) + 604800
-            )
-
-            bot.send_message(
-                user_id,
-                f"🔐 *ACCESO A TUS CANALES*\n\n"
-                f"🎬 *CANAL DE PELÍCULAS:*\n{invite_link_pelis.invite_link}\n\n"
-                f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
-                f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días",
-                # 👈 SIN parse_mode
-            )
-
-            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y enlaces enviados")
-
-        except Exception as e:
-            bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
-            bot.send_message(user_id, f"🎉 Membresía activada. En breve recibirás los enlaces.")
-
+        # Mensaje de confirmación genérico
         bot.send_message(
             user_id,
             f"🎉 *¡Membresía Activada!*\n\n"
@@ -251,7 +269,6 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             f"📅 Vence: {fecha_vencimiento.strftime('%d/%m/%Y')}",
             parse_mode="Markdown"
         )
-
         return True
 
     except Exception as e:
@@ -860,6 +877,164 @@ def mis_pedidos():
         response = jsonify({"error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", "*")
         return response, 500
+
+# ============ ENDPOINT PARA CRON-JOB (VERIFICAR VENCIMIENTOS) ============
+@app.route("/cron/verificar_vencimientos", methods=["GET"])
+def cron_verificar_vencimientos():
+    """Endpoint para ser llamado por cron-job.org periódicamente."""
+    try:
+        verificar_vencimientos()  # ← Esta función la definiremos abajo
+        return "OK", 200
+    except Exception as e:
+        print(f"Error en cron: {e}")
+        return "Error", 500
+    
+def verificar_vencimientos():
+    """Ejecutar periódicamente para notificar y expulsar."""
+    ahora = datetime.now()
+    hoy = ahora.isoformat()
+
+    # --- 1. Usuarios que vencen en 3 días ---
+    en_3_dias = (ahora + timedelta(days=3)).isoformat()
+    usuarios_proximos = supabase.table("usuarios") \
+        .select("*") \
+        .eq("membresia_activa", True) \
+        .gte("fecha_vencimiento", hoy) \
+        .lte("fecha_vencimiento", en_3_dias) \
+        .execute()
+
+    for u in usuarios_proximos.data:
+        try:
+            vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
+            bot.send_message(
+                u["telegram_id"],
+                f"⏳ *Tu membresía vence en 3 días* ({vence}).\n"
+                f"Renueva para no perder el acceso.",
+                parse_mode="Markdown"
+            )
+            print(f"Notificación 3 días enviada a {u['telegram_id']}")
+        except Exception as e:
+            print(f"Error notificando a {u['telegram_id']}: {e}")
+
+    # --- 2. Usuarios que vencen en 3 horas ---
+    en_3_horas = (ahora + timedelta(hours=3)).isoformat()
+    usuarios_muy_proximos = supabase.table("usuarios") \
+        .select("*") \
+        .eq("membresia_activa", True) \
+        .gte("fecha_vencimiento", hoy) \
+        .lte("fecha_vencimiento", en_3_horas) \
+        .execute()
+
+    for u in usuarios_muy_proximos.data:
+        try:
+            vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
+            bot.send_message(
+                u["telegram_id"],
+                f"⚠️ *¡Tu membresía vence en 3 horas!* ({vence}).\n"
+                f"Renueva para mantener el acceso.",
+                parse_mode="Markdown"
+            )
+            print(f"Notificación 3 horas enviada a {u['telegram_id']}")
+        except Exception as e:
+            print(f"Error notificando a {u['telegram_id']}: {e}")
+
+    # --- 3. Usuarios ya vencidos (limpiar y expulsar) ---
+    usuarios_vencidos = supabase.table("usuarios") \
+        .select("*") \
+        .eq("membresia_activa", True) \
+        .lt("fecha_vencimiento", hoy) \
+        .execute()
+
+    for u in usuarios_vencidos.data:
+        # Desactivar en BD
+        supabase.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
+        supabase.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
+
+        # Expulsar de canales
+        try:
+            bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
+            bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
+            print(f"Usuario {u['telegram_id']} expulsado de canales por vencimiento")
+        except Exception as e:
+            print(f"Error expulsando a {u['telegram_id']}: {e}")
+
+        # Notificar
+        try:
+            bot.send_message(
+                u["telegram_id"],
+                "❌ Tu membresía ha vencido. Has sido expulsado de los canales.\n"
+                "Renueva para seguir disfrutando."
+            )
+        except:
+            pass
+@app.route("/webhook/buymeacoffee", methods=["POST"])
+def webhook_buymeacoffee():
+    # Verificar firma HMAC-SHA256
+    secret = os.getenv("BUY_ME_A_COFFEE_WEBHOOK_SECRET")
+    if not secret:
+        print("❌ BUY_ME_A_COFFEE_WEBHOOK_SECRET no está configurado")
+        return jsonify({"error": "Configuración incorrecta"}), 500
+
+    signature_header = request.headers.get("x-signature-sha256")
+    if not signature_header:
+        return jsonify({"error": "Firma no proporcionada"}), 400
+
+    payload = request.get_data()
+    expected_signature = hmac.new(
+        key=secret.encode('utf-8'),
+        msg=payload,
+        digestmod=hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(f"sha256={expected_signature}", signature_header):
+        return jsonify({"error": "Firma inválida"}), 403
+
+    # Procesar payload
+    data = request.get_json()
+    print("📩 Webhook recibido:", data)
+
+    # Identificar plan comprado
+    plan_comprado = None
+    if data.get("type") == "membership.created":
+        nivel = data.get("data", {}).get("membership", {}).get("membership_level_name", "").lower()
+        if nivel in ["copper", "silver"]:
+            plan_comprado = nivel
+    elif data.get("type") == "extra_purchase.created":
+        product_id = data.get("data", {}).get("extra", {}).get("extra_id")
+        # Mapea los IDs reales de tus productos
+        product_to_plan = {
+            "510546": "gold",        # Reemplaza con el ID real de tu producto Gold
+            "510549": "platinum",      # ID de tu producto Platinum
+            "510552": "diamond"    # Reemplaza con el ID real de tu producto Diamond
+        }
+        plan_comprado = product_to_plan.get(str(product_id))
+
+    if not plan_comprado:
+        return jsonify({"error": "Plan no identificado"}), 400
+
+    # Extraer telegram_id del parámetro "ref"
+    telegram_id = None
+    if data.get("data") and data["data"].get("checkout"):
+        telegram_id = data["data"]["checkout"].get("ref")
+    elif data.get("ref"):
+        telegram_id = data.get("ref")
+
+    if not telegram_id:
+        print("❌ No se encontró el parámetro 'ref' en el webhook")
+        return jsonify({"error": "Usuario no identificado (falta ref)"}), 400
+
+    try:
+        telegram_id = int(telegram_id)
+    except ValueError:
+        return jsonify({"error": "ref no es un número válido"}), 400
+
+    # Activar membresía
+    exito = activar_usuario(telegram_id, plan_comprado, ADMIN_ID)
+
+    if exito:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"error": "Error al activar membresía"}), 500
 
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
