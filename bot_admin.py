@@ -631,7 +631,7 @@ def crear_pedido():
         # Obtener membresía activa con plan y pedidos_extra
         hoy = datetime.now().isoformat()
         mem_res = supabase_service.table("membresias_activas") \
-            .select("*, membresias_planes(*)") \
+            .select("*, membresias_planes!membresias_activas_plan_id_fkey(*)") \
             .eq("usuario_id", usuario["id"]) \
             .eq("estado", "activa") \
             .gte("fecha_fin", hoy) \
@@ -893,7 +893,7 @@ def verificar_vencimientos():
         .gte("fecha_vencimiento", hoy) \
         .lte("fecha_vencimiento", en_3_dias) \
         .execute()
-
+    
     for u in usuarios_proximos.data:
         try:
             vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
@@ -915,7 +915,7 @@ def verificar_vencimientos():
         .gte("fecha_vencimiento", hoy) \
         .lte("fecha_vencimiento", en_3_horas) \
         .execute()
-
+    
     for u in usuarios_muy_proximos.data:
         try:
             vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
@@ -930,11 +930,11 @@ def verificar_vencimientos():
             print(f"Error notificando a {u['telegram_id']}: {e}")
 
     # --- 3. Usuarios ya vencidos (fecha_vencimiento < hoy) ---
-usuarios_vencidos = supabase_service.table("usuarios") \
-    .select("*, membresias_activas!inner(*)") \
-    .eq("membresia_activa", True) \
-    .lt("fecha_vencimiento", hoy) \
-    .execute()
+    usuarios_vencidos = supabase_service.table("usuarios") \
+        .select("*, membresias_activas!inner(*)") \
+        .eq("membresia_activa", True) \
+        .lt("fecha_vencimiento", hoy) \
+        .execute()
 
 for u in usuarios_vencidos.data:
     # Obtener la membresía activa (la que está vencida)
