@@ -893,7 +893,7 @@ def verificar_vencimientos():
         .gte("fecha_vencimiento", hoy) \
         .lte("fecha_vencimiento", en_3_dias) \
         .execute()
-    
+
     for u in usuarios_proximos.data:
         try:
             vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
@@ -915,7 +915,7 @@ def verificar_vencimientos():
         .gte("fecha_vencimiento", hoy) \
         .lte("fecha_vencimiento", en_3_horas) \
         .execute()
-    
+
     for u in usuarios_muy_proximos.data:
         try:
             vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
@@ -936,52 +936,49 @@ def verificar_vencimientos():
         .lt("fecha_vencimiento", hoy) \
         .execute()
 
-for u in usuarios_vencidos.data:
-    # Obtener la membresía activa (la que está vencida)
-    mem_act = supabase_service.table("membresias_activas") \
-        .select("*") \
-        .eq("usuario_id", u["id"]) \
-        .eq("estado", "activa") \
-        .single() \
-        .execute()
-
-    if mem_act.data and mem_act.data.get("plan_futuro"):
-        # Hay un cambio programado: activar el nuevo plan
-        nuevo_plan_id = mem_act.data["plan_futuro"]
-        plan_nuevo_res = supabase_service.table("membresias_planes").select("nombre").eq("id", nuevo_plan_id).execute()
-        if plan_nuevo_res.data:
-            nuevo_plan = plan_nuevo_res.data[0]["nombre"]
-            # Activar el nuevo plan (la función ya maneja que no envíe enlaces si ya tenía membresía)
-            activar_usuario(u["telegram_id"], nuevo_plan, ADMIN_ID)
-
-        # Limpiar el campo plan_futuro (ya se usó)
-        supabase_service.table("membresias_activas") \
-            .update({"plan_futuro": None}) \
-            .eq("id", mem_act.data["id"]) \
+    for u in usuarios_vencidos.data:
+        # Obtener la membresía activa (la que está vencida)
+        mem_act_res = supabase_service.table("membresias_activas") \
+            .select("*") \
+            .eq("usuario_id", u["id"]) \
+            .eq("estado", "activa") \
             .execute()
+        mem_act = mem_act_res.data[0] if mem_act_res.data else None
 
-        # No desactivamos la membresía actual porque activar_usuario ya la desactivó y creó una nueva
-    else:
-        # No hay cambio programado: desactivar y expulsar normalmente
-        supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
-        supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
+        if mem_act and mem_act.get("plan_futuro"):
+            # Hay un cambio programado: activar el nuevo plan
+            nuevo_plan_id = mem_act["plan_futuro"]
+            plan_nuevo_res = supabase_service.table("membresias_planes").select("nombre").eq("id", nuevo_plan_id).execute()
+            if plan_nuevo_res.data:
+                nuevo_plan = plan_nuevo_res.data[0]["nombre"]
+                activar_usuario(u["telegram_id"], nuevo_plan, ADMIN_ID)
 
-        # Expulsar de canales
-        try:
-            bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
-            bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
-        except Exception as e:
-            print(f"Error expulsando a {u['telegram_id']}: {e}")
+            # Limpiar el campo plan_futuro
+            supabase_service.table("membresias_activas") \
+                .update({"plan_futuro": None}) \
+                .eq("id", mem_act["id"]) \
+                .execute()
+        else:
+            # Desactivar y expulsar normalmente
+            supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
+            supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
 
-        # Notificar
-        try:
-            bot.send_message(
-                u["telegram_id"],
-                "❌ Tu membresía ha vencido. Has sido expulsado de los canales.\n"
-                "Renueva para seguir disfrutando."
-            )
-        except:
-            pass
+            # Expulsar de canales
+            try:
+                bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
+                bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
+            except Exception as e:
+                print(f"Error expulsando a {u['telegram_id']}: {e}")
+
+            # Notificar
+            try:
+                bot.send_message(
+                    u["telegram_id"],
+                    "❌ Tu membresía ha vencido. Has sido expulsado de los canales.\n"
+                    "Renueva para seguir disfrutando."
+                )
+            except:
+                pass
 
 @app.route("/webhook/buymeacoffee", methods=["POST"])
 def webhook_buymeacoffee():
