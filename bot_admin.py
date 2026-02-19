@@ -28,7 +28,13 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # ============ MENÚ PRINCIPAL MEJORADO ============
-def menu_principal(chat_id, user_name=""):
+def menu_principal(chat_id, user_name="", mostrar_inline=True):
+    """Muestra el menú principal con botones.
+    Args:
+        chat_id: ID del chat
+        user_name: Nombre del usuario para personalizar
+        mostrar_inline: Si es True, muestra también los botones inline
+    """
     # Menú de teclado (botones persistentes)
     markup_reply = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup_reply.add(
@@ -52,17 +58,7 @@ def menu_principal(chat_id, user_name=""):
         "👇 *¿Qué deseas hacer?*"
     )
     
-    # Botones inline (debajo del mensaje)
-    markup_inline = InlineKeyboardMarkup(row_width=2)
-    markup_inline.add(
-        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
-        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
-        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
-        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
-        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"})
-    )
-    
-    # Enviar mensaje con ambos tipos de botones
+    # Enviar mensaje con el teclado
     bot.send_message(
         chat_id,
         welcome_text,
@@ -70,12 +66,23 @@ def menu_principal(chat_id, user_name=""):
         parse_mode="Markdown"
     )
     
-    bot.send_message(
-        chat_id,
-        "Acciones rápidas:",
-        reply_markup=markup_inline,
-        parse_mode="Markdown"
-    )
+    # Botones inline (solo si se solicita)
+    if mostrar_inline:
+        markup_inline = InlineKeyboardMarkup(row_width=2)
+        markup_inline.add(
+            InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
+            InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+            InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
+            InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
+            InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"})
+        )
+        
+        bot.send_message(
+            chat_id,
+            "⚡ *Acciones rápidas:*",
+            reply_markup=markup_inline,
+            parse_mode="Markdown"
+        )
 
 # ============ START ============
 @bot.message_handler(commands=['start'])
@@ -109,7 +116,7 @@ def start(message):
             "/desactivar ID",
             parse_mode="Markdown"
         )
-        # No retornamos aquí para que también vea el menú normal
+        # No retornamos para que también vea el menú normal
 
     # Procesar parámetros de pago (ej. /start pago_copper_22)
     args = message.text.split()
@@ -143,12 +150,13 @@ def start(message):
             "⏳ Tu membresía será activada una vez validemos el pago.",
             parse_mode="Markdown"
         )
-        # También mostramos el menú principal
-        menu_principal(message.chat.id, user_name)
+        
+        # Mostrar menú principal SIN botones inline para no saturar
+        menu_principal(message.chat.id, user_name, mostrar_inline=False)
         return
 
-    # Mostrar menú principal
-    menu_principal(message.chat.id, user_name)
+    # Mostrar menú principal completo (con botones inline)
+    menu_principal(message.chat.id, user_name, mostrar_inline=True)
 
 # ============ SISTEMA DE RESPUESTAS AUTOMÁTICAS (KEYWORD REPLIES) ============
 KEYWORD_REPLIES = {
