@@ -27,6 +27,129 @@ CANAL_SERIES_ID = -1003879512007
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# ============ MENÚ PRINCIPAL MEJORADO ============
+def menu_principal(chat_id, user_name=""):
+    # Menú de teclado (botones persistentes)
+    markup_reply = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup_reply.add(
+        KeyboardButton("💎 Ver Planes"),
+        KeyboardButton("🇵🇪 Pago en Soles (Yape/Plin)"),
+        KeyboardButton("💳 Pago en Dólares (Tarjeta)"),
+        KeyboardButton("🎬 Beneficios VIP"),
+        KeyboardButton("👤 Mi Perfil"),
+        KeyboardButton("🆘 Ayuda")
+    )
+    
+    # Mensaje de bienvenida con formato
+    welcome_text = (
+        f"🎬 *¡Bienvenido {user_name} a QuehayApp VIP!*\n\n"
+        "Disfruta de películas y series exclusivas en Telegram con estos planes:\n\n"
+        "• COPPER: S/22 | $5.99 - Acceso a canales\n"
+        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
+        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
+        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
+        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
+        "👇 *¿Qué deseas hacer?*"
+    )
+    
+    # Botones inline (debajo del mensaje)
+    markup_inline = InlineKeyboardMarkup(row_width=2)
+    markup_inline.add(
+        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
+        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
+        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
+        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"})
+    )
+    
+    # Enviar mensaje con ambos tipos de botones
+    bot.send_message(
+        chat_id,
+        welcome_text,
+        reply_markup=markup_reply,
+        parse_mode="Markdown"
+    )
+    
+    bot.send_message(
+        chat_id,
+        "Acciones rápidas:",
+        reply_markup=markup_inline,
+        parse_mode="Markdown"
+    )
+
+# ============ START ============
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name
+
+    # Registrar o actualizar usuario en Supabase
+    usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+    
+    if not usuario.data:
+        supabase_service.table('usuarios').insert({
+            "telegram_id": user_id,
+            "nombre": user_name,
+            "membresia_activa": False
+        }).execute()
+        print(f"✅ Usuario creado: {user_name} ({user_id})")
+    else:
+        supabase_service.table('usuarios').update({
+            "nombre": user_name
+        }).eq('telegram_id', user_id).execute()
+        print(f"✅ Usuario actualizado: {user_name}")
+
+    # Si es admin, mostrar comandos extra
+    if user_id == ADMIN_ID:
+        bot.send_message(
+            message.chat.id,
+            "🤖 *Modo Admin Activado*\n\nComandos disponibles:\n"
+            "/planes\n"
+            "/activar ID PLAN\n"
+            "/desactivar ID",
+            parse_mode="Markdown"
+        )
+        # No retornamos aquí para que también vea el menú normal
+
+    # Procesar parámetros de pago (ej. /start pago_copper_22)
+    args = message.text.split()
+    
+    if len(args) > 1 and args[1].startswith("pago_"):
+        partes = args[1].split("_")
+        plan = partes[1]
+        precio = partes[2]
+
+        supabase_service.table('pagos_manuales').insert({
+            "usuario_id": user_id,
+            "membresia_comprada": plan,
+            "monto": precio,
+            "metodo": "yape",
+            "fecha_pago": datetime.now().isoformat(),
+            "estado": "pendiente",
+            "activado": False
+        }).execute()
+
+        bot.send_message(
+            message.chat.id,
+            f"💎 *PLAN {plan.upper()}*\n\n"
+            f"💰 *Monto a pagar:* S/{precio}\n\n"
+            "📲 *Método:* Yape / Plin\n\n"
+            "👤 *Titular:* Richard Quiroz\n"
+            "📱 *Número:* 930202820\n\n"
+            "📝 *Concepto a colocar:*\n"
+            f"{user_id}\n\n"
+            "📸 *Después del pago:*\n"
+            "Envía aquí la captura del voucher.\n\n"
+            "⏳ Tu membresía será activada una vez validemos el pago.",
+            parse_mode="Markdown"
+        )
+        # También mostramos el menú principal
+        menu_principal(message.chat.id, user_name)
+        return
+
+    # Mostrar menú principal
+    menu_principal(message.chat.id, user_name)
+
 # ============ SISTEMA DE RESPUESTAS AUTOMÁTICAS (KEYWORD REPLIES) ============
 KEYWORD_REPLIES = {
     # Saludos y presentación
@@ -130,122 +253,6 @@ KEYWORD_REPLIES = {
     "gracias": "😊 ¡A ti por confiar en nosotros! Disfruta del contenido.",
     "chau": "👋 ¡Hasta pronto! Vuelve cuando quieras a ver más películas."
 }
-
-# ============ MENÚ PRINCIPAL MEJORADO ============
-def menu_principal(chat_id):
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add(
-        KeyboardButton("💎 Ver Planes"),
-        KeyboardButton("🇵🇪 Pago en Soles (Yape/Plin)"),
-        KeyboardButton("💳 Pago en Dólares (Tarjeta)"),
-        KeyboardButton("🎬 Beneficios VIP"),
-        KeyboardButton("👤 Mi Perfil"),
-        KeyboardButton("🆘 Ayuda")
-    )
-    bot.send_message(
-        chat_id,
-        "🎬 *QuehayApp VIP* - Elige una opción:\n\n"
-        "💎 *Planes*: Copper (S/22) a Diamond (S/348)\n"
-        "🇵🇪 *Pago soles*: Yape/Plin, envío de voucher\n"
-        "💳 *Pago dólares*: Tarjeta internacional (Buy Me a Coffee)\n"
-        "🎬 *Beneficios*: Canales privados, pedidos, sin publicidad\n"
-        "👤 *Perfil*: Ver tu membresía y vencimiento\n"
-        "🆘 *Ayuda*: Soporte, problemas con pagos, etc.",
-        reply_markup=markup,
-        parse_mode="Markdown"
-    )
-
-    # ============ START ============
-@bot.message_handler(commands=['start'])
-def start(message):
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name
-
-    # Registrar o actualizar usuario en Supabase
-    usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
-    if not usuario.data:
-        supabase_service.table('usuarios').insert({
-            "telegram_id": user_id,
-            "nombre": user_name,
-            "membresia_activa": False
-        }).execute()
-        print(f"✅ Usuario creado: {user_name} ({user_id})")
-    else:
-        supabase_service.table('usuarios').update({
-            "nombre": user_name
-        }).eq('telegram_id', user_id).execute()
-        print(f"✅ Usuario actualizado: {user_name}")
-
-    # Mensaje de bienvenida con botones inline
-    welcome = (
-        f"🎬 *¡Bienvenido {user_name} a QuehayApp VIP!*\n\n"
-        "Disfruta de películas y series exclusivas en Telegram con estos planes:\n\n"
-        "• COPPER: S/22 | $5.99 - Acceso a canales\n"
-        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
-        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
-        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
-        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
-        "👇 *¿Qué deseas hacer?*"
-    )
-
-    markup = InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
-        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
-        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
-        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
-        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://tu-mini-app.com"})  # Reemplaza URL
-    )
-
-    bot.send_message(message.chat.id, welcome, reply_markup=markup, parse_mode="Markdown")
-
-    # Si es admin, mostrar comandos extra
-    if user_id == ADMIN_ID:
-        bot.send_message(
-            message.chat.id,
-            "🤖 *Modo Admin Activado*\n\nComandos disponibles:\n"
-            "/planes\n"
-            "/activar ID PLAN\n"
-            "/desactivar ID",
-            parse_mode="Markdown"
-        )
-        return
-
-    # Procesar parámetros de pago (ej. /start pago_copper_22)
-    args = message.text.split()
-    if len(args) > 1 and args[1].startswith("pago_"):
-        partes = args[1].split("_")
-        plan = partes[1]
-        precio = partes[2]
-
-        supabase_service.table('pagos_manuales').insert({
-            "usuario_id": user_id,
-            "membresia_comprada": plan,
-            "monto": precio,
-            "metodo": "yape",
-            "fecha_pago": datetime.now().isoformat(),
-            "estado": "pendiente",
-            "activado": False
-        }).execute()
-
-        bot.send_message(
-            message.chat.id,
-            f"💎 *PLAN {plan.upper()}*\n\n"
-            f"💰 *Monto a pagar:* S/{precio}\n\n"
-            "📲 *Método:* Yape / Plin\n\n"
-            "👤 *Titular:* Richard Quiroz\n"
-            "📱 *Número:* 930202820\n\n"
-            "📝 *Concepto a colocar:*\n"
-            f"{user_id}\n\n"
-            "📸 *Después del pago:*\n"
-            "Envía aquí la captura del voucher.\n\n"
-            "⏳ Tu membresía será activada una vez validemos el pago.",
-            parse_mode="Markdown"
-        )
-        return
-
-    # Mostrar menú principal
-    menu_principal(message.chat.id)
 
 # ============ HANDLER DE MENSAJES (RESPUESTAS AUTOMÁTICAS) ============
 @bot.message_handler(func=lambda message: True)
