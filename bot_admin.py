@@ -155,6 +155,98 @@ def menu_principal(chat_id):
         parse_mode="Markdown"
     )
 
+    # ============ START ============
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name
+
+    # Registrar o actualizar usuario en Supabase
+    usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+    if not usuario.data:
+        supabase_service.table('usuarios').insert({
+            "telegram_id": user_id,
+            "nombre": user_name,
+            "membresia_activa": False
+        }).execute()
+        print(f"✅ Usuario creado: {user_name} ({user_id})")
+    else:
+        supabase_service.table('usuarios').update({
+            "nombre": user_name
+        }).eq('telegram_id', user_id).execute()
+        print(f"✅ Usuario actualizado: {user_name}")
+
+    # Mensaje de bienvenida con botones inline
+    welcome = (
+        f"🎬 *¡Bienvenido {user_name} a QuehayApp VIP!*\n\n"
+        "Disfruta de películas y series exclusivas en Telegram con estos planes:\n\n"
+        "• COPPER: S/22 | $5.99 - Acceso a canales\n"
+        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
+        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
+        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
+        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
+        "👇 *¿Qué deseas hacer?*"
+    )
+
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
+        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
+        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
+        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://tu-mini-app.com"})  # Reemplaza URL
+    )
+
+    bot.send_message(message.chat.id, welcome, reply_markup=markup, parse_mode="Markdown")
+
+    # Si es admin, mostrar comandos extra
+    if user_id == ADMIN_ID:
+        bot.send_message(
+            message.chat.id,
+            "🤖 *Modo Admin Activado*\n\nComandos disponibles:\n"
+            "/planes\n"
+            "/activar ID PLAN\n"
+            "/desactivar ID",
+            parse_mode="Markdown"
+        )
+        return
+
+    # Procesar parámetros de pago (ej. /start pago_copper_22)
+    args = message.text.split()
+    if len(args) > 1 and args[1].startswith("pago_"):
+        partes = args[1].split("_")
+        plan = partes[1]
+        precio = partes[2]
+
+        supabase_service.table('pagos_manuales').insert({
+            "usuario_id": user_id,
+            "membresia_comprada": plan,
+            "monto": precio,
+            "metodo": "yape",
+            "fecha_pago": datetime.now().isoformat(),
+            "estado": "pendiente",
+            "activado": False
+        }).execute()
+
+        bot.send_message(
+            message.chat.id,
+            f"💎 *PLAN {plan.upper()}*\n\n"
+            f"💰 *Monto a pagar:* S/{precio}\n\n"
+            "📲 *Método:* Yape / Plin\n\n"
+            "👤 *Titular:* Richard Quiroz\n"
+            "📱 *Número:* 930202820\n\n"
+            "📝 *Concepto a colocar:*\n"
+            f"{user_id}\n\n"
+            "📸 *Después del pago:*\n"
+            "Envía aquí la captura del voucher.\n\n"
+            "⏳ Tu membresía será activada una vez validemos el pago.",
+            parse_mode="Markdown"
+        )
+        return
+
+    # Mostrar menú principal
+    menu_principal(message.chat.id)
+
 # ============ HANDLER DE MENSAJES (RESPUESTAS AUTOMÁTICAS) ============
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
@@ -395,98 +487,6 @@ def handle_callback(call):
         bot.send_message(chat_id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
     else:
         bot.send_message(chat_id, "Opción no reconocida.")
-
-# ============ START ============
-@bot.message_handler(commands=['start'])
-def start(message):
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name
-
-    # Registrar o actualizar usuario en Supabase
-    usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
-    if not usuario.data:
-        supabase_service.table('usuarios').insert({
-            "telegram_id": user_id,
-            "nombre": user_name,
-            "membresia_activa": False
-        }).execute()
-        print(f"✅ Usuario creado: {user_name} ({user_id})")
-    else:
-        supabase_service.table('usuarios').update({
-            "nombre": user_name
-        }).eq('telegram_id', user_id).execute()
-        print(f"✅ Usuario actualizado: {user_name}")
-
-    # Mensaje de bienvenida con botones inline
-    welcome = (
-        f"🎬 *¡Bienvenido {user_name} a QuehayApp VIP!*\n\n"
-        "Disfruta de películas y series exclusivas en Telegram con estos planes:\n\n"
-        "• COPPER: S/22 | $5.99 - Acceso a canales\n"
-        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
-        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
-        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
-        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
-        "👇 *¿Qué deseas hacer?*"
-    )
-
-    markup = InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
-        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
-        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
-        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
-        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://tu-mini-app.com"})  # Reemplaza URL
-    )
-
-    bot.send_message(message.chat.id, welcome, reply_markup=markup, parse_mode="Markdown")
-
-    # Si es admin, mostrar comandos extra
-    if user_id == ADMIN_ID:
-        bot.send_message(
-            message.chat.id,
-            "🤖 *Modo Admin Activado*\n\nComandos disponibles:\n"
-            "/planes\n"
-            "/activar ID PLAN\n"
-            "/desactivar ID",
-            parse_mode="Markdown"
-        )
-        return
-
-    # Procesar parámetros de pago (ej. /start pago_copper_22)
-    args = message.text.split()
-    if len(args) > 1 and args[1].startswith("pago_"):
-        partes = args[1].split("_")
-        plan = partes[1]
-        precio = partes[2]
-
-        supabase_service.table('pagos_manuales').insert({
-            "usuario_id": user_id,
-            "membresia_comprada": plan,
-            "monto": precio,
-            "metodo": "yape",
-            "fecha_pago": datetime.now().isoformat(),
-            "estado": "pendiente",
-            "activado": False
-        }).execute()
-
-        bot.send_message(
-            message.chat.id,
-            f"💎 *PLAN {plan.upper()}*\n\n"
-            f"💰 *Monto a pagar:* S/{precio}\n\n"
-            "📲 *Método:* Yape / Plin\n\n"
-            "👤 *Titular:* Richard Quiroz\n"
-            "📱 *Número:* 930202820\n\n"
-            "📝 *Concepto a colocar:*\n"
-            f"{user_id}\n\n"
-            "📸 *Después del pago:*\n"
-            "Envía aquí la captura del voucher.\n\n"
-            "⏳ Tu membresía será activada una vez validemos el pago.",
-            parse_mode="Markdown"
-        )
-        return
-
-    # Mostrar menú principal
-    menu_principal(message.chat.id)
 
 # ============ ADMIN ============
 @bot.message_handler(commands=['planes'])
@@ -946,35 +946,44 @@ def crear_pedido():
         if not telegram_id or not titulo:
             return jsonify({"error": "Datos incompletos"}), 400
 
-        # Obtener usuario
+        # 1️⃣ Obtener usuario
         usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
         if not usuario_res.data:
             return jsonify({"error": "Usuario no encontrado"}), 404
-
         usuario = usuario_res.data[0]
+
         if not usuario.get("membresia_activa"):
             return jsonify({"error": "No tienes membresía activa"}), 403
 
-        # Obtener membresía activa con plan y pedidos_extra
+        # 2️⃣ Obtener membresía activa (sin join)
         hoy = datetime.now().isoformat()
         mem_res = supabase_service.table("membresias_activas") \
-            .select("*, membresias_planes(*)") \
+            .select("*") \
             .eq("usuario_id", usuario["id"]) \
             .eq("estado", "activa") \
             .gte("fecha_fin", hoy) \
             .execute()
         if not mem_res.data:
             return jsonify({"error": "No se encontró membresía activa válida"}), 403
-
         membresia = mem_res.data[0]
-        plan = membresia["membresias_planes"]
+
+        # 3️⃣ Obtener el plan por separado
+        plan_res = supabase_service.table("membresias_planes") \
+            .select("*") \
+            .eq("id", membresia["plan_id"]) \
+            .execute()
+        if not plan_res.data:
+            return jsonify({"error": "Plan no encontrado"}), 404
+        plan = plan_res.data[0]
+
+        # 4️⃣ Validar límite de pedidos
         pedidos_extra = membresia.get("pedidos_extra", 0)
         limite_total = plan["pedidos_por_mes"] + pedidos_extra
 
         if limite_total == 0:
             return jsonify({"error": "Tu plan no incluye pedidos"}), 403
 
-        # Contar pedidos usados en el período actual
+        # 5️⃣ Contar pedidos usados en el período
         pedidos_usados_res = supabase_service.table("pedidos") \
             .select("*", count="exact") \
             .eq("usuario_id", telegram_id) \
@@ -986,7 +995,7 @@ def crear_pedido():
         if usados >= limite_total:
             return jsonify({"error": "Has alcanzado el límite de tu plan"}), 403
 
-        # Insertar pedido
+        # 6️⃣ Insertar pedido
         supabase_service.table("pedidos").insert({
             "usuario_id": telegram_id,
             "titulo_pedido": titulo,
@@ -997,7 +1006,7 @@ def crear_pedido():
 
         restantes = limite_total - (usados + 1)
 
-        # Notificaciones
+        # 7️⃣ Notificaciones
         bot.send_message(
             ADMIN_ID,
             f"📥 NUEVO PEDIDO\n\n"
