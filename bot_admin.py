@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
 from datetime import datetime, timedelta
 import time
@@ -15,6 +15,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+# Diccionario para estados de usuarios (vouchers, etc.)
+user_states = {}
+
 # ============ CANALES PRIVADOS ============
 CANAL_PELICULAS_ID = -1003890553566
 CANAL_SERIES_ID = -1003879512007
@@ -23,31 +27,383 @@ CANAL_SERIES_ID = -1003879512007
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ============ MENÚ PRINCIPAL ============
+# ============ SISTEMA DE RESPUESTAS AUTOMÁTICAS (KEYWORD REPLIES) ============
+KEYWORD_REPLIES = {
+    # Saludos y presentación
+    "hola": "👋 ¡Hola! Bienvenido a QuehayApp VIP. ¿Te gustaría conocer nuestros planes?",
+    "buenos días": "¡Buenos días! ⭐ ¿En qué puedo ayudarte hoy?",
+    "buenas tardes": "¡Buenas tardes! ¿Necesitas información sobre las membresías?",
+    "buenas noches": "¡Buenas noches! Aunque sea tarde, siempre estamos para servirte.",
+
+    # Consultas sobre planes
+    "planes": (
+        "💎 *Planes disponibles*\n\n"
+        "• COPPER: S/22 | $5.99 - Acceso a canales (sin pedidos)\n"
+        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
+        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
+        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
+        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
+        "¿Te gustaría pagar en soles o dólares?"
+    ),
+    "precio": (
+        "💰 *Precios actualizados*\n\n"
+        "COPPER: S/22 / $5.99 · SILVER: S/33 / $8.99 · GOLD: S/85 / $22.99 · "
+        "PLATINUM: S/163 / $43.99 · DIAMOND: S/348 / $93.99"
+    ),
+    "membresía": "Para ver nuestras membresías, escribe 'planes' o haz clic en el botón '💎 Ver Planes'.",
+    "costo": "Los costos están en soles y dólares. Escribí 'planes' para ver el detalle.",
+
+    # Intención de compra
+    "comprar": (
+        "🛒 *¡Genial! Elige tu método de pago:*\n\n"
+        "🇵🇪 *Yape/Plin* (pago en soles)\n"
+        "💳 *Tarjeta internacional* (dólares, vía Buy Me a Coffee)\n\n"
+        "¿Cuál prefieres?"
+    ),
+    "quiero comprar": "Perfecto. Primero, ¿quieres pagar en soles o en dólares?",
+    "yape": (
+        "🇵🇪 *Pago con Yape/Plin*\n\n"
+        "1. Abre la mini app y selecciona el plan que deseas.\n"
+        "2. Presiona '🇵🇪 Yape / Plin'.\n"
+        "3. Sigue las instrucciones y envía el voucher.\n\n"
+        "¿Ya tienes la mini app abierta?"
+    ),
+    "plin": "El proceso es el mismo que con Yape. Usa la mini app para generar el pedido de pago.",
+    "tarjeta": (
+        "💳 *Pago con tarjeta internacional*\n\n"
+        "1. Elige el plan en la mini app.\n"
+        "2. Presiona '💳 Tarjeta Gpay ApplePay y mas'.\n"
+        "3. Serás redirigido a Buy Me a Coffee para completar el pago.\n"
+        "4. Al finalizar, tu membresía se activará automáticamente.\n\n"
+        "¿Listo para continuar?"
+    ),
+
+    # Beneficios
+    "beneficios": (
+        "🎬 *Beneficios de ser VIP*\n\n"
+        "✅ Acceso a canales privados con películas y series\n"
+        "✅ Solicita contenido que no encuentres (según tu plan)\n"
+        "✅ Sin publicidad\n"
+        "✅ Soporte prioritario\n\n"
+        "¿Te gustaría ver los planes nuevamente?"
+    ),
+    "que incluye": "Los beneficios incluyen acceso a canales privados y la posibilidad de pedir películas. Escribí 'beneficios' para más detalles.",
+
+    # Soporte y ayuda
+    "ayuda": (
+        "🆘 *¿Necesitas ayuda?*\n\n"
+        "• Para ver planes, escribe 'planes'\n"
+        "• Para comprar, escribe 'comprar'\n"
+        "• Para problemas con pagos, escribe 'soporte'\n"
+        "• Para contactar a un humano, describe tu problema y te responderemos."
+    ),
+    "soporte": (
+        "📞 *Contacta con soporte*\n\n"
+        "Cuéntanos tu problema con el mayor detalle posible:\n"
+        "- ID de Telegram (lo ves en tu perfil de la mini app)\n"
+        "- Tipo de problema (pago, acceso, pedidos, etc.)\n"
+        "- Captura de pantalla si es necesario.\n\n"
+        "Un administrador te responderá a la brevedad."
+    ),
+    "problema": "Lamento el inconveniente. Por favor, explícanos qué sucede para poder ayudarte.",
+    "error": "Parece que algo no funcionó. ¿Puedes darnos más detalles?",
+
+    # Pedidos
+    "pedido": (
+        "📦 *Solicitar película/serie*\n\n"
+        "1. Debes tener una membresía activa (Silver o superior).\n"
+        "2. Abre la mini app y ve a 'Pedidos'.\n"
+        "3. Completa el formulario con el título y tipo.\n\n"
+        "¿Tienes membresía activa?"
+    ),
+    "mis pedidos": "Puedes ver el estado de tus pedidos en la mini app, sección 'Pedidos'. Allí aparecen los que has solicitado.",
+
+    # Enlaces y acceso
+    "enlace": (
+        "🔗 *Acceso a los canales*\n\n"
+        "Si ya tienes una membresía activa, los enlaces de acceso se te enviaron automáticamente al activarla.\n"
+        "Si no los recibiste, escribe 'no me llegaron los enlaces'."
+    ),
+    "no me llegan los enlaces": "Revisaremos tu caso. Por favor, indícanos tu ID de Telegram (lo encuentras en el perfil de la mini app) para que un admin te ayude.",
+
+    # Agradecimientos y despedida
+    "gracias": "😊 ¡A ti por confiar en nosotros! Disfruta del contenido.",
+    "chau": "👋 ¡Hasta pronto! Vuelve cuando quieras a ver más películas."
+}
+
+# ============ MENÚ PRINCIPAL MEJORADO ============
 def menu_principal(chat_id):
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row(KeyboardButton("💎 Ver Planes"))
-    markup.row(KeyboardButton("📲 Cómo Comprar"))
-    markup.row(KeyboardButton("🎬 Beneficios"))
-    markup.row(KeyboardButton("📞 Soporte"))
-    
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(
+        KeyboardButton("💎 Ver Planes"),
+        KeyboardButton("🇵🇪 Pago en Soles (Yape/Plin)"),
+        KeyboardButton("💳 Pago en Dólares (Tarjeta)"),
+        KeyboardButton("🎬 Beneficios VIP"),
+        KeyboardButton("👤 Mi Perfil"),
+        KeyboardButton("🆘 Ayuda")
+    )
     bot.send_message(
         chat_id,
-        "🎬 *Bienvenido a CineApp VIP*\n\n"
-        "Accede a películas y series exclusivas directamente desde Telegram.\n\n"
-        "Selecciona una opción:",
+        "🎬 *QuehayApp VIP* - Elige una opción:\n\n"
+        "💎 *Planes*: Copper (S/22) a Diamond (S/348)\n"
+        "🇵🇪 *Pago soles*: Yape/Plin, envío de voucher\n"
+        "💳 *Pago dólares*: Tarjeta internacional (Buy Me a Coffee)\n"
+        "🎬 *Beneficios*: Canales privados, pedidos, sin publicidad\n"
+        "👤 *Perfil*: Ver tu membresía y vencimiento\n"
+        "🆘 *Ayuda*: Soporte, problemas con pagos, etc.",
         reply_markup=markup,
         parse_mode="Markdown"
-    )   
+    )
+
+# ============ HANDLER DE MENSAJES (RESPUESTAS AUTOMÁTICAS) ============
+@bot.message_handler(func=lambda message: True)
+def handle_all_messages(message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    text = message.text.lower().strip() if message.text else ""
+
+    # Verificar si el usuario tiene un estado activo (ej. esperando voucher)
+    if user_id in user_states:
+        state = user_states[user_id]
+        if state["estado"] == "esperando_voucher":
+            # El usuario debe enviar una foto
+            if message.photo:
+                # Es una foto, procesarla
+                plan = state["plan"]
+                photo = message.photo[-1]
+                file_id = photo.file_id
+
+                # Notificar al administrador
+                bot.send_message(
+                    ADMIN_ID,
+                    f"📥 Nuevo voucher recibido de {user_id} para plan *{plan.upper()}*."
+                )
+                bot.send_photo(ADMIN_ID, file_id, caption=f"Voucher de {user_id} para {plan}")
+
+                # Confirmar al usuario
+                bot.send_message(
+                    chat_id,
+                    f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado.\n"
+                    "Te notificaremos cuando tu membresía esté activa.",
+                    parse_mode="Markdown"
+                )
+
+                # Limpiar el estado
+                del user_states[user_id]
+                return
+            else:
+                # El usuario no envió una foto, recordarle
+                bot.send_message(
+                    chat_id,
+                    "❌ Por favor, envía una **foto** del voucher (no texto).\n"
+                    "Si necesitas cancelar, escribe 'cancelar'.",
+                    parse_mode="Markdown"
+                )
+                return
+
+    # Comando para cancelar el estado
+    if text == "cancelar" and user_id in user_states:
+        del user_states[user_id]
+        bot.send_message(chat_id, "✅ Proceso cancelado. Puedes volver a empezar cuando quieras.")
+        return
+
+    print(f"📩 Mensaje de {user_id}: {text}")
+
+    # Ignorar comandos (ya tienen handlers específicos)
+    if text.startswith('/'):
+        return
+
+    # Buscar coincidencia en KEYWORD_REPLIES
+    for keyword, reply in KEYWORD_REPLIES.items():
+        if keyword in text:
+            bot.send_message(message.chat.id, reply, parse_mode="Markdown")
+            # Si la intención es compra, ofrecer botones inline adicionales
+            if any(word in text for word in ["comprar", "quiero comprar", "planes", "precio"]):
+                markup = InlineKeyboardMarkup(row_width=2)
+                markup.add(
+                    InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+                    InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general")
+                )
+                bot.send_message(
+                    message.chat.id,
+                    "¿Cómo prefieres pagar?",
+                    reply_markup=markup
+                )
+            return
+
+    # Si no hay coincidencia, mostrar menú principal como ayuda
+    bot.send_message(
+        message.chat.id,
+        "No entendí tu mensaje. Aquí tienes las opciones disponibles:"
+    )
+    menu_principal(message.chat.id)
+
+# ============ HANDLER DE BOTONES DEL MENÚ PRINCIPAL ============
+@bot.message_handler(func=lambda message: message.text == "💎 Ver Planes")
+def ver_planes_handler(message):
+    planes = supabase_service.table('membresias_planes').select('*').execute()
+    texto = "💎 *Planes Disponibles:*\n\n"
+    for p in planes.data:
+        texto += f"🔹 *{p['nombre'].upper()}*\n"
+        texto += f"💰 S/{p['precio_soles']} | ${p['precio_dolares']}\n"
+        texto += f"⏳ {p['duracion_dias']} días\n"
+        texto += f"📦 {p['pedidos_por_mes']} pedidos\n\n"
+    texto += "📲 Compra desde la MiniApp."
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
+
+@bot.message_handler(func=lambda message: message.text == "🇵🇪 Pago en Soles (Yape/Plin)")
+def pago_soles_handler(message):
+    # Podría redirigir a la mini app o dar instrucciones
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://tu-mini-app.com"}))
+    bot.send_message(
+        message.chat.id,
+        "🇵🇪 Para pagar en soles:\n"
+        "1. Abre la mini app.\n"
+        "2. Elige tu plan y presiona 'Yape/Plin'.\n"
+        "3. Sigue las instrucciones y envía el voucher.\n\n"
+        "¿Listo?",
+        reply_markup=markup
+    )
+
+@bot.message_handler(func=lambda message: message.text == "💳 Pago en Dólares (Tarjeta)")
+def pago_dolares_handler(message):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
+    bot.send_message(
+        message.chat.id,
+        "💳 Para pagar en dólares:\n"
+        "1. Haz clic en el enlace.\n"
+        "2. Elige el plan (Copper, Silver, etc.).\n"
+        "3. Completa el pago con tarjeta.\n\n"
+        "Al terminar, tu membresía se activará automáticamente.",
+        reply_markup=markup
+    )
+
+@bot.message_handler(func=lambda message: message.text == "🎬 Beneficios VIP")
+def beneficios_handler(message):
+    bot.send_message(
+        message.chat.id,
+        KEYWORD_REPLIES["beneficios"],
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(func=lambda message: message.text == "👤 Mi Perfil")
+def perfil_handler(message):
+    # Aquí podrías mostrar información del perfil, tal vez llamando a un endpoint de tu backend
+    # Por ahora, un mensaje genérico:
+    bot.send_message(
+        message.chat.id,
+        "👤 Para ver tu perfil y membresía, abre la mini app.",
+        reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton("Abrir mini app", web_app={"url": "https://tu-mini-app.com"}))
+    )
+
+@bot.message_handler(func=lambda message: message.text == "🆘 Ayuda")
+def ayuda_handler(message):
+    bot.send_message(
+        message.chat.id,
+        KEYWORD_REPLIES["ayuda"],
+        parse_mode="Markdown"
+    )
+
+# ============ HANDLER DE CALLBACKS (BOTONES INLINE) ============
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call):
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    data = call.data
+
+    bot.answer_callback_query(call.id)
+
+    if data == "pago_soles_general":
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://tu-mini-app.com"}))
+        bot.send_message(
+            chat_id,
+            "🇵🇪 Para pagar en soles:\n"
+            "1. Abre la mini app.\n"
+            "2. Elige tu plan y presiona 'Yape/Plin'.\n"
+            "3. Sigue las instrucciones y envía el voucher.\n\n"
+            "¿Listo?",
+            reply_markup=markup
+        )
+    elif data == "pago_dolares_general":
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
+        bot.send_message(
+            chat_id,
+            "💳 Para pagar en dólares:\n"
+            "1. Haz clic en el enlace.\n"
+            "2. Elige el plan (Copper, Silver, etc.).\n"
+            "3. Completa el pago con tarjeta.\n\n"
+            "Al terminar, tu membresía se activará automáticamente.",
+            reply_markup=markup
+        )
+    elif data.startswith("plan_"):
+        # Ejemplo: plan_copper_soles, plan_silver_dolares, etc.
+        partes = data.split("_")
+        if len(partes) >= 3:
+            plan = partes[1]
+            moneda = partes[2]
+            if moneda == "soles":
+                markup = InlineKeyboardMarkup()
+                markup.add(InlineKeyboardButton("📸 Enviar voucher", callback_data=f"voucher_{plan}"))
+                bot.send_message(
+                    chat_id,
+                    f"Has elegido *{plan.upper()}* en soles.\n\n"
+                    "🇵🇪 *Paga con Yape/Plin:*\n"
+                    "• Número: 930202820\n"
+                    "• Titular: Richard Quiroz\n"
+                    f"• Monto: S/{'22' if plan == 'copper' else '33' if plan == 'silver' else '85' if plan == 'gold' else '163' if plan == 'platinum' else '348'}\n\n"
+                    "Después del pago, presiona el botón y adjunta la captura.",
+                    reply_markup=markup,
+                    parse_mode="Markdown"
+                )
+            else:  # dólares
+                links = {
+                    "copper": "https://buymeacoffee.com/quehay/membership",
+                    "silver": "https://buymeacoffee.com/quehay/membership",
+                    "gold": "https://buymeacoffee.com/quehay/e/510546",
+                    "platinum": "https://buymeacoffee.com/quehay/e/510549",
+                    "diamond": "https://buymeacoffee.com/quehay/e/510552"
+                }
+                url = links.get(plan, "")
+                if url:
+                    markup = InlineKeyboardMarkup()
+                    markup.add(InlineKeyboardButton("💳 Pagar ahora", url=f"{url}?ref={user_id}"))
+                    bot.send_message(
+                        chat_id,
+                        f"Has elegido *{plan.upper()}* en dólares.\n\n"
+                        "Serás redirigido a Buy Me a Coffee para pagar con tarjeta.\n"
+                        "Al completar, tu membresía se activará automáticamente.",
+                        reply_markup=markup,
+                        parse_mode="Markdown"
+                    )
+    elif data.startswith("voucher_"):
+        plan = data.split("_")[1]
+        # Guardar el estado del usuario
+        user_states[user_id] = {"estado": "esperando_voucher", "plan": plan}
+        bot.send_message(
+            chat_id,
+            f"Por favor, envía la captura del voucher de tu pago de *{plan.upper()}*.\n"
+            "Un administrador la revisará y activará tu membresía.",
+            parse_mode="Markdown"
+        )
+    elif data == "ver_planes_detalle":
+        bot.send_message(chat_id, KEYWORD_REPLIES["planes"], parse_mode="Markdown")
+    elif data == "beneficios":
+        bot.send_message(chat_id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
+    else:
+        bot.send_message(chat_id, "Opción no reconocida.")
+
 # ============ START ============
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
 
-    # Verificar si el usuario ya existe
+    # Registrar o actualizar usuario en Supabase
     usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
-    
     if not usuario.data:
         supabase_service.table('usuarios').insert({
             "telegram_id": user_id,
@@ -61,7 +417,30 @@ def start(message):
         }).eq('telegram_id', user_id).execute()
         print(f"✅ Usuario actualizado: {user_name}")
 
-    # MODO ADMIN
+    # Mensaje de bienvenida con botones inline
+    welcome = (
+        f"🎬 *¡Bienvenido {user_name} a QuehayApp VIP!*\n\n"
+        "Disfruta de películas y series exclusivas en Telegram con estos planes:\n\n"
+        "• COPPER: S/22 | $5.99 - Acceso a canales\n"
+        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
+        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
+        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
+        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
+        "👇 *¿Qué deseas hacer?*"
+    )
+
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
+        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
+        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
+        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://tu-mini-app.com"})  # Reemplaza URL
+    )
+
+    bot.send_message(message.chat.id, welcome, reply_markup=markup, parse_mode="Markdown")
+
+    # Si es admin, mostrar comandos extra
     if user_id == ADMIN_ID:
         bot.send_message(
             message.chat.id,
@@ -73,23 +452,22 @@ def start(message):
         )
         return
 
-    # USUARIO NORMAL
+    # Procesar parámetros de pago (ej. /start pago_copper_22)
     args = message.text.split()
-
     if len(args) > 1 and args[1].startswith("pago_"):
         partes = args[1].split("_")
         plan = partes[1]
         precio = partes[2]
 
         supabase_service.table('pagos_manuales').insert({
-             "usuario_id": user_id,
-             "membresia_comprada": plan,
-             "monto": precio,
-             "metodo": "yape",
-             "fecha_pago": datetime.now().isoformat(),
-             "estado": "pendiente",
-             "activado": False
-          }).execute()
+            "usuario_id": user_id,
+            "membresia_comprada": plan,
+            "monto": precio,
+            "metodo": "yape",
+            "fecha_pago": datetime.now().isoformat(),
+            "estado": "pendiente",
+            "activado": False
+        }).execute()
 
         bot.send_message(
             message.chat.id,
@@ -107,59 +485,8 @@ def start(message):
         )
         return
 
+    # Mostrar menú principal
     menu_principal(message.chat.id)
-
-# ============ BOTONES ============
-@bot.message_handler(func=lambda message: message.text == "💎 Ver Planes")
-def ver_planes(message):
-    planes = supabase_service.table('membresias_planes').select('*').execute()
-    
-    texto = "💎 *Planes Disponibles:*\n\n"
-    
-    for p in planes.data:
-        texto += f"🔹 *{p['nombre'].upper()}*\n"
-        texto += f"💰 S/{p['precio_soles']} | ${p['precio_dolares']}\n"
-        texto += f"⏳ {p['duracion_dias']} días\n"
-        texto += f"📦 {p['pedidos_por_mes']} pedidos\n\n"
-    
-    texto += "📲 Compra desde la MiniApp."
-    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
-
-@bot.message_handler(func=lambda message: message.text == "📲 Cómo Comprar")
-def como_comprar(message):
-    bot.send_message(
-        message.chat.id,
-        "📲 *Cómo comprar tu membresía:*\n\n"
-        "1️⃣ Entra a la MiniApp.\n"
-        "2️⃣ Elige tu plan.\n"
-        "3️⃣ Paga con Yape / Plin o Tarjeta.\n"
-        "4️⃣ Tu acceso se activa en minutos.\n\n"
-        "⚡ Si pagas con Yape, envía el voucher aquí.",
-        parse_mode="Markdown"
-    )
-
-@bot.message_handler(func=lambda message: message.text == "🎬 Beneficios")
-def beneficios(message):
-    bot.send_message(
-        message.chat.id,
-        "🎬 *Beneficios VIP:*\n\n"
-        "✅ Acceso al canal privado\n"
-        "✅ Ver y descargar en Telegram\n"
-        "✅ Sin publicidad\n"
-        "✅ Contenido exclusivo\n"
-        "✅ Pedidos según tu plan\n"
-        "✅ Soporte directo\n",
-        parse_mode="Markdown"
-    )
-
-@bot.message_handler(func=lambda message: message.text == "📞 Soporte")
-def soporte(message):
-    bot.send_message(
-        message.chat.id,
-        "📞 Soporte:\n\n"
-        "Si tienes problemas con tu pago o acceso,\n"
-        "envíanos un mensaje aquí mismo y te ayudaremos.",
-    )
 
 # ============ ADMIN ============
 @bot.message_handler(commands=['planes'])
@@ -167,7 +494,7 @@ def planes(message):
     if message.from_user.id != ADMIN_ID:
         return
     
-    planes = supabase_service.table('membresias_planes').select('*').execute()
+    planes = supabase.table('membresias_planes').select('*').execute()
     texto = "📋 MEMBRESÍAS DISPONIBLES:\n\n"
     
     for p in planes.data:
@@ -355,7 +682,7 @@ def listar_activos(message):
         return
     
     try:
-        usuarios_activos = supabase_service.table('usuarios') \
+        usuarios_activos = supabase.table('usuarios') \
             .select('telegram_id, nombre, membresia_tipo, fecha_vencimiento') \
             .eq('membresia_activa', True) \
             .execute()
@@ -392,7 +719,7 @@ def desactivar(message):
             return
             
         user_id = int(partes[1])
-        usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        usuario = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
         
         if not usuario.data:
             bot.send_message(message.chat.id, f"❌ Usuario {user_id} no encontrado")
@@ -401,8 +728,8 @@ def desactivar(message):
         usuario_data = usuario.data[0]
         usuario_id = usuario_data['id']
         
-        supabase_service.table('usuarios').update({"membresia_activa": False}).eq('telegram_id', user_id).execute()
-        supabase_service.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
+        supabase.table('usuarios').update({"membresia_activa": False}).eq('telegram_id', user_id).execute()
+        supabase.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
         
         bot.send_message(message.chat.id, f"✅ Usuario {user_id} desactivado")
         
@@ -429,7 +756,7 @@ def generar_enlaces(message):
         membresia = partes[2]
         
         # Verificar que el usuario existe
-        usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        usuario = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
         if not usuario.data:
             bot.reply_to(message, f"❌ Usuario {user_id} no encontrado")
             return
@@ -463,7 +790,7 @@ def generar_enlaces(message):
         
         # Guardar en base de datos (opcional)
         try:
-            supabase_service.table('invitaciones').insert([
+            supabase.table('invitaciones').insert([
                 {
                     "usuario_id": user_id,
                     "canal": "peliculas",
@@ -538,14 +865,14 @@ def aprobar_pago():
             return jsonify({"error": "pagoId requerido"}), 400
 
         # 1️⃣ Obtener pago
-        pago_res = supabase_service.table("pagos_manuales").select("*").eq("id", pago_id).execute()
+        pago_res = supabase.table("pagos_manuales").select("*").eq("id", pago_id).execute()
         if not pago_res.data:
             return jsonify({"error": "Pago no encontrado"}), 404
 
         pago = pago_res.data[0]
 
         # 2️⃣ Obtener usuario
-        usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", pago["usuario_id"]).execute()
+        usuario_res = supabase.table("usuarios").select("*").eq("telegram_id", pago["usuario_id"]).execute()
         if not usuario_res.data:
             return jsonify({"error": "Usuario no encontrado"}), 404
 
@@ -562,7 +889,7 @@ def aprobar_pago():
             return jsonify({"error": "Error activando membresía"}), 500
 
         # 4️⃣ Marcar pago como aprobado
-        supabase_service.table("pagos_manuales").update({
+        supabase.table("pagos_manuales").update({
             "estado": "aprobado",
             "activado": True
         }).eq("id", pago_id).execute()
@@ -580,7 +907,7 @@ def limpiar_membresias_vencidas():
     ahora = datetime.now().isoformat()
 
     # Buscar usuarios con membresía activa pero fecha vencida
-    usuarios = supabase_service.table("usuarios") \
+    usuarios = supabase.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .lt("fecha_vencimiento", ahora) \
@@ -588,12 +915,12 @@ def limpiar_membresias_vencidas():
 
     for u in usuarios.data:
         # Desactivar membresía en usuarios
-        supabase_service.table("usuarios").update({
+        supabase.table("usuarios").update({
             "membresia_activa": False
         }).eq("id", u["id"]).execute()
 
         # Opcional: también podrías desactivar el registro en membresias_activas
-        supabase_service.table("membresias_activas").update({
+        supabase.table("membresias_activas").update({
             "estado": "inactiva"
         }).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
 
@@ -631,7 +958,7 @@ def crear_pedido():
         # Obtener membresía activa con plan y pedidos_extra
         hoy = datetime.now().isoformat()
         mem_res = supabase_service.table("membresias_activas") \
-            .select("*, membresias_planes!membresias_activas_plan_id_fkey(*)") \
+            .select("*, membresias_planes(*)") \
             .eq("usuario_id", usuario["id"]) \
             .eq("estado", "activa") \
             .gte("fecha_fin", hoy) \
@@ -712,7 +1039,7 @@ def admin_pedidos():
             return response, 403
 
         # Obtener TODOS los pedidos con información del usuario
-        pedidos_res = supabase_service.table("pedidos") \
+        pedidos_res = supabase.table("pedidos") \
             .select("*, usuarios!inner(*)") \
             .order("fecha_pedido", desc=True) \
             .execute()
@@ -771,7 +1098,7 @@ def marcar_entregado():
             return response, 403
 
         # Obtener pedido con información del usuario
-        pedido_res = supabase_service.table("pedidos") \
+        pedido_res = supabase.table("pedidos") \
             .select("*, usuarios!inner(*)") \
             .eq("id", pedido_id) \
             .execute()
@@ -784,7 +1111,7 @@ def marcar_entregado():
         pedido = pedido_res.data[0]
 
         # Actualizar estado del pedido
-        supabase_service.table("pedidos").update({
+        supabase.table("pedidos").update({
             "estado": "entregado",
             "fecha_respuesta": datetime.now().isoformat()
         }).eq("id", pedido_id).execute()
@@ -831,7 +1158,7 @@ def mis_pedidos():
             return jsonify({"error": "telegram_id requerido"}), 400
 
         # Buscar pedidos del usuario
-        pedidos_res = supabase_service.table("pedidos") \
+        pedidos_res = supabase.table("pedidos") \
             .select("*") \
             .eq("usuario_id", telegram_id) \
             .order("fecha_pedido", desc=True) \
@@ -849,7 +1176,7 @@ def mis_pedidos():
             })
 
         # También obtener info del usuario para mostrar membresía
-        usuario_res = supabase_service.table("usuarios") \
+        usuario_res = supabase.table("usuarios") \
             .select("membresia_tipo, membresia_activa") \
             .eq("telegram_id", telegram_id) \
             .execute()
@@ -887,7 +1214,7 @@ def verificar_vencimientos():
 
     # --- 1. Usuarios que vencen en 3 días ---
     en_3_dias = (ahora + timedelta(days=3)).isoformat()
-    usuarios_proximos = supabase_service.table("usuarios") \
+    usuarios_proximos = supabase.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .gte("fecha_vencimiento", hoy) \
@@ -909,7 +1236,7 @@ def verificar_vencimientos():
 
     # --- 2. Usuarios que vencen en 3 horas ---
     en_3_horas = (ahora + timedelta(hours=3)).isoformat()
-    usuarios_muy_proximos = supabase_service.table("usuarios") \
+    usuarios_muy_proximos = supabase.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .gte("fecha_vencimiento", hoy) \
@@ -929,56 +1256,35 @@ def verificar_vencimientos():
         except Exception as e:
             print(f"Error notificando a {u['telegram_id']}: {e}")
 
-    # --- 3. Usuarios ya vencidos (fecha_vencimiento < hoy) ---
-    usuarios_vencidos = supabase_service.table("usuarios") \
-        .select("*, membresias_activas!inner(*)") \
+    # --- 3. Usuarios ya vencidos (limpiar y expulsar) ---
+    usuarios_vencidos = supabase.table("usuarios") \
+        .select("*") \
         .eq("membresia_activa", True) \
         .lt("fecha_vencimiento", hoy) \
         .execute()
 
     for u in usuarios_vencidos.data:
-        # Obtener la membresía activa (la que está vencida)
-        mem_act_res = supabase_service.table("membresias_activas") \
-            .select("*") \
-            .eq("usuario_id", u["id"]) \
-            .eq("estado", "activa") \
-            .execute()
-        mem_act = mem_act_res.data[0] if mem_act_res.data else None
+        # Desactivar en BD
+        supabase.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
+        supabase.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
 
-        if mem_act and mem_act.get("plan_futuro"):
-            # Hay un cambio programado: activar el nuevo plan
-            nuevo_plan_id = mem_act["plan_futuro"]
-            plan_nuevo_res = supabase_service.table("membresias_planes").select("nombre").eq("id", nuevo_plan_id).execute()
-            if plan_nuevo_res.data:
-                nuevo_plan = plan_nuevo_res.data[0]["nombre"]
-                activar_usuario(u["telegram_id"], nuevo_plan, ADMIN_ID)
+        # Expulsar de canales
+        try:
+            bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
+            bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
+            print(f"Usuario {u['telegram_id']} expulsado de canales por vencimiento")
+        except Exception as e:
+            print(f"Error expulsando a {u['telegram_id']}: {e}")
 
-            # Limpiar el campo plan_futuro
-            supabase_service.table("membresias_activas") \
-                .update({"plan_futuro": None}) \
-                .eq("id", mem_act["id"]) \
-                .execute()
-        else:
-            # Desactivar y expulsar normalmente
-            supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
-            supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
-
-            # Expulsar de canales
-            try:
-                bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
-                bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
-            except Exception as e:
-                print(f"Error expulsando a {u['telegram_id']}: {e}")
-
-            # Notificar
-            try:
-                bot.send_message(
-                    u["telegram_id"],
-                    "❌ Tu membresía ha vencido. Has sido expulsado de los canales.\n"
-                    "Renueva para seguir disfrutando."
-                )
-            except:
-                pass
+        # Notificar
+        try:
+            bot.send_message(
+                u["telegram_id"],
+                "❌ Tu membresía ha vencido. Has sido expulsado de los canales.\n"
+                "Renueva para seguir disfrutando."
+            )
+        except:
+            pass
 
 @app.route("/webhook/buymeacoffee", methods=["POST"])
 def webhook_buymeacoffee():
@@ -1062,46 +1368,30 @@ def webhook_buymeacoffee():
 
 @app.route("/api/usuario", methods=["POST"])
 def api_usuario():
-    try:
-        data = request.get_json()
-        telegram_id = data.get("telegram_id")
-        if not telegram_id:
-            return jsonify({"error": "telegram_id requerido"}), 400
+    data = request.get_json()
+    telegram_id = data.get("telegram_id")
+    if not telegram_id:
+        return jsonify({"error": "telegram_id requerido"}), 400
 
-        # Obtener usuario
-        usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
-        usuario = usuario_res.data[0] if usuario_res.data else None
+    # Obtener usuario
+    usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
+    usuario = usuario_res.data[0] if usuario_res.data else None
 
-        membresia = None
-        if usuario:
-            hoy = datetime.now().isoformat()
-            # Primero obtener la membresía activa sin el join
-            mem_res = supabase_service.table("membresias_activas") \
-                .select("*") \
-                .eq("usuario_id", usuario["id"]) \
-                .eq("estado", "activa") \
-                .gte("fecha_fin", hoy) \
-                .execute()
-            
-            if mem_res.data:
-                membresia = mem_res.data[0]
-                # Luego obtener el plan por separado
-                plan_res = supabase_service.table("membresias_planes") \
-                    .select("*") \
-                    .eq("id", membresia["plan_id"]) \
-                    .execute()
-                if plan_res.data:
-                    membresia["membresias_planes"] = plan_res.data[0]
+    membresia = None
+    if usuario:
+        hoy = datetime.now().isoformat()
+        mem_res = supabase_service.table("membresias_activas") \
+            .select("*, membresias_planes(*)") \
+            .eq("usuario_id", usuario["id"]) \
+            .eq("estado", "activa") \
+            .gte("fecha_fin", hoy) \
+            .execute()
+        membresia = mem_res.data[0] if mem_res.data else None
 
-        return jsonify({
-            "usuario": usuario,
-            "membresia": membresia
-        }), 200
-
-    except Exception as e:
-        print("❌ Error en /api/usuario:", str(e))
-        return jsonify({"error": "Error interno del servidor"}), 500
-    
+    return jsonify({
+        "usuario": usuario,
+        "membresia": membresia
+    })
 @app.route("/api/planes", methods=["GET"])
 def api_planes():
     planes = supabase_service.table("membresias_planes").select("*").execute()
@@ -1167,67 +1457,6 @@ def api_mis_pedidos():
         p["fecha"] = datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M")
     
     return jsonify({"pedidos": pedidos.data})
-
-@app.route("/api/solicitar_cambio_plan", methods=["POST"])
-def solicitar_cambio_plan():
-    data = request.get_json()
-    telegram_id = data.get("telegram_id")
-    nuevo_plan_id = data.get("nuevo_plan_id")
-
-    if not telegram_id or not nuevo_plan_id:
-        return jsonify({"error": "Faltan datos"}), 400
-
-    # Obtener usuario
-    usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
-    if not usuario_res.data:
-        return jsonify({"error": "Usuario no encontrado"}), 404
-
-    usuario = usuario_res.data[0]
-
-    # Obtener membresía activa actual
-    hoy = datetime.now().isoformat()
-    mem_res = supabase_service.table("membresias_activas") \
-        .select("*, membresias_planes(*)") \
-        .eq("usuario_id", usuario["id"]) \
-        .eq("estado", "activa") \
-        .gte("fecha_fin", hoy) \
-        .execute()
-
-    if not mem_res.data:
-        return jsonify({"error": "No tienes una membresía activa"}), 400
-
-    membresia_actual = mem_res.data[0]
-    plan_actual = membresia_actual["membresias_planes"]
-
-    # Verificar que el nuevo plan sea realmente inferior (por ejemplo, menos pedidos o menor precio)
-
-    plan_nuevo_res = supabase_service.table("membresias_planes").select("*").eq("id", nuevo_plan_id).execute()
-    if not plan_nuevo_res.data:
-        return jsonify({"error": "Plan no válido"}), 400
-
-    plan_nuevo = plan_nuevo_res.data[0]
-    if plan_nuevo["pedidos_por_mes"] > plan_actual["pedidos_por_mes"]:
-        return jsonify({"error": "El plan seleccionado no es inferior al actual"}), 400
-
-    # Registrar el plan futuro en la membresía activa
-    supabase_service.table("membresias_activas") \
-        .update({"plan_futuro": nuevo_plan_id}) \
-        .eq("id", membresia_actual["id"]) \
-        .execute()
-
-    # Notificar al usuario
-    try:
-        bot.send_message(
-            telegram_id,
-            f"🔄 Has solicitado cambiar a *{plan_nuevo['nombre'].upper()}* al finalizar tu período actual.\n"
-            f"📅 Tu membresía actual vence el {datetime.fromisoformat(membresia_actual['fecha_fin']).strftime('%d/%m/%Y')}.\n"
-            f"Después de esa fecha, se activará tu nuevo plan.",
-            parse_mode="Markdown"
-        )
-    except Exception as e:
-        print(f"Error notificando al usuario: {e}")
-
-    return jsonify({"success": True, "mensaje": "Cambio programado correctamente"})
 
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
