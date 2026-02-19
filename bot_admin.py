@@ -104,11 +104,12 @@ def start(message):
             bot.send_message(
                 chat_id,
                 f"💎 *PLAN {plan.upper()}*\n\n"
-                f"💰 Monto: S/{precio}\n\n"
-                "📲 Yape/Plin: 930202820\n"
+                f"💰 Monto a Pagar: S/{precio}\n\n"
+                "📲 *Yape/Plin:* `930202820` (Richard Quiroz)\n"
                 f"📝 Concepto: {user_id}\n\n"
-                "✅ El sistema la detectará automáticamente.\n\n"
-                "📸 Envía la captura del voucher aquí.",
+                "📸 Envía la captura del voucher aquí\n"
+                f"✅ El sistema la enviara al admin.\n\n"
+                "🟢 Despues de validar pago tu membresía se activara.",               
                 parse_mode="Markdown",
                 reply_markup=markup
             )
@@ -256,7 +257,7 @@ def recibir_foto(message):
 
         bot.send_message(
             chat_id,
-            f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado.",
+            f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado, si es correcto se te enviaran 2 enlaces a los canales privados y se te activara tu Membresía",
             parse_mode="Markdown"
         )
 
@@ -284,33 +285,6 @@ def soporte_archivos(message):
 
     bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
     bot.send_message(chat_id, "📩 Tu archivo fue enviado a soporte.")
-
-#// ÚNICO HANDLER DE TEXTO
-
-@bot.message_handler(content_types=['text'])
-def manejar_texto(message):
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-    text = message.text.strip()
-
-    botones = [
-        "💎 Ver Planes",
-        "🎬 Beneficios VIP",
-        "🇵🇪 Pago en Soles",
-        "💳 Pago en Dólares",
-        "👤 Mi Perfil",
-        "🆘 Ayuda"
-    ]
-
-    if text.startswith("/") or text in botones:
-        return
-
-    if user_id in user_states and user_states[user_id]["estado"] == "esperando_voucher":
-        bot.send_message(chat_id, "❌ Envía una FOTO del voucher o presiona Cancelar.")
-        return
-
-    bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
-    bot.send_message(chat_id, "📩 Tu mensaje fue enviado a soporte.")
 
 #//responder desde el grupo
 
@@ -359,6 +333,57 @@ def responder_desde_grupo(message):
     except Exception as e:
         print("Error respondiendo desde grupo:", e)
         bot.reply_to(message, "❌ Error al enviar respuesta.")
+
+#// ÚNICO HANDLER DE TEXTO
+
+@bot.message_handler(content_types=['text'])
+def manejar_texto(message):
+
+    # 🚫 Ignorar mensajes del grupo soporte
+    if message.chat.id == GRUPO_SOPORTE_ID:
+        return
+
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    text_original = message.text.strip()
+    text = text_original.lower()
+
+    botones = [
+        "💎 Ver Planes",
+        "🎬 Beneficios VIP",
+        "🇵🇪 Pago en Soles",
+        "💳 Pago en Dólares",
+        "👤 Mi Perfil",
+        "🆘 Ayuda"
+    ]
+
+    # Ignorar comandos y botones
+    if text_original.startswith("/") or text_original in botones:
+        return
+
+    # ==============================
+    # SI ESTÁ ESPERANDO VOUCHER
+    # ==============================
+    if user_id in user_states and user_states[user_id]["estado"] == "esperando_voucher":
+        bot.send_message(
+            chat_id,
+            "❌ Envía una FOTO del voucher o presiona Cancelar."
+        )
+        return
+
+    # ==============================
+    # PALABRAS CLAVE
+    # ==============================
+    for keyword, reply in KEYWORD_REPLIES.items():
+        if keyword in text:
+            bot.send_message(chat_id, reply, parse_mode="Markdown")
+            return
+
+    # ==============================
+    # SI NO COINCIDE → SOPORTE
+    # ==============================
+    bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+    bot.send_message(chat_id, "📩 Tu mensaje fue enviado a soporte.")
 
 # ============ SISTEMA DE RESPUESTAS AUTOMÁTICAS (KEYWORD REPLIES) ============
 KEYWORD_REPLIES = {
