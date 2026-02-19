@@ -494,7 +494,7 @@ def planes(message):
     if message.from_user.id != ADMIN_ID:
         return
     
-    planes = supabase.table('membresias_planes').select('*').execute()
+    planes = supabase_service.table('membresias_planes').select('*').execute()
     texto = "📋 MEMBRESÍAS DISPONIBLES:\n\n"
     
     for p in planes.data:
@@ -682,7 +682,7 @@ def listar_activos(message):
         return
     
     try:
-        usuarios_activos = supabase.table('usuarios') \
+        usuarios_activos = supabase_service.table('usuarios') \
             .select('telegram_id, nombre, membresia_tipo, fecha_vencimiento') \
             .eq('membresia_activa', True) \
             .execute()
@@ -719,7 +719,7 @@ def desactivar(message):
             return
             
         user_id = int(partes[1])
-        usuario = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
         
         if not usuario.data:
             bot.send_message(message.chat.id, f"❌ Usuario {user_id} no encontrado")
@@ -728,8 +728,8 @@ def desactivar(message):
         usuario_data = usuario.data[0]
         usuario_id = usuario_data['id']
         
-        supabase.table('usuarios').update({"membresia_activa": False}).eq('telegram_id', user_id).execute()
-        supabase.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
+        supabase_service.table('usuarios').update({"membresia_activa": False}).eq('telegram_id', user_id).execute()
+        supabase_service.table('membresias_activas').update({"estado": "inactiva"}).eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
         
         bot.send_message(message.chat.id, f"✅ Usuario {user_id} desactivado")
         
@@ -756,7 +756,7 @@ def generar_enlaces(message):
         membresia = partes[2]
         
         # Verificar que el usuario existe
-        usuario = supabase.table('usuarios').select('*').eq('telegram_id', user_id).execute()
+        usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
         if not usuario.data:
             bot.reply_to(message, f"❌ Usuario {user_id} no encontrado")
             return
@@ -790,7 +790,7 @@ def generar_enlaces(message):
         
         # Guardar en base de datos (opcional)
         try:
-            supabase.table('invitaciones').insert([
+            supabase_service.table('invitaciones').insert([
                 {
                     "usuario_id": user_id,
                     "canal": "peliculas",
@@ -865,14 +865,14 @@ def aprobar_pago():
             return jsonify({"error": "pagoId requerido"}), 400
 
         # 1️⃣ Obtener pago
-        pago_res = supabase.table("pagos_manuales").select("*").eq("id", pago_id).execute()
+        pago_res = supabase_service.table("pagos_manuales").select("*").eq("id", pago_id).execute()
         if not pago_res.data:
             return jsonify({"error": "Pago no encontrado"}), 404
 
         pago = pago_res.data[0]
 
         # 2️⃣ Obtener usuario
-        usuario_res = supabase.table("usuarios").select("*").eq("telegram_id", pago["usuario_id"]).execute()
+        usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", pago["usuario_id"]).execute()
         if not usuario_res.data:
             return jsonify({"error": "Usuario no encontrado"}), 404
 
@@ -889,7 +889,7 @@ def aprobar_pago():
             return jsonify({"error": "Error activando membresía"}), 500
 
         # 4️⃣ Marcar pago como aprobado
-        supabase.table("pagos_manuales").update({
+        supabase_service.table("pagos_manuales").update({
             "estado": "aprobado",
             "activado": True
         }).eq("id", pago_id).execute()
@@ -907,7 +907,7 @@ def limpiar_membresias_vencidas():
     ahora = datetime.now().isoformat()
 
     # Buscar usuarios con membresía activa pero fecha vencida
-    usuarios = supabase.table("usuarios") \
+    usuarios = supabase_service.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .lt("fecha_vencimiento", ahora) \
@@ -915,12 +915,12 @@ def limpiar_membresias_vencidas():
 
     for u in usuarios.data:
         # Desactivar membresía en usuarios
-        supabase.table("usuarios").update({
+        supabase_service.table("usuarios").update({
             "membresia_activa": False
         }).eq("id", u["id"]).execute()
 
         # Opcional: también podrías desactivar el registro en membresias_activas
-        supabase.table("membresias_activas").update({
+        supabase_service.table("membresias_activas").update({
             "estado": "inactiva"
         }).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
 
@@ -1039,7 +1039,7 @@ def admin_pedidos():
             return response, 403
 
         # Obtener TODOS los pedidos con información del usuario
-        pedidos_res = supabase.table("pedidos") \
+        pedidos_res = supabase_service.table("pedidos") \
             .select("*, usuarios!inner(*)") \
             .order("fecha_pedido", desc=True) \
             .execute()
@@ -1098,7 +1098,7 @@ def marcar_entregado():
             return response, 403
 
         # Obtener pedido con información del usuario
-        pedido_res = supabase.table("pedidos") \
+        pedido_res = supabase_service.table("pedidos") \
             .select("*, usuarios!inner(*)") \
             .eq("id", pedido_id) \
             .execute()
@@ -1111,7 +1111,7 @@ def marcar_entregado():
         pedido = pedido_res.data[0]
 
         # Actualizar estado del pedido
-        supabase.table("pedidos").update({
+        supabase_service.table("pedidos").update({
             "estado": "entregado",
             "fecha_respuesta": datetime.now().isoformat()
         }).eq("id", pedido_id).execute()
@@ -1158,7 +1158,7 @@ def mis_pedidos():
             return jsonify({"error": "telegram_id requerido"}), 400
 
         # Buscar pedidos del usuario
-        pedidos_res = supabase.table("pedidos") \
+        pedidos_res = supabase_service.table("pedidos") \
             .select("*") \
             .eq("usuario_id", telegram_id) \
             .order("fecha_pedido", desc=True) \
@@ -1176,7 +1176,7 @@ def mis_pedidos():
             })
 
         # También obtener info del usuario para mostrar membresía
-        usuario_res = supabase.table("usuarios") \
+        usuario_res = supabase_service.table("usuarios") \
             .select("membresia_tipo, membresia_activa") \
             .eq("telegram_id", telegram_id) \
             .execute()
@@ -1214,7 +1214,7 @@ def verificar_vencimientos():
 
     # --- 1. Usuarios que vencen en 3 días ---
     en_3_dias = (ahora + timedelta(days=3)).isoformat()
-    usuarios_proximos = supabase.table("usuarios") \
+    usuarios_proximos = supabase_service.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .gte("fecha_vencimiento", hoy) \
@@ -1236,7 +1236,7 @@ def verificar_vencimientos():
 
     # --- 2. Usuarios que vencen en 3 horas ---
     en_3_horas = (ahora + timedelta(hours=3)).isoformat()
-    usuarios_muy_proximos = supabase.table("usuarios") \
+    usuarios_muy_proximos = supabase_service.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .gte("fecha_vencimiento", hoy) \
@@ -1257,7 +1257,7 @@ def verificar_vencimientos():
             print(f"Error notificando a {u['telegram_id']}: {e}")
 
     # --- 3. Usuarios ya vencidos (limpiar y expulsar) ---
-    usuarios_vencidos = supabase.table("usuarios") \
+    usuarios_vencidos = supabase_service.table("usuarios") \
         .select("*") \
         .eq("membresia_activa", True) \
         .lt("fecha_vencimiento", hoy) \
@@ -1265,8 +1265,8 @@ def verificar_vencimientos():
 
     for u in usuarios_vencidos.data:
         # Desactivar en BD
-        supabase.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
-        supabase.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
+        supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
+        supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado", "activa").execute()
 
         # Expulsar de canales
         try:
