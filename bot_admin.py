@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import time
 import hmac
 import hashlib
+import re
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -15,7 +16,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
+GRUPO_SOPORTE_ID = -1003805629374  
 # Diccionario para estados de usuarios (vouchers, etc.)
 user_states = {}
 
@@ -28,25 +29,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # ============ MENÚ PRINCIPAL MEJORADO ============
-def menu_principal(chat_id, user_name="", mostrar_inline=True):
-    """Muestra el menú principal con botones.
-    Args:
-        chat_id: ID del chat
-        user_name: Nombre del usuario para personalizar
-        mostrar_inline: Si es True, muestra también los botones inline
-    """
-    # Menú de teclado (botones persistentes)
-    markup_reply = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup_reply.add(
-        KeyboardButton("💎 Ver Planes"),
-        KeyboardButton("🇵🇪 Pago en Soles (Yape/Plin)"),
-        KeyboardButton("💳 Pago en Dólares (Tarjeta)"),
-        KeyboardButton("🎬 Beneficios VIP"),
-        KeyboardButton("👤 Mi Perfil"),
-        KeyboardButton("🆘 Ayuda")
-    )
-    
-    # Mensaje de bienvenida con formato
+def menu_principal(chat_id, user_name=""):
+    """Muestra el menú principal con botones."""
+    # Mensaje de bienvenida
     welcome_text = (
         f"🎬 *¡Bienvenido {user_name} a QuehayApp VIP!*\n\n"
         "Disfruta de películas y series exclusivas en Telegram con estos planes:\n\n"
@@ -55,10 +40,21 @@ def menu_principal(chat_id, user_name="", mostrar_inline=True):
         "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
         "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
         "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
-        "👇 *¿Qué deseas hacer?*"
+        "👇 *Elige una opción:*"
     )
     
-    # Enviar mensaje con el teclado
+    # Botones del teclado persistente (ReplyKeyboardMarkup)
+    markup_reply = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup_reply.add(
+        KeyboardButton("💎 Ver Planes"),
+        KeyboardButton("🇵🇪 Pago en Soles"),
+        KeyboardButton("💳 Pago en Dólares"),
+        KeyboardButton("🎬 Beneficios VIP"),
+        KeyboardButton("👤 Mi Perfil"),
+        KeyboardButton("🆘 Ayuda")
+    )
+    
+    # Enviar mensaje con teclado persistente
     bot.send_message(
         chat_id,
         welcome_text,
@@ -66,23 +62,61 @@ def menu_principal(chat_id, user_name="", mostrar_inline=True):
         parse_mode="Markdown"
     )
     
-    # Botones inline (solo si se solicita)
-    if mostrar_inline:
-        markup_inline = InlineKeyboardMarkup(row_width=2)
-        markup_inline.add(
-            InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
-            InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
-            InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
-            InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
-            InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"})
-        )
+    # Botones inline (debajo, en un mensaje aparte)
+    markup_inline = InlineKeyboardMarkup(row_width=2)
+    markup_inline.add(
+        InlineKeyboardButton("💎 Ver Planes", callback_data="ver_planes_detalle"),
+        InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+        InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general"),
+        InlineKeyboardButton("🎬 Beneficios", callback_data="beneficios"),
+        InlineKeyboardButton("👤 Mi Perfil", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"})
+    )
+    
+    bot.send_message(
+        chat_id,
+        "⚡ *Acciones rápidas:*",
+        reply_markup=markup_inline,
+        parse_mode="Markdown"
+    )
+
+# ============ SISTEMA DE RESPUESTA DESDE EL GRUPO ============
+@bot.message_handler(func=lambda message: message.chat.id == GRUPO_SOPORTE_ID and message.reply_to_message)
+def responder_desde_grupo(message):
+    """Responde a usuarios desde el grupo de soporte."""
+    try:
+        # Obtener el mensaje original al que se está respondiendo
+        msg_original = message.reply_to_message
         
-        bot.send_message(
-            chat_id,
-            "⚡ *Acciones rápidas:*",
-            reply_markup=markup_inline,
-            parse_mode="Markdown"
-        )
+        # Extraer user_id del texto del mensaje original
+        import re
+        
+        # Buscar patrones como "Nuevo voucher de 123456789" o "Mensaje de 123456789"
+        texto_original = msg_original.text or msg_original.caption or ""
+        match = re.search(r'de (\d+)', texto_original)
+        
+        if match:
+            user_id = int(match.group(1))
+            
+            # Reenviar la respuesta al usuario
+            if message.photo:
+                # Si la respuesta es una foto (ej. un admin responde con un voucher aprobado)
+                photo = message.photo[-1]
+                caption = f"📝 *Respuesta de soporte:*\n\n{message.caption or ''}"
+                bot.send_photo(user_id, photo.file_id, caption=caption, parse_mode="Markdown")
+            elif message.text:
+                # Si es texto
+                bot.send_message(user_id, f"📝 *Respuesta de soporte:*\n\n{message.text}", parse_mode="Markdown")
+            elif message.document:
+                bot.send_document(user_id, message.document.file_id, caption=f"📝 *Respuesta de soporte:*\n\n{message.caption or ''}")
+            
+            # Confirmar en el grupo que se envió
+            bot.reply_to(message, "✅ Respuesta enviada al usuario.")
+        else:
+            bot.reply_to(message, "❌ No pude identificar al usuario. Asegúrate de responder a un mensaje reenviado.")
+            
+    except Exception as e:
+        print(f"Error en responder_desde_grupo: {e}")
+        bot.reply_to(message, f"❌ Error: {e}")
 
 # ============ START ============
 @bot.message_handler(commands=['start'])
@@ -106,22 +140,11 @@ def start(message):
         }).eq('telegram_id', user_id).execute()
         print(f"✅ Usuario actualizado: {user_name}")
 
-    # Si es admin, mostrar comandos extra
-    if user_id == ADMIN_ID:
-        bot.send_message(
-            message.chat.id,
-            "🤖 *Modo Admin Activado*\n\nComandos disponibles:\n"
-            "/planes\n"
-            "/activar ID PLAN\n"
-            "/desactivar ID",
-            parse_mode="Markdown"
-        )
-        # No retornamos para que también vea el menú normal
-
-    # Procesar parámetros de pago (ej. /start pago_copper_22)
+    # ✅ IMPORTANTE: Primero verificar si es un pago
     args = message.text.split()
     
     if len(args) > 1 and args[1].startswith("pago_"):
+        # Es un pago por Yape/Plin, NO mostrar bienvenida
         partes = args[1].split("_")
         plan = partes[1]
         precio = partes[2]
@@ -136,6 +159,7 @@ def start(message):
             "activado": False
         }).execute()
 
+        # Solo enviar instrucciones de pago, nada más
         bot.send_message(
             message.chat.id,
             f"💎 *PLAN {plan.upper()}*\n\n"
@@ -151,12 +175,306 @@ def start(message):
             parse_mode="Markdown"
         )
         
-        # Mostrar menú principal SIN botones inline para no saturar
-        menu_principal(message.chat.id, user_name, mostrar_inline=False)
+        # 🚫 NO llamamos a menu_principal aquí, para evitar duplicados
         return
 
-    # Mostrar menú principal completo (con botones inline)
-    menu_principal(message.chat.id, user_name, mostrar_inline=True)
+    # Si es admin, mostrar comandos extra (además del menú normal)
+    if user_id == ADMIN_ID:
+        bot.send_message(
+            message.chat.id,
+            "🤖 *Modo Admin Activado*\n\nComandos disponibles:\n"
+            "/planes\n"
+            "/activar ID PLAN\n"
+            "/desactivar ID",
+            parse_mode="Markdown"
+        )
+        # No retornamos, sigue con el menú normal
+
+    # Si no es un pago, mostramos el menú principal completo
+    menu_principal(message.chat.id, user_name)
+
+    # ============Alejandro HANDLER DE MENSAJES (RESPUESTAS AUTOMÁTICAS) ============
+@bot.message_handler(func=lambda message: True)
+def handle_all_messages(message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    text = message.text.lower().strip() if message.text else ""
+    
+    # ===== REENVIAR AL GRUPO DE SOPORTE (excepto si es el admin) =====
+    if user_id != ADMIN_ID and user_id != GRUPO_SOPORTE_ID:
+        try:
+            # Si es una foto, reenviar la foto
+            if message.photo:
+                # Obtener la foto de mayor calidad
+                photo = message.photo[-1]
+                caption = f"📸 *Nuevo voucher de {user_id}*"
+                if message.caption:
+                    caption += f"\n\n{message.caption}"
+                bot.send_photo(
+                    GRUPO_SOPORTE_ID,
+                    photo.file_id,
+                    caption=caption,
+                    parse_mode="Markdown"
+                )
+            # Si es texto, reenviar el texto
+            elif message.text:
+                bot.send_message(
+                    GRUPO_SOPORTE_ID,
+                    f"💬 *Mensaje de {user_id}:*\n\n{message.text}",
+                    parse_mode="Markdown"
+                )
+            # Si es otro tipo de archivo (video, documento, etc.)
+            elif message.document:
+                bot.send_document(
+                    GRUPO_SOPORTE_ID,
+                    message.document.file_id,
+                    caption=f"📄 *Documento de {user_id}*\n{message.caption or ''}"
+                )
+        except Exception as e:
+            print(f"Error reenviando al grupo: {e}")
+
+    # ===== VERIFICAR SI EL USUARIO TIENE UN ESTADO ACTIVO =====
+    if user_id in user_states:
+        state = user_states[user_id]
+        if state["estado"] == "esperando_voucher":
+            # El usuario debe enviar una foto
+            if message.photo:
+                # Es una foto, procesarla
+                plan = state["plan"]
+                photo = message.photo[-1]
+                file_id = photo.file_id
+                
+                # Confirmar al usuario
+                bot.send_message(
+                    chat_id,
+                    f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado.\n"
+                    "Te notificaremos cuando tu membresía esté activa.",
+                    parse_mode="Markdown"
+                )
+                
+                # Limpiar el estado
+                del user_states[user_id]
+                return
+            else:
+                # El usuario no envió una foto, recordarle
+                bot.send_message(
+                    chat_id,
+                    "❌ Por favor, envía una **foto** del voucher (no texto).\n"
+                    "Si necesitas cancelar, escribe 'cancelar'.",
+                    parse_mode="Markdown"
+                )
+                return
+
+    # ===== COMANDO PARA CANCELAR ESTADO =====
+    if text == "cancelar" and user_id in user_states:
+        del user_states[user_id]
+        bot.send_message(chat_id, "✅ Proceso cancelado. Puedes volver a empezar cuando quieras.")
+        return
+    
+    # ===== LOG PARA DEPURACIÓN =====
+    print(f"📩 Mensaje de {user_id}: {text}")
+    
+    # ===== IGNORAR COMANDOS (ya tienen handlers específicos) =====
+    if text.startswith('/'):
+        return
+    
+    # ===== BUSCAR COINCIDENCIA EN KEYWORD_REPLIES =====
+    for keyword, reply in KEYWORD_REPLIES.items():
+        if keyword in text:
+            bot.send_message(message.chat.id, reply, parse_mode="Markdown")
+            
+            # Si la intención es compra, podemos ofrecer botones inline adicionales
+            if any(word in text for word in ["comprar", "quiero comprar", "planes", "precio"]):
+                markup = telebot.types.InlineKeyboardMarkup(row_width=2)
+                markup.add(
+                    telebot.types.InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
+                    telebot.types.InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general")
+                )
+                bot.send_message(
+                    message.chat.id,
+                    "¿Cómo prefieres pagar?",
+                    reply_markup=markup
+                )
+            return
+    
+    # ===== SI NO HAY COINCIDENCIA, MOSTRAR MENÚ PRINCIPAL =====
+    bot.send_message(
+        message.chat.id,
+        "No entendí tu mensaje. Aquí tienes las opciones disponibles:"
+    )
+    menu_principal(message.chat.id, message.from_user.first_name)
+
+# ============ HANDLER DE BOTONES DEL MENÚ PRINCIPAL ============
+@bot.message_handler(func=lambda message: message.text == "💎 Ver Planes")
+def ver_planes_handler(message):
+    planes = supabase_service.table('membresias_planes').select('*').execute()
+    texto = "💎 *Planes Disponibles:*\n\n"
+    for p in planes.data:
+        texto += f"🔹 *{p['nombre'].upper()}*\n"
+        texto += f"💰 S/{p['precio_soles']} | ${p['precio_dolares']}\n"
+        texto += f"⏳ {p['duracion_dias']} días\n"
+        texto += f"📦 {p['pedidos_por_mes']} pedidos\n\n"
+    texto += "📲 Compra desde la MiniApp."
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
+
+@bot.message_handler(func=lambda message: message.text == "🇵🇪 Pago en Soles (Yape/Plin)")
+def pago_soles_handler(message):
+    # Podría redirigir a la mini app o dar instrucciones
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"}))
+    bot.send_message(
+        message.chat.id,
+        "🇵🇪 Para pagar en soles:\n"
+        "1. Abre la mini app.\n"
+        "2. Elige tu plan y presiona 'Yape/Plin'.\n"
+        "3. Sigue las instrucciones y envía el voucher.\n\n"
+        "¿Listo?",
+        reply_markup=markup
+    )
+
+@bot.message_handler(func=lambda message: message.text == "💳 Pago en Dólares (Tarjeta)")
+def pago_dolares_handler(message):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
+    bot.send_message(
+        message.chat.id,
+        "💳 Para pagar en dólares:\n"
+        "1. Haz clic en el enlace.\n"
+        "2. Elige el plan (Copper, Silver, etc.).\n"
+        "3. Completa el pago con tarjeta.\n\n"
+        "Al terminar, tu membresía se activará automáticamente.",
+        reply_markup=markup
+    )
+
+@bot.message_handler(func=lambda message: message.text == "🎬 Beneficios VIP")
+def beneficios_handler(message):
+    bot.send_message(
+        message.chat.id,
+        KEYWORD_REPLIES["beneficios"],
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(func=lambda message: message.text == "👤 Mi Perfil")
+def perfil_handler(message):
+    # Aquí podrías mostrar información del perfil, tal vez llamando a un endpoint de tu backend
+    # Por ahora, un mensaje genérico:
+    bot.send_message(
+        message.chat.id,
+        "👤 Para ver tu perfil y membresía, abre la mini app.",
+        reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton("Abrir mini app", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"}))
+    )
+
+@bot.message_handler(func=lambda message: message.text == "🆘 Ayuda")
+def ayuda_handler(message):
+    bot.send_message(
+        message.chat.id,
+        KEYWORD_REPLIES["ayuda"],
+        parse_mode="Markdown"
+    )
+
+# ============ HANDLER DE CALLBACKS (BOTONES INLINE) ============
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call):
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    data = call.data
+
+    bot.answer_callback_query(call.id)
+
+    if data == "pago_soles_general":
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"}))
+        bot.send_message(
+            chat_id,
+            "🇵🇪 Para pagar en soles:\n"
+            "1. Abre la mini app.\n"
+            "2. Elige tu plan y presiona 'Yape/Plin'.\n"
+            "3. Sigue las instrucciones y envía el voucher.\n\n"
+            "¿Listo?",
+            reply_markup=markup
+        )
+    elif data == "pago_dolares_general":
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
+        bot.send_message(
+            chat_id,
+            "💳 Para pagar en dólares:\n"
+            "1. Haz clic en el enlace.\n"
+            "2. Elige el plan (Copper, Silver, etc.).\n"
+            "3. Completa el pago con tarjeta.\n\n"
+            "Al terminar, tu membresía se activará automáticamente.",
+            reply_markup=markup
+        )
+    elif data.startswith("plan_"):
+        # Ejemplo: plan_copper_soles, plan_silver_dolares, etc.
+        partes = data.split("_")
+        if len(partes) >= 3:
+            plan = partes[1]
+            moneda = partes[2]
+            if moneda == "soles":
+                markup = InlineKeyboardMarkup()
+                markup.add(InlineKeyboardButton("📸 Enviar voucher", callback_data=f"voucher_{plan}"))
+                bot.send_message(
+                    chat_id,
+                    f"Has elegido *{plan.upper()}* en soles.\n\n"
+                    "🇵🇪 *Paga con Yape/Plin:*\n"
+                    "• Número: 930202820\n"
+                    "• Titular: Richard Quiroz\n"
+                    f"• Monto: S/{'22' if plan == 'copper' else '33' if plan == 'silver' else '85' if plan == 'gold' else '163' if plan == 'platinum' else '348'}\n\n"
+                    "Después del pago, presiona el botón y adjunta la captura.",
+                    reply_markup=markup,
+                    parse_mode="Markdown"
+                )
+            else:  # dólares
+                links = {
+                    "copper": "https://buymeacoffee.com/quehay/membership",
+                    "silver": "https://buymeacoffee.com/quehay/membership",
+                    "gold": "https://buymeacoffee.com/quehay/e/510546",
+                    "platinum": "https://buymeacoffee.com/quehay/e/510549",
+                    "diamond": "https://buymeacoffee.com/quehay/e/510552"
+                }
+                url = links.get(plan, "")
+                if url:
+                    markup = InlineKeyboardMarkup()
+                    markup.add(InlineKeyboardButton("💳 Pagar ahora", url=f"{url}?ref={user_id}"))
+                    bot.send_message(
+                        chat_id,
+                        f"Has elegido *{plan.upper()}* en dólares.\n\n"
+                        "Serás redirigido a Buy Me a Coffee para pagar con tarjeta.\n"
+                        "Al completar, tu membresía se activará automáticamente.",
+                        reply_markup=markup,
+                        parse_mode="Markdown"
+                    )
+    elif data.startswith("voucher_"):
+        plan = data.split("_")[1]
+        # Guardar el estado del usuario
+        user_states[user_id] = {"estado": "esperando_voucher", "plan": plan}
+        bot.send_message(
+            chat_id,
+            f"Por favor, envía la captura del voucher de tu pago de *{plan.upper()}*.\n"
+            "Un administrador la revisará y activará tu membresía.",
+            parse_mode="Markdown"
+        )
+    elif data == "ver_planes_detalle":
+        bot.send_message(chat_id, KEYWORD_REPLIES["planes"], parse_mode="Markdown")
+    elif data == "beneficios":
+        bot.send_message(chat_id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
+    else:
+        bot.send_message(chat_id, "Opción no reconocida.")
+
+# ============ ADMIN ============
+@bot.message_handler(commands=['planes'])
+def planes(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    planes = supabase_service.table('membresias_planes').select('*').execute()
+    texto = "📋 MEMBRESÍAS DISPONIBLES:\n\n"
+    
+    for p in planes.data:
+        texto += f"{p['nombre'].upper()} - S/{p['precio_soles']} - {p['duracion_dias']} días - {p['pedidos_por_mes']} pedidos\n"
+    
+    bot.send_message(message.chat.id, texto)
 
 # ============ SISTEMA DE RESPUESTAS AUTOMÁTICAS (KEYWORD REPLIES) ============
 KEYWORD_REPLIES = {
@@ -261,261 +579,6 @@ KEYWORD_REPLIES = {
     "gracias": "😊 ¡A ti por confiar en nosotros! Disfruta del contenido.",
     "chau": "👋 ¡Hasta pronto! Vuelve cuando quieras a ver más películas."
 }
-
-# ============ HANDLER DE MENSAJES (RESPUESTAS AUTOMÁTICAS) ============
-@bot.message_handler(func=lambda message: True)
-def handle_all_messages(message):
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-    text = message.text.lower().strip() if message.text else ""
-
-    # Verificar si el usuario tiene un estado activo (ej. esperando voucher)
-    if user_id in user_states:
-        state = user_states[user_id]
-        if state["estado"] == "esperando_voucher":
-            # El usuario debe enviar una foto
-            if message.photo:
-                # Es una foto, procesarla
-                plan = state["plan"]
-                photo = message.photo[-1]
-                file_id = photo.file_id
-
-                # Notificar al administrador
-                bot.send_message(
-                    ADMIN_ID,
-                    f"📥 Nuevo voucher recibido de {user_id} para plan *{plan.upper()}*."
-                )
-                bot.send_photo(ADMIN_ID, file_id, caption=f"Voucher de {user_id} para {plan}")
-
-                # Confirmar al usuario
-                bot.send_message(
-                    chat_id,
-                    f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado.\n"
-                    "Te notificaremos cuando tu membresía esté activa.",
-                    parse_mode="Markdown"
-                )
-
-                # Limpiar el estado
-                del user_states[user_id]
-                return
-            else:
-                # El usuario no envió una foto, recordarle
-                bot.send_message(
-                    chat_id,
-                    "❌ Por favor, envía una **foto** del voucher (no texto).\n"
-                    "Si necesitas cancelar, escribe 'cancelar'.",
-                    parse_mode="Markdown"
-                )
-                return
-
-    # Comando para cancelar el estado
-    if text == "cancelar" and user_id in user_states:
-        del user_states[user_id]
-        bot.send_message(chat_id, "✅ Proceso cancelado. Puedes volver a empezar cuando quieras.")
-        return
-
-    print(f"📩 Mensaje de {user_id}: {text}")
-
-    # Ignorar comandos (ya tienen handlers específicos)
-    if text.startswith('/'):
-        return
-
-    # Buscar coincidencia en KEYWORD_REPLIES
-    for keyword, reply in KEYWORD_REPLIES.items():
-        if keyword in text:
-            bot.send_message(message.chat.id, reply, parse_mode="Markdown")
-            # Si la intención es compra, ofrecer botones inline adicionales
-            if any(word in text for word in ["comprar", "quiero comprar", "planes", "precio"]):
-                markup = InlineKeyboardMarkup(row_width=2)
-                markup.add(
-                    InlineKeyboardButton("🇵🇪 Pagar en Soles", callback_data="pago_soles_general"),
-                    InlineKeyboardButton("💳 Pagar en Dólares", callback_data="pago_dolares_general")
-                )
-                bot.send_message(
-                    message.chat.id,
-                    "¿Cómo prefieres pagar?",
-                    reply_markup=markup
-                )
-            return
-
-    # Si no hay coincidencia, mostrar menú principal como ayuda
-    bot.send_message(
-        message.chat.id,
-        "No entendí tu mensaje. Aquí tienes las opciones disponibles:"
-    )
-    menu_principal(message.chat.id)
-
-# ============ HANDLER DE BOTONES DEL MENÚ PRINCIPAL ============
-@bot.message_handler(func=lambda message: message.text == "💎 Ver Planes")
-def ver_planes_handler(message):
-    planes = supabase_service.table('membresias_planes').select('*').execute()
-    texto = "💎 *Planes Disponibles:*\n\n"
-    for p in planes.data:
-        texto += f"🔹 *{p['nombre'].upper()}*\n"
-        texto += f"💰 S/{p['precio_soles']} | ${p['precio_dolares']}\n"
-        texto += f"⏳ {p['duracion_dias']} días\n"
-        texto += f"📦 {p['pedidos_por_mes']} pedidos\n\n"
-    texto += "📲 Compra desde la MiniApp."
-    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
-
-@bot.message_handler(func=lambda message: message.text == "🇵🇪 Pago en Soles (Yape/Plin)")
-def pago_soles_handler(message):
-    # Podría redirigir a la mini app o dar instrucciones
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://tu-mini-app.com"}))
-    bot.send_message(
-        message.chat.id,
-        "🇵🇪 Para pagar en soles:\n"
-        "1. Abre la mini app.\n"
-        "2. Elige tu plan y presiona 'Yape/Plin'.\n"
-        "3. Sigue las instrucciones y envía el voucher.\n\n"
-        "¿Listo?",
-        reply_markup=markup
-    )
-
-@bot.message_handler(func=lambda message: message.text == "💳 Pago en Dólares (Tarjeta)")
-def pago_dolares_handler(message):
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
-    bot.send_message(
-        message.chat.id,
-        "💳 Para pagar en dólares:\n"
-        "1. Haz clic en el enlace.\n"
-        "2. Elige el plan (Copper, Silver, etc.).\n"
-        "3. Completa el pago con tarjeta.\n\n"
-        "Al terminar, tu membresía se activará automáticamente.",
-        reply_markup=markup
-    )
-
-@bot.message_handler(func=lambda message: message.text == "🎬 Beneficios VIP")
-def beneficios_handler(message):
-    bot.send_message(
-        message.chat.id,
-        KEYWORD_REPLIES["beneficios"],
-        parse_mode="Markdown"
-    )
-
-@bot.message_handler(func=lambda message: message.text == "👤 Mi Perfil")
-def perfil_handler(message):
-    # Aquí podrías mostrar información del perfil, tal vez llamando a un endpoint de tu backend
-    # Por ahora, un mensaje genérico:
-    bot.send_message(
-        message.chat.id,
-        "👤 Para ver tu perfil y membresía, abre la mini app.",
-        reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton("Abrir mini app", web_app={"url": "https://tu-mini-app.com"}))
-    )
-
-@bot.message_handler(func=lambda message: message.text == "🆘 Ayuda")
-def ayuda_handler(message):
-    bot.send_message(
-        message.chat.id,
-        KEYWORD_REPLIES["ayuda"],
-        parse_mode="Markdown"
-    )
-
-# ============ HANDLER DE CALLBACKS (BOTONES INLINE) ============
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callback(call):
-    chat_id = call.message.chat.id
-    user_id = call.from_user.id
-    data = call.data
-
-    bot.answer_callback_query(call.id)
-
-    if data == "pago_soles_general":
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://tu-mini-app.com"}))
-        bot.send_message(
-            chat_id,
-            "🇵🇪 Para pagar en soles:\n"
-            "1. Abre la mini app.\n"
-            "2. Elige tu plan y presiona 'Yape/Plin'.\n"
-            "3. Sigue las instrucciones y envía el voucher.\n\n"
-            "¿Listo?",
-            reply_markup=markup
-        )
-    elif data == "pago_dolares_general":
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
-        bot.send_message(
-            chat_id,
-            "💳 Para pagar en dólares:\n"
-            "1. Haz clic en el enlace.\n"
-            "2. Elige el plan (Copper, Silver, etc.).\n"
-            "3. Completa el pago con tarjeta.\n\n"
-            "Al terminar, tu membresía se activará automáticamente.",
-            reply_markup=markup
-        )
-    elif data.startswith("plan_"):
-        # Ejemplo: plan_copper_soles, plan_silver_dolares, etc.
-        partes = data.split("_")
-        if len(partes) >= 3:
-            plan = partes[1]
-            moneda = partes[2]
-            if moneda == "soles":
-                markup = InlineKeyboardMarkup()
-                markup.add(InlineKeyboardButton("📸 Enviar voucher", callback_data=f"voucher_{plan}"))
-                bot.send_message(
-                    chat_id,
-                    f"Has elegido *{plan.upper()}* en soles.\n\n"
-                    "🇵🇪 *Paga con Yape/Plin:*\n"
-                    "• Número: 930202820\n"
-                    "• Titular: Richard Quiroz\n"
-                    f"• Monto: S/{'22' if plan == 'copper' else '33' if plan == 'silver' else '85' if plan == 'gold' else '163' if plan == 'platinum' else '348'}\n\n"
-                    "Después del pago, presiona el botón y adjunta la captura.",
-                    reply_markup=markup,
-                    parse_mode="Markdown"
-                )
-            else:  # dólares
-                links = {
-                    "copper": "https://buymeacoffee.com/quehay/membership",
-                    "silver": "https://buymeacoffee.com/quehay/membership",
-                    "gold": "https://buymeacoffee.com/quehay/e/510546",
-                    "platinum": "https://buymeacoffee.com/quehay/e/510549",
-                    "diamond": "https://buymeacoffee.com/quehay/e/510552"
-                }
-                url = links.get(plan, "")
-                if url:
-                    markup = InlineKeyboardMarkup()
-                    markup.add(InlineKeyboardButton("💳 Pagar ahora", url=f"{url}?ref={user_id}"))
-                    bot.send_message(
-                        chat_id,
-                        f"Has elegido *{plan.upper()}* en dólares.\n\n"
-                        "Serás redirigido a Buy Me a Coffee para pagar con tarjeta.\n"
-                        "Al completar, tu membresía se activará automáticamente.",
-                        reply_markup=markup,
-                        parse_mode="Markdown"
-                    )
-    elif data.startswith("voucher_"):
-        plan = data.split("_")[1]
-        # Guardar el estado del usuario
-        user_states[user_id] = {"estado": "esperando_voucher", "plan": plan}
-        bot.send_message(
-            chat_id,
-            f"Por favor, envía la captura del voucher de tu pago de *{plan.upper()}*.\n"
-            "Un administrador la revisará y activará tu membresía.",
-            parse_mode="Markdown"
-        )
-    elif data == "ver_planes_detalle":
-        bot.send_message(chat_id, KEYWORD_REPLIES["planes"], parse_mode="Markdown")
-    elif data == "beneficios":
-        bot.send_message(chat_id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
-    else:
-        bot.send_message(chat_id, "Opción no reconocida.")
-
-# ============ ADMIN ============
-@bot.message_handler(commands=['planes'])
-def planes(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    
-    planes = supabase_service.table('membresias_planes').select('*').execute()
-    texto = "📋 MEMBRESÍAS DISPONIBLES:\n\n"
-    
-    for p in planes.data:
-        texto += f"{p['nombre'].upper()} - S/{p['precio_soles']} - {p['duracion_dias']} días - {p['pedidos_por_mes']} pedidos\n"
-    
-    bot.send_message(message.chat.id, texto)
 
 # ============ FUNCIÓN DE ACTIVACIÓN REUTILIZABLE ============
 def activar_usuario(user_id, membresia, chat_id_admin):
