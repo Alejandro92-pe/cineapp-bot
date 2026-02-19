@@ -1368,30 +1368,46 @@ def webhook_buymeacoffee():
 
 @app.route("/api/usuario", methods=["POST"])
 def api_usuario():
-    data = request.get_json()
-    telegram_id = data.get("telegram_id")
-    if not telegram_id:
-        return jsonify({"error": "telegram_id requerido"}), 400
+    try:
+        data = request.get_json()
+        telegram_id = data.get("telegram_id")
+        if not telegram_id:
+            return jsonify({"error": "telegram_id requerido"}), 400
 
-    # Obtener usuario
-    usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
-    usuario = usuario_res.data[0] if usuario_res.data else None
+        # Obtener usuario
+        usuario_res = supabase_service.table("usuarios").select("*").eq("telegram_id", telegram_id).execute()
+        usuario = usuario_res.data[0] if usuario_res.data else None
 
-    membresia = None
-    if usuario:
-        hoy = datetime.now().isoformat()
-        mem_res = supabase_service.table("membresias_activas") \
-            .select("*, membresias_planes(*)") \
-            .eq("usuario_id", usuario["id"]) \
-            .eq("estado", "activa") \
-            .gte("fecha_fin", hoy) \
-            .execute()
-        membresia = mem_res.data[0] if mem_res.data else None
+        membresia = None
+        if usuario:
+            hoy = datetime.now().isoformat()
+            # Obtener membresía activa sin join
+            mem_res = supabase_service.table("membresias_activas") \
+                .select("*") \
+                .eq("usuario_id", usuario["id"]) \
+                .eq("estado", "activa") \
+                .gte("fecha_fin", hoy) \
+                .execute()
+            
+            if mem_res.data:
+                membresia = mem_res.data[0]
+                # Obtener el plan por separado
+                plan_res = supabase_service.table("membresias_planes") \
+                    .select("*") \
+                    .eq("id", membresia["plan_id"]) \
+                    .execute()
+                if plan_res.data:
+                    membresia["membresias_planes"] = plan_res.data[0]
 
-    return jsonify({
-        "usuario": usuario,
-        "membresia": membresia
-    })
+        return jsonify({
+            "usuario": usuario,
+            "membresia": membresia
+        }), 200
+
+    except Exception as e:
+        print("❌ Error en /api/usuario:", str(e))
+        return jsonify({"error": "Error interno del servidor"}), 500
+    
 @app.route("/api/planes", methods=["GET"])
 def api_planes():
     planes = supabase_service.table("membresias_planes").select("*").execute()
