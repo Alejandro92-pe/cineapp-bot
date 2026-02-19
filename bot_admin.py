@@ -118,37 +118,31 @@ def responder_desde_grupo(message):
         print(f"Error en responder_desde_grupo: {e}")
         bot.reply_to(message, f"❌ Error: {e}")
 
-# ============ START ============
+    # ============ START ============
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
+    chat_id = message.chat.id
 
-    # Registrar o actualizar usuario en Supabase
+    # Registrar usuario en Supabase (código existente)
     usuario = supabase_service.table('usuarios').select('*').eq('telegram_id', user_id).execute()
-    
     if not usuario.data:
         supabase_service.table('usuarios').insert({
             "telegram_id": user_id,
             "nombre": user_name,
             "membresia_activa": False
         }).execute()
-        print(f"✅ Usuario creado: {user_name} ({user_id})")
-    else:
-        supabase_service.table('usuarios').update({
-            "nombre": user_name
-        }).eq('telegram_id', user_id).execute()
-        print(f"✅ Usuario actualizado: {user_name}")
+        print(f"✅ Usuario creado: {user_name}")
 
-    # ✅ IMPORTANTE: Primero verificar si es un pago
+    # ✅ VERIFICAR SI ES UN PAGO
     args = message.text.split()
-    
     if len(args) > 1 and args[1].startswith("pago_"):
-        # Es un pago por Yape/Plin, NO mostrar bienvenida
         partes = args[1].split("_")
         plan = partes[1]
         precio = partes[2]
 
+        # Guardar pago pendiente en Supabase
         supabase_service.table('pagos_manuales').insert({
             "usuario_id": user_id,
             "membresia_comprada": plan,
@@ -159,24 +153,28 @@ def start(message):
             "activado": False
         }).execute()
 
-        # Solo enviar instrucciones de pago, nada más
-        bot.send_message(
-            message.chat.id,
+        # 🟢 ACTIVAR ESTADO AUTOMÁTICAMENTE
+        user_states[user_id] = {"estado": "esperando_voucher", "plan": plan}
+
+        # Botón inline para cancelar
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("❌ Cancelar pago", callback_data="cancelar_voucher"))
+
+        # Instrucciones claras
+        texto = (
             f"💎 *PLAN {plan.upper()}*\n\n"
             f"💰 *Monto a pagar:* S/{precio}\n\n"
-            "📲 *Método:* Yape / Plin\n\n"
-            "👤 *Titular:* Richard Quiroz\n"
-            "📱 *Número:* 930202820\n\n"
-            "📝 *Concepto a colocar:*\n"
-            f"{user_id}\n\n"
-            "📸 *Después del pago:*\n"
-            "Envía aquí la captura del voucher.\n\n"
-            "⏳ Tu membresía será activada una vez validemos el pago.",
-            parse_mode="Markdown"
+            "📲 *Yape/Plin:* `930202820` (Richard Quiroz)\n"
+            f"📝 *Concepto:* `{user_id}`\n\n"
+            "📸 **Después de pagar, envía la foto del voucher aquí.**\n"
+            "✅ El sistema la detectará automáticamente.\n\n"
+            "❌ Si ya no deseas continuar, presiona el botón Cancelar."
         )
-        
-        # 🚫 NO llamamos a menu_principal aquí, para evitar duplicados
+        bot.send_message(chat_id, texto, reply_markup=markup, parse_mode="Markdown")
         return
+
+    # Si no es pago, mostrar menú principal
+    menu_principal(chat_id, user_name)
 
     # Si es admin, mostrar comandos extra (además del menú normal)
     if user_id == ADMIN_ID:
@@ -199,77 +197,69 @@ def handle_all_messages(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     text = message.text.lower().strip() if message.text else ""
-    
-    # ===== REENVIAR AL GRUPO DE SOPORTE (excepto si es el admin) =====
-    if user_id != ADMIN_ID and user_id != GRUPO_SOPORTE_ID:
-        try:
-            # Si es una foto, reenviar la foto
+
+    # ===== VERIFICAR SI EL USUARIO TIENE UN ESTADO ACTIVO (VOUCHER) =====
+    if user_id in user_states:
+        state = user_states[user_id]
+        if state["estado"] == "esperando_voucher":
             if message.photo:
-                # Obtener la foto de mayor calidad
+                # Procesar voucher
+                plan = state["plan"]
                 photo = message.photo[-1]
-                caption = f"📸 *Nuevo voucher de {user_id}*"
-                if message.caption:
-                    caption += f"\n\n{message.caption}"
+                
+                # Confirmar al usuario
+                bot.send_message(
+                    chat_id,
+                    f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado.",
+                    parse_mode="Markdown"
+                )
+                
+                # Reenviar al grupo de soporte con información del plan
+                caption = f"📸 *VOUCHER*\n👤 Usuario: {user_id}\n💎 Plan: {plan.upper()}"
                 bot.send_photo(
                     GRUPO_SOPORTE_ID,
                     photo.file_id,
                     caption=caption,
                     parse_mode="Markdown"
                 )
-            # Si es texto, reenviar el texto
-            elif message.text:
-                bot.send_message(
-                    GRUPO_SOPORTE_ID,
-                    f"💬 *Mensaje de {user_id}:*\n\n{message.text}",
-                    parse_mode="Markdown"
-                )
-            # Si es otro tipo de archivo (video, documento, etc.)
-            elif message.document:
-                bot.send_document(
-                    GRUPO_SOPORTE_ID,
-                    message.document.file_id,
-                    caption=f"📄 *Documento de {user_id}*\n{message.caption or ''}"
-                )
-        except Exception as e:
-            print(f"Error reenviando al grupo: {e}")
-
-    # ===== VERIFICAR SI EL USUARIO TIENE UN ESTADO ACTIVO =====
-    if user_id in user_states:
-        state = user_states[user_id]
-        if state["estado"] == "esperando_voucher":
-            # El usuario debe enviar una foto
-            if message.photo:
-                # Es una foto, procesarla
-                plan = state["plan"]
-                photo = message.photo[-1]
-                file_id = photo.file_id
                 
-                # Confirmar al usuario
-                bot.send_message(
-                    chat_id,
-                    f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado.\n"
-                    "Te notificaremos cuando tu membresía esté activa.",
-                    parse_mode="Markdown"
-                )
-                
-                # Limpiar el estado
                 del user_states[user_id]
-                return
+                return  # Salir para que no siga al reenvío genérico
             else:
-                # El usuario no envió una foto, recordarle
+                # El usuario no envió foto, recordarle
                 bot.send_message(
                     chat_id,
-                    "❌ Por favor, envía una **foto** del voucher (no texto).\n"
-                    "Si necesitas cancelar, escribe 'cancelar'.",
+                    "❌ Por favor, envía una **foto** del voucher.\n"
+                    "Escribe 'cancelar' para salir.",
                     parse_mode="Markdown"
                 )
                 return
 
-    # ===== COMANDO PARA CANCELAR ESTADO =====
+    # ===== COMANDO CANCELAR =====
     if text == "cancelar" and user_id in user_states:
         del user_states[user_id]
-        bot.send_message(chat_id, "✅ Proceso cancelado. Puedes volver a empezar cuando quieras.")
+        bot.send_message(chat_id, "✅ Proceso cancelado.")
         return
+
+    # ===== REENVIAR CUALQUIER MENSAJE AL GRUPO DE SOPORTE =====
+    # Obtenemos ADMIN_ID desde variables de entorno (ya está definido globalmente)
+    admin_id = int(os.getenv("ADMIN_ID"))  # O usa directamente ADMIN_ID si ya lo tienes como variable
+    if user_id != admin_id and user_id != GRUPO_SOPORTE_ID:
+        try:
+            # Reenvía el mensaje exacto (se ve igual que lo envió el usuario)
+            bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+        except Exception as e:
+            print(f"Error reenviando al grupo: {e}")
+            # Si falla, intenta con métodos alternativos (opcional)
+            try:
+                if message.text:
+                    bot.send_message(GRUPO_SOPORTE_ID, f"💬 {user_id}: {message.text}")
+                elif message.photo:
+                    bot.send_photo(GRUPO_SOPORTE_ID, message.photo[-1].file_id, caption=f"📸 {user_id}")
+                elif message.document:
+                    bot.send_document(GRUPO_SOPORTE_ID, message.document.file_id, caption=f"📄 {user_id}")
+            except:
+                pass
     
     # ===== LOG PARA DEPURACIÓN =====
     print(f"📩 Mensaje de {user_id}: {text}")
@@ -306,7 +296,7 @@ def handle_all_messages(message):
 
 # ============ HANDLER DE BOTONES DEL MENÚ PRINCIPAL ============
 @bot.message_handler(func=lambda message: message.text == "💎 Ver Planes")
-def ver_planes_handler(message):
+def ver_planes(message):
     planes = supabase_service.table('membresias_planes').select('*').execute()
     texto = "💎 *Planes Disponibles:*\n\n"
     for p in planes.data:
@@ -318,7 +308,7 @@ def ver_planes_handler(message):
     bot.send_message(message.chat.id, texto, parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: message.text == "🇵🇪 Pago en Soles (Yape/Plin)")
-def pago_soles_handler(message):
+def pago_en_soles(message):
     # Podría redirigir a la mini app o dar instrucciones
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("🛒 Abrir mini app", web_app={"url": "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"}))
@@ -333,7 +323,7 @@ def pago_soles_handler(message):
     )
 
 @bot.message_handler(func=lambda message: message.text == "💳 Pago en Dólares (Tarjeta)")
-def pago_dolares_handler(message):
+def pago_en_dólares(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("💳 Ir a Buy Me a Coffee", url="https://buymeacoffee.com/quehay/membership"))
     bot.send_message(
@@ -347,17 +337,21 @@ def pago_dolares_handler(message):
     )
 
 @bot.message_handler(func=lambda message: message.text == "🎬 Beneficios VIP")
-def beneficios_handler(message):
+def beneficios_vip(message):
     bot.send_message(
         message.chat.id,
-        KEYWORD_REPLIES["beneficios"],
+        "🎬 *Beneficios VIP:*\n\n"
+        "✅ Acceso al canal privado\n"
+        "✅ Ver y descargar en Telegram\n"
+        "✅ Sin publicidad\n"
+        "✅ Contenido exclusivo\n"
+        "✅ Pedidos según tu plan\n"
+        "✅ Soporte directo\n",
         parse_mode="Markdown"
     )
 
 @bot.message_handler(func=lambda message: message.text == "👤 Mi Perfil")
-def perfil_handler(message):
-    # Aquí podrías mostrar información del perfil, tal vez llamando a un endpoint de tu backend
-    # Por ahora, un mensaje genérico:
+def mi_perfil(message):
     bot.send_message(
         message.chat.id,
         "👤 Para ver tu perfil y membresía, abre la mini app.",
@@ -373,6 +367,7 @@ def ayuda_handler(message):
     )
 
 # ============ HANDLER DE CALLBACKS (BOTONES INLINE) ============
+
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
     chat_id = call.message.chat.id
@@ -455,10 +450,17 @@ def handle_callback(call):
             "Un administrador la revisará y activará tu membresía.",
             parse_mode="Markdown"
         )
+    
     elif data == "ver_planes_detalle":
         bot.send_message(chat_id, KEYWORD_REPLIES["planes"], parse_mode="Markdown")
     elif data == "beneficios":
         bot.send_message(chat_id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
+    elif data == "cancelar_voucher":
+        if user_id in user_states:
+            del user_states[user_id]
+            bot.send_message(chat_id, "✅ Pago cancelado. Puedes volver a empezar cuando quieras.")
+        else:
+            bot.send_message(chat_id, "❌ No hay ningún pago en curso.")
     else:
         bot.send_message(chat_id, "Opción no reconocida.")
 
