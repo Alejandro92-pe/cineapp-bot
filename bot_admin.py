@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import telebot
@@ -17,7 +17,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 GRUPO_SOPORTE_ID = -1003805629374  
-MINIAPP_URL = "https://clairvoyantly-adactylous-leonida.ngrok-free.dev"
+MINIAPP_URL = "https://cineapp-bot.onrender.com"
 
 BMC_URL = "https://buymeacoffee.com/quehay/membership"
 
@@ -866,6 +866,10 @@ from flask import Flask, request
 
 app = Flask(__name__)
 CORS(app)
+
+@app.route("/")
+def serve_miniapp():
+    return send_from_directory("static", "index.html")
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
