@@ -47,8 +47,8 @@ def menu_principal(chat_id, user_name=""):
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("💎 Ver Planes", "🎬 Beneficios VIP")
-    markup.row("🇵🇪 Pago en Soles", "💳 Pago en Dólares")
-    markup.row("👤 Mi Perfil", "🆘 Ayuda")
+    markup.row("Pago en Soles", "💳 Pago en Dólares")
+    markup.row("Mi Perfil", "🆘 Ayuda")
 
     bot.send_message(chat_id, texto, reply_markup=markup, parse_mode="Markdown")
 
@@ -129,7 +129,7 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
+@bot.message_handler(func=lambda m: m.text == "Pago en Soles")
 def pago_en_soles(message):
     print("✅ Handler pago_en_soles ejecutado")
     markup = InlineKeyboardMarkup()
@@ -144,7 +144,7 @@ def pago_dolares(message):
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
+@bot.message_handler(func=lambda m: m.text == "Mi Perfil")
 def perfil(message):
     print("✅ Handler perfil ejecutado")
     markup = InlineKeyboardMarkup()
@@ -353,9 +353,9 @@ def manejar_texto(message):
     botones = [
         "💎 Ver Planes",
         "🎬 Beneficios VIP",
-        "🇵🇪 Pago en Soles",
+        "Pago en Soles",
         "💳 Pago en Dólares",
-        "👤 Mi Perfil",
+        "Mi Perfil",
         "🆘 Ayuda"
     ]
 
@@ -382,18 +382,6 @@ def manejar_texto(message):
             "📩 Tu mensaje fue enviado directamente al equipo.\n"
             "🕒 Te responderemos lo antes posible."
         )
-
-        # Mensaje especial destacado al grupo
-        bot.send_message(
-            GRUPO_SOPORTE_ID,
-            f"🚨 *SOLICITUD DIRECTA DE ADMIN*\n\n"
-            f"👤 Usuario: `{user_id}`\n"
-            f"💬 Mensaje: {message.text}",
-            parse_mode="Markdown"
-        )
-
-        # También reenviamos el mensaje original
-        bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
 
         return
 
