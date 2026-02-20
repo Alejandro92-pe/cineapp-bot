@@ -121,7 +121,7 @@ def start(message):
 
 @bot.message_handler(func=lambda m: m.text == "💎 Ver Planes")
 def ver_planes(message):
-    bot.send_message(message.chat.id, KEYWORD_REPLIES["planes"], parse_mode="Markdown")
+    bot.send_message(message.chat.id, KEYWORD_REPLIES["c"], parse_mode="Markdown")
 
 
 @bot.message_handler(func=lambda m: m.text == "🎬 Beneficios VIP")
@@ -129,21 +129,21 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
-def pago_soles(message):
+@bot.message_handler(func=lambda m: m.text and "pago en soles" in m.text.lower())
+def pago_en_soles(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL}))
-    bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app:", reply_markup=markup)
+    bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app, vea a membresías escoge tu plan", reply_markup=markup)
 
 
 @bot.message_handler(func=lambda m: m.text == "💳 Pago en Dólares")
 def pago_dolares(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("💳 Pagar ahora", url=BMC_URL))
-    bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta:", reply_markup=markup)
+    bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
+@bot.message_handler(func=lambda m: m.text and "mi perfil" in m.text.lower())
 def perfil(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("Abrir perfil", web_app={"url": MINIAPP_URL}))
@@ -370,6 +370,31 @@ def manejar_texto(message):
             "❌ Envía una FOTO del voucher o presiona Cancelar."
         )
         return
+           # ==============================
+    # 🔹 SOLICITUD DIRECTA DE HUMANO / ADMIN
+    # ==============================
+    if any(palabra in text for palabra in ["humano", "admin", "persona", "real"]):
+
+        bot.send_message(
+            chat_id,
+            "👨‍💼 Claro, te pondré en contacto con un administrador.\n\n"
+            "📩 Tu mensaje fue enviado directamente al equipo.\n"
+            "🕒 Te responderemos lo antes posible."
+        )
+
+        # Mensaje especial destacado al grupo
+        bot.send_message(
+            GRUPO_SOPORTE_ID,
+            f"🚨 *SOLICITUD DIRECTA DE ADMIN*\n\n"
+            f"👤 Usuario: `{user_id}`\n"
+            f"💬 Mensaje: {message.text}",
+            parse_mode="Markdown"
+        )
+
+        # También reenviamos el mensaje original
+        bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+
+        return
 
     # ==============================
     # PALABRAS CLAVE
@@ -395,18 +420,29 @@ KEYWORD_REPLIES = {
 
     # Consultas sobre planes
     "planes": (
-        "💎 *Planes disponibles*\n\n"
-        "• COPPER: S/22 | $5.99 - Acceso a canales (sin pedidos)\n"
-        "• SILVER: S/33 | $8.99 - 2 pedidos/mes\n"
-        "• GOLD: S/85 | $22.99 - 3 pedidos/3 meses\n"
-        "• PLATINUM: S/163 | $43.99 - 5 pedidos/6 meses\n"
-        "• DIAMOND: S/348 | $93.99 - 8 pedidos/año\n\n"
-        "¿Te gustaría pagar en soles o dólares?"
+    "💎✨ *PLANES VIP DISPONIBLES* ✨💎\n\n"
+    "🥉 *COPPER* — S/22 | $5.99\n"
+    "🔓 Acceso a canales (sin pedidos)\n\n"
+    "🥈 *SILVER* — S/33 | $8.99\n"
+    "📦 2 pedidos por mes\n\n"
+    "🥇 *GOLD* — S/85 | $22.99\n"
+    "🎬 3 pedidos cada 3 meses\n\n"
+    "🏆 *PLATINUM* — S/163 | $43.99\n"
+    "🚀 5 pedidos cada 6 meses\n\n"
+    "💠 *DIAMOND* — S/348 | $93.99\n"
+    "👑 8 pedidos al año\n\n"
+    "💳 ¿Te gustaría pagar en *soles* o en *dólares*?"
+    ),
+    "bro":  (
+    "😎 ¡Habla bro! ¿Qué necesitas hoy?\n\n"
+    "💎 Escribe *planes* para ver membresías\n"
+    "💳 Escribe *comprar* para activar tu acceso\n"
+    "🆘 Escribe *ayuda* si tienes un problema"
     ),
     "precio": (
         "💰 *Precios actualizados*\n\n"
-        "COPPER: S/22 / $5.99 · SILVER: S/33 / $8.99 · GOLD: S/85 / $22.99 · "
-        "PLATINUM: S/163 / $43.99 · DIAMOND: S/348 / $93.99"
+        "🥉 COPPER: S/22 / $5.99 · 🥈 SILVER: S/33 / $8.99 · 🥇 GOLD: S/85 / $22.99 · "
+        "🏆 PLATINUM: S/163 / $43.99 ·💠 DIAMOND: S/348 / $93.99"
     ),
     "membresía": "Para ver nuestras membresías, escribe 'planes' o haz clic en el botón '💎 Ver Planes'.",
     "costo": "Los costos están en soles y dólares. Escribí 'planes' para ver el detalle.",
@@ -438,14 +474,20 @@ KEYWORD_REPLIES = {
 
     # Beneficios
     "beneficios": (
-        "🎬 *Beneficios de ser VIP*\n\n"
-        "✅ Acceso a canales privados con películas y series\n"
-        "✅ Solicita contenido que no encuentres (según tu plan)\n"
-        "✅ Sin publicidad\n"
-        "✅ Soporte prioritario\n\n"
-        "¿Te gustaría ver los planes nuevamente?"
-    ),
-    "que incluye": "Los beneficios incluyen acceso a canales privados y la posibilidad de pedir películas. Escribí 'beneficios' para más detalles.",
+    "✨🎬 *BENEFICIOS DE SER VIP* 🎬✨\n\n"
+    "🔐 *Ingreso VIP al canal privado de Telegram*\n"
+    "📥 Ver y descargar directamente en Telegram\n"
+    "🔗 Enlaces directos sin complicaciones\n"
+    "🚫 Libre de publicidad\n"
+    "🎞 Contenido exclusivo actualizado\n"
+    "📺 Incluye series completas\n"
+    "📦 Incluye pedidos en algunos planes\n"
+    "🤖 Bot asistente inteligente\n"
+    "📲 MiniApp integrada en Telegram\n"
+    "🛟 Soporte básico y avanzado\n\n"
+    "💎 ¿Te gustaría ver los planes disponibles?"
+     ),
+    "que incluye": "Los beneficios incluyen acceso a canales privados y la posibilidad de pedir películas. Escribe 'beneficios' para más detalles.",
 
     # Soporte y ayuda
     "ayuda": (
@@ -482,7 +524,7 @@ KEYWORD_REPLIES = {
         "Si ya tienes una membresía activa, los enlaces de acceso se te enviaron automáticamente al activarla.\n"
         "Si no los recibiste, escribe 'no me llegaron los enlaces'."
     ),
-    "no me llegan los enlaces": "Revisaremos tu caso. Por favor, indícanos tu ID de Telegram (lo encuentras en el perfil de la mini app) para que un admin te ayude.",
+    "no me llegaron los enlaces": "Revisaremos tu caso. Por favor, indícanos tu ID de Telegram (lo encuentras en el perfil de la mini app) para que un admin te ayude.",
 
     # Agradecimientos y despedida
     "gracias": "😊 ¡A ti por confiar en nosotros! Disfruta del contenido.",
@@ -922,6 +964,54 @@ def limpiar_membresias_vencidas():
 
         print(f"✅ Membresía vencida desactivada para usuario {u['telegram_id']}")
 
+# ============ CREAR PAGO TARJETA ============
+
+@app.route("/crear_pago_tarjeta", methods=["POST"])
+def crear_pago_tarjeta():
+    try:
+        data = request.get_json()
+        telegram_id = data.get("telegram_id")
+        plan = data.get("plan")
+        email = data.get("email")
+
+        if not telegram_id or not plan or not email:
+            return jsonify({"error": "Datos incompletos"}), 400
+
+        # 1️⃣ Guardar email en usuario
+        supabase_service.table("usuarios").update({
+            "email": email
+        }).eq("telegram_id", telegram_id).execute()
+
+        # 2️⃣ Guardar pago pendiente_webhook
+        supabase_service.table("pagos_manuales").insert({
+            "usuario_id": telegram_id,
+            "membresia_comprada": plan.lower(),
+            "metodo": "tarjeta",
+            "estado": "pendiente_webhook",
+            "activado": False,
+            "email": email,
+            "fecha_pago": datetime.now().isoformat()
+        }).execute()
+
+        # 3️⃣ Links BuyMeACoffee
+        links = {
+            "copper": "https://buymeacoffee.com/quehay/membership",
+            "silver": "https://buymeacoffee.com/quehay/membership",
+            "gold": "https://buymeacoffee.com/quehay/e/510546",
+            "platinum": "https://buymeacoffee.com/quehay/e/510549",
+            "diamond": "https://buymeacoffee.com/quehay/e/510552"
+        }
+
+        return jsonify({
+            "success": True,
+            "url": links.get(plan.lower())
+        }), 200
+
+    except Exception as e:
+        print("❌ Error crear_pago_tarjeta:", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/crear_pedido", methods=["POST"])
 def crear_pedido():
     try:
@@ -1284,81 +1374,96 @@ def verificar_vencimientos():
 
 @app.route("/webhook/buymeacoffee", methods=["POST"])
 def webhook_buymeacoffee():
-    # ... (código de verificación HMAC igual, no lo repito) ...
-
-    data = request.get_json()
-    print("📩 Webhook recibido:", data)
-
-    tipo_evento = data.get("tipo")
-    datos = data.get("datos", {})
-
-    # Extraer telegram_id del ref (igual que antes)
-    telegram_id = None
     try:
-        telegram_id = datos.get("checkout", {}).get("ref") or data.get("ref")
-    except:
-        telegram_id = None
+        data = request.get_json()
+        print("📩 Webhook recibido:", data)
 
-    if not telegram_id:
-        print("❌ No se encontró ref")
-        return jsonify({"error": "Usuario no identificado"}), 400
+        tipo_evento = data.get("tipo")
+        datos = data.get("datos", {})
 
-    try:
-        telegram_id = int(telegram_id)
-    except:
-        return jsonify({"error": "ref inválido"}), 400
+        # 🔹 Extraer email del comprador
+        email = datos.get("supporter_email")
 
-    plan_comprado = None
+        if not email:
+            print("❌ No se encontró supporter_email")
+            return jsonify({"error": "Email no encontrado"}), 400
 
-    # --- MEMBRESÍAS (Copper, Silver) ---
-    if tipo_evento in ["membership.started", "membership.updated"]:
-        # Solo procesar si está activa y no es cancelación
-        estado = datos.get("estado") or datos.get("status")
-        cancelado = datos.get("cancelado") or datos.get("canceled")
-        cancel_at_period_end = datos.get("cancel_at_period_end") == "true"
+        # 🔹 Buscar pago pendiente_webhook por email
+        pago_res = supabase_service.table("pagos_manuales") \
+            .select("*") \
+            .eq("email", email) \
+            .eq("estado", "pendiente_webhook") \
+            .execute()
 
-        if estado == "active" and not cancelado and not cancel_at_period_end:
-            nivel = (datos.get("nombre_de_nivel_de_membresía") or datos.get("membership_level_name", "")).lower()
-            if nivel in ["copper", "silver"]:
-                plan_comprado = nivel
-            else:
-                print(f"Nivel no reconocido: {nivel}")
-                return jsonify({"error": "Nivel no reconocido"}), 400
+        if not pago_res.data:
+            print("⚠️ No hay pago pendiente para este email")
+            return jsonify({"error": "No hay pago pendiente"}), 400
+
+        registro_pago = pago_res.data[0]
+        telegram_id = registro_pago["usuario_id"]
+        plan_comprado = registro_pago["membresia_comprada"].lower()
+
+        # 🔹 Determinar si el evento realmente es pago exitoso
+
+        plan_detectado = None
+
+        # ---- MEMBERSHIP (Copper / Silver) ----
+        if tipo_evento in ["membership.started", "membership.updated"]:
+            estado = datos.get("estado") or datos.get("status")
+            cancelado = datos.get("cancelado") or datos.get("canceled")
+            cancel_at_period_end = datos.get("cancel_at_period_end") == "true"
+
+            if estado == "active" and not cancelado and not cancel_at_period_end:
+                nivel = (datos.get("membership_level_name", "")).lower()
+                plan_detectado = nivel
+
+        # ---- EXTRAS (Gold / Platinum / Diamond) ----
+        elif tipo_evento == "extra_purchase.created":
+            extras = datos.get("extras", [])
+            if extras:
+                product_id = str(extras[0].get("id"))
+
+                product_to_plan = {
+                    "510546": "gold",
+                    "510549": "platinum",
+                    "510552": "diamond"
+                }
+
+                plan_detectado = product_to_plan.get(product_id)
+
+        # ---- CANCELACIONES ----
+        elif tipo_evento == "membership.cancelled":
+            print("ℹ️ Cancelación recibida, ignorada")
+            return jsonify({"success": True}), 200
+
         else:
-            # Es una actualización de cancelación, la ignoramos (ya manejada en otros casos)
-            return jsonify({"success": True, "message": "Evento de cancelación ignorado"}), 200
+            print(f"ℹ️ Evento ignorado: {tipo_evento}")
+            return jsonify({"success": True}), 200
 
-    # --- PRODUCTOS DIGITALES (Gold, Platinum, Diamond) ---
-    elif tipo_evento == "extra_purchase.created":
-        extras = datos.get("extras", [])
-        if extras:
-            product_id = str(extras[0].get("id"))
-            product_to_plan = {
-                "510546": "gold",
-                "510549": "platinum",
-                "510552": "diamond"
-            }
-            plan_comprado = product_to_plan.get(product_id)
+        # 🔹 Validar que el plan detectado coincide con el pendiente
+        if not plan_detectado or plan_detectado != plan_comprado:
+            print("❌ Plan no coincide o no detectado")
+            return jsonify({"error": "Plan no coincide"}), 400
 
-    elif tipo_evento == "membership.cancelled":
-        # Manejar cancelación inmediata (opcional)
-        print(f"Cancelación para usuario {telegram_id}")
-        # Aquí puedes desactivar la membresía si quieres
+        # 🔹 Activar membresía
+        exito = activar_usuario(telegram_id, plan_comprado, ADMIN_ID)
+
+        if not exito:
+            return jsonify({"error": "Error activando membresía"}), 500
+
+        # 🔹 Marcar pago como aprobado
+        supabase_service.table("pagos_manuales").update({
+            "estado": "aprobado",
+            "activado": True
+        }).eq("id", registro_pago["id"]).execute()
+
+        print(f"✅ Usuario {telegram_id} activado automáticamente por tarjeta")
+
         return jsonify({"success": True}), 200
 
-    else:
-        print(f"Evento ignorado: {tipo_evento}")
-        return jsonify({"success": True}), 200
-
-    if not plan_comprado:
-        return jsonify({"error": "No se pudo determinar el plan"}), 400
-
-    # Activar membresía
-    exito = activar_usuario(telegram_id, plan_comprado, ADMIN_ID)
-    if exito:
-        return jsonify({"success": True}), 200
-    else:
-        return jsonify({"error": "Error al activar"}), 500
+    except Exception as e:
+        print("❌ ERROR webhook:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 # ============ NUEVOS ENDPOINTS PARA PRODUCCIÓN ============
 
