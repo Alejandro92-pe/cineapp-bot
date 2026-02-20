@@ -131,6 +131,7 @@ def beneficios(message):
 
 @bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
 def pago_en_soles(message):
+    print("✅ Handler pago_en_soles ejecutado")
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL}))
     bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app, ve a membresías y escoge tu plan", reply_markup=markup)
@@ -145,6 +146,7 @@ def pago_dolares(message):
 
 @bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
 def perfil(message):
+    print("✅ Handler perfil ejecutado")
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("Abrir perfil", web_app={"url": MINIAPP_URL}))
     bot.send_message(message.chat.id, "Consulta tu perfil:", reply_markup=markup)
@@ -358,10 +360,8 @@ def manejar_texto(message):
     ]
 
     # Ignorar comandos y botones
-    if text_original.startswith("/"):
-        return
-
-
+    if text_original.startswith("/") or text_original in botones:
+         return
     # ==============================
     # SI ESTÁ ESPERANDO VOUCHER
     # ==============================
