@@ -121,7 +121,7 @@ def start(message):
 
 @bot.message_handler(func=lambda m: m.text == "💎 Ver Planes")
 def ver_planes(message):
-    bot.send_message(message.chat.id, KEYWORD_REPLIES["c"], parse_mode="Markdown")
+    bot.send_message(message.chat.id, KEYWORD_REPLIES["planes"], parse_mode="Markdown")
 
 
 @bot.message_handler(func=lambda m: m.text == "🎬 Beneficios VIP")
@@ -129,11 +129,11 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text and "pago en soles" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
 def pago_en_soles(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL}))
-    bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app, vea a membresías escoge tu plan", reply_markup=markup)
+    bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app, ve a membresías y escoge tu plan", reply_markup=markup)
 
 
 @bot.message_handler(func=lambda m: m.text == "💳 Pago en Dólares")
@@ -143,7 +143,7 @@ def pago_dolares(message):
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text and "mi perfil" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
 def perfil(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("Abrir perfil", web_app={"url": MINIAPP_URL}))
@@ -358,8 +358,9 @@ def manejar_texto(message):
     ]
 
     # Ignorar comandos y botones
-    if text_original.startswith("/") or text_original in botones:
+    if text_original.startswith("/"):
         return
+
 
     # ==============================
     # SI ESTÁ ESPERANDO VOUCHER
@@ -1378,8 +1379,8 @@ def webhook_buymeacoffee():
         data = request.get_json()
         print("📩 Webhook recibido:", data)
 
-        tipo_evento = data.get("tipo")
-        datos = data.get("datos", {})
+        tipo_evento = data.get("type")
+        datos = data.get("data", {})
 
         # 🔹 Extraer email del comprador
         email = datos.get("supporter_email")
