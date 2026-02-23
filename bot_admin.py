@@ -169,7 +169,7 @@ def handle_callbacks(call):
     # ==============================
     # 🔹 PAGO GENERAL EN SOLES
     # ==============================
-    elif data == "pago_soles_general":
+    if data == "pago_soles_general":
         markup = InlineKeyboardMarkup()
         markup.add(
             InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL)
