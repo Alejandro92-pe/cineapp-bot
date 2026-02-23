@@ -129,15 +129,13 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text and "pago en soles" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
 def pago_en_soles(message):
+    print("✅ Handler pago_en_soles ejecutado")
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL}))
-    bot.send_message(
-        message.chat.id,
-        "🇵🇪 Paga en soles desde la mini app, ve a membresías y escoge tu plan",
-        reply_markup=markup
-    )
+    markup.add(InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL))
+    bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app, ve a membresías y escoge tu plan", reply_markup=markup)
+    
 
 @bot.message_handler(func=lambda m: m.text == "💳 Pago en Dólares")
 def pago_dolares(message):
@@ -146,11 +144,12 @@ def pago_dolares(message):
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text and "mi perfil" in m.text.lower())
-def perfil(message):
+@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
+def pago_en_soles(message):
+    print("✅ Handler pago_en_soles ejecutado")
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("Abrir perfil", web_app={"url": MINIAPP_URL}))
-    bot.send_message(message.chat.id, "Consulta tu perfil:", reply_markup=markup)
+    markup.add(InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL))
+    bot.send_message(message.chat.id, "🇵🇪 Paga en soles desde la mini app, ve a membresías y escoge tu plan", reply_markup=markup)
 
 
 @bot.message_handler(func=lambda m: m.text == "🆘 Ayuda")
