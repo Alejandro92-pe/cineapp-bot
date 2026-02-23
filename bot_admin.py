@@ -129,7 +129,7 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text and "pago en soles" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text and "🇵🇪 Pago en Soles" in m.text.lower())
 def pago_en_soles(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
@@ -154,7 +154,7 @@ def pago_dolares(message):
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text and "perfil" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text and "👤 Mi Perfil" in m.text.lower())
 def perfil(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
