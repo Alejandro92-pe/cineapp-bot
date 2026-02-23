@@ -192,7 +192,7 @@ def handle_callbacks(call):
     if data == "pago_soles_general":
         markup = InlineKeyboardMarkup(row_width=1)
         markup.add(
-            InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL)
+            InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL),
             InlineKeyboardButton(
                 "🛒 Abrir Mini App",
                 web_app=types.WebAppInfo(url=MINIAPP_URL + "?section=pago-soles")
