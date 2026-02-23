@@ -17,7 +17,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 GRUPO_SOPORTE_ID = -1003805629374  
-MINIAPP_URL = "https://cineapp-bot.onrender.com"
+MINIAPP_URL = "cineapp-bot.onrender.com"
 
 BMC_URL = "https://buymeacoffee.com/quehay/membership"
 
