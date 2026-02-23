@@ -140,14 +140,12 @@ def pago_en_soles(message):
         "🇵🇪 Paga en soles desde la mini app.",
         reply_markup=markup
     )
-    
 
 @bot.message_handler(func=lambda m: m.text == "💳 Pago en Dólares")
 def pago_dolares(message):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("💳 Pagar ahora", url=BMC_URL))
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
-
 
 @bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
 def perfil(message):
@@ -156,7 +154,6 @@ def perfil(message):
     markup.add(InlineKeyboardButton("Abrir perfil", url=MINIAPP_URL))
     bot.send_message(message.chat.id, "Consulta tu perfil:", reply_markup=markup)
     
-
 @bot.message_handler(func=lambda m: m.text == "🆘 Ayuda")
 def ayuda(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["ayuda"], parse_mode="Markdown")
