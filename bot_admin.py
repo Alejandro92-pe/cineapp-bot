@@ -129,20 +129,21 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
+@bot.message_handler(func=lambda m: m.text and "pago en soles" in m.text.lower())
 def pago_en_soles(message):
-    markup = InlineKeyboardMarkup(row_width=1)
+    markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        InlineKeyboardButton(
+        types.InlineKeyboardButton(
             "🛒 Abrir Mini App y pagar",
-            web_app=types.WebAppInfo(url=MINIAPP_URL + "?section=pago-soles")
+            web_app=types.WebAppInfo(
+                url=MINIAPP_URL + "?section=membresias"
+            )
         )
     )
     bot.send_message(
         message.chat.id,
-        "🇵🇪 Selecciona tu plan y paga directamente en la Mini App:",
-        reply_markup=markup,
-        parse_mode="Markdown"
+        "🇵🇪 Selecciona tu plan en Membresías:",
+        reply_markup=markup
     )
     
 
@@ -153,20 +154,21 @@ def pago_dolares(message):
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
+@bot.message_handler(func=lambda m: m.text and "perfil" in m.text.lower())
 def perfil(message):
-    markup = InlineKeyboardMarkup(row_width=1)
+    markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        InlineKeyboardButton(
+        types.InlineKeyboardButton(
             "📱 Abrir mi perfil",
-            web_app=types.WebAppInfo(url=MINIAPP_URL + "?section=profile")  # puedes agregar parámetros
+            web_app=types.WebAppInfo(
+                url=MINIAPP_URL + "?section=perfil"
+            )
         )
     )
     bot.send_message(
         message.chat.id,
         "👤 Abre tu perfil dentro de Telegram:",
-        reply_markup=markup,
-        parse_mode="Markdown"
+        reply_markup=markup
     )
 
 
