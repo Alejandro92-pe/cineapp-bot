@@ -190,11 +190,15 @@ def handle_callbacks(call):
     # 🔹 PAGO GENERAL EN SOLES
     # ==============================
     if data == "pago_soles_general":
-        markup = InlineKeyboardMarkup()
+        markup = InlineKeyboardMarkup(row_width=1)
         markup.add(
             InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL)
+            InlineKeyboardButton(
+                "🛒 Abrir Mini App",
+                web_app=types.WebAppInfo(url=MINIAPP_URL + "?section=pago-soles")
+            )
         )
-        bot.send_message(chat_id, "🇵🇪 Paga en soles desde la mini app:", reply_markup=markup)
+        bot.send_message(chat_id, "🇵🇪 Paga en soles desde la Mini App:", reply_markup=markup)
 
     # ==============================
     # 🔹 PAGO GENERAL EN DÓLARES
