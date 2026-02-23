@@ -129,20 +129,15 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text and "🇵🇪 Pago en Soles" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
 def pago_en_soles(message):
-    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup = InlineKeyboardMarkup()
     markup.add(
-        types.InlineKeyboardButton(
-            "🛒 Abrir Mini App y pagar",
-            web_app=types.WebAppInfo(
-                url=MINIAPP_URL + "?section=membresias"
-            )
-        )
+        InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL})
     )
     bot.send_message(
         message.chat.id,
-        "🇵🇪 Selecciona tu plan en Membresías:",
+        "🇵🇪 Paga en soles desde la mini app.",
         reply_markup=markup
     )
     
@@ -154,23 +149,13 @@ def pago_dolares(message):
     bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: m.text and "👤 Mi Perfil" in m.text.lower())
+@bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
 def perfil(message):
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        types.InlineKeyboardButton(
-            "📱 Abrir mi perfil",
-            web_app=types.WebAppInfo(
-                url=MINIAPP_URL + "?section=perfil"
-            )
-        )
-    )
-    bot.send_message(
-        message.chat.id,
-        "👤 Abre tu perfil dentro de Telegram:",
-        reply_markup=markup
-    )
-
+    print("✅ Handler perfil ejecutado")
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("Abrir perfil", url=MINIAPP_URL))
+    bot.send_message(message.chat.id, "Consulta tu perfil:", reply_markup=markup)
+    
 
 @bot.message_handler(func=lambda m: m.text == "🆘 Ayuda")
 def ayuda(message):
@@ -190,14 +175,10 @@ def handle_callbacks(call):
     # 🔹 PAGO GENERAL EN SOLES
     # ==============================
     if data == "pago_soles_general":
-        markup = InlineKeyboardMarkup(row_width=1)
+        markup = InlineKeyboardMarkup()
         markup.add(
-            InlineKeyboardButton("🛒 Abrir Mini App", url=MINIAPP_URL),
-            InlineKeyboardButton(
-                "🛒 Abrir Mini App",
-                web_app=types.WebAppInfo(url=MINIAPP_URL + "?section=pago-soles")
-            )
-        )
+            InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL})
+    )
         bot.send_message(chat_id, "🇵🇪 Paga en soles desde la Mini App:", reply_markup=markup)
 
     # ==============================
