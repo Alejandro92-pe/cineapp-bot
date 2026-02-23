@@ -47,8 +47,8 @@ def menu_principal(chat_id, user_name=""):
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("💎 Ver Planes", "🎬 Beneficios VIP")
-    markup.row("🇵🇪 Pago en Soles", "💳 Pago en Dólares")
-    markup.row("👤 Mi Perfil", "🆘 Ayuda")
+    markup.row("⭐ Testimonios", "🎞 Pedir Película")
+    markup.row("📱 Mini App Vip", "🆘 Ayuda")
 
     bot.send_message(chat_id, texto, reply_markup=markup, parse_mode="Markdown")
 
@@ -129,30 +129,80 @@ def beneficios(message):
     bot.send_message(message.chat.id, KEYWORD_REPLIES["beneficios"], parse_mode="Markdown")
 
 
-@bot.message_handler(func=lambda m: m.text == "🇵🇪 Pago en Soles")
-def pago_en_soles(message):
-    markup = InlineKeyboardMarkup()
-    markup.add(
-        InlineKeyboardButton("🛒 Abrir Mini App", web_app={"url": MINIAPP_URL})
+@bot.message_handler(func=lambda m: m.text == "📱 Mini App Vip")
+def miniapp_info(message):
+
+    texto = (
+        "📱 *¿QUÉ ES LA MINI APP VIP?*\n\n"
+        "Es una aplicación dentro de Telegram donde puedes:\n\n"
+        "🎬 Ver el catálogo completo de películas y series\n"
+        "🔎 Buscar contenido fácilmente\n"
+        "📦 Hacer pedidos según tu plan\n"
+        "👤 Ver tu membresía y fecha de vencimiento\n"
+        "💳 Comprar tu plan de forma segura\n\n"
+        "🚀 Todo sin salir de Telegram.\n\n"
+        "👇 Para entrar escribe:\n"
+        "*abrir app*"
     )
+
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
+
+@bot.message_handler(func=lambda m: m.text and "abrir app" in m.text.lower())
+def abrir_app(message):
+
     bot.send_message(
         message.chat.id,
-        "🇵🇪 Paga en soles desde la mini app.",
-        reply_markup=markup
+        "📱 *Accede a la Mini App aquí:*\n\n"
+        "👉 https://cineapp-bot.onrender.com\n\n"
+        "⚡ Recomendado usar desde Telegram.",
+        parse_mode="Markdown"
     )
 
-@bot.message_handler(func=lambda m: m.text == "💳 Pago en Dólares")
-def pago_dolares(message):
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("💳 Pagar ahora", url=BMC_URL))
-    bot.send_message(message.chat.id, "💳 Paga en dólares con tarjeta, Gpay, ApplePay, Link y mas", reply_markup=markup)
+@bot.message_handler(func=lambda m: m.text == "🎞 Pedir Película")
+def pedir_pelicula_info(message):
 
-@bot.message_handler(func=lambda m: m.text == "👤 Mi Perfil")
-def perfil(message):
-    print("✅ Handler perfil ejecutado")
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("Abrir perfil", url=MINIAPP_URL))
-    bot.send_message(message.chat.id, "Consulta tu perfil:", reply_markup=markup)
+    texto = (
+        "🎞 *PIDE TU PELÍCULA o SERIE FAVORITA*\n\n"
+        "¿No encuentras una película o serie?\n"
+        "💎 Como miembro VIP puedes solicitarla.\n\n"
+        "📦 Según tu plan puedes tener pedidos mensuales.\n"
+        "⚡ Nuestro equipo la buscará y la añadirá al canal.\n\n"
+        "🎬 Puedes pedir:\n"
+        "• Películas clásicas\n"
+        "• Estrenos\n"
+        "• Series\n"
+        "• Contenido difícil de encontrar\n\n"
+        "👇 Para hacer tu pedido escribe:\n"
+        "*quiero pedir*\n\n"
+        "💡 (Disponible solo para miembros activos)"
+    )
+
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
+
+@bot.message_handler(func=lambda m: m.text and "quiero pedir" in m.text.lower())
+def redirigir_miniapp_pedidos(message):
+
+    bot.send_message(
+        message.chat.id,
+        "📱 *Abre la Mini App y ve a la sección:* 📦 Pedidos\n\n"
+        "✍️ Completa los datos del contenido que deseas.\n"
+        "🔔 Cuando esté disponible, recibirás notificación automática.",
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(func=lambda m: m.text == "⭐ Testimonios")
+def testimonios(message):
+
+    texto = (
+        "⭐ *LO QUE DICEN NUESTROS MIEMBROS VIP*\n\n"
+        "💬 “El mejor canal que encontré, siempre actualizan contenido.”\n\n"
+        "💬 “Me encanta poder pedir películas y que las suban rápido.”\n\n"
+        "💬 “Vale totalmente la pena, sin publicidad y todo ordenado.”\n\n"
+        "💎 ¿Te gustaría formar parte?\n"
+        "Escribe *ver planes* para comenzar."
+    )
+
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
     
 @bot.message_handler(func=lambda m: m.text == "🆘 Ayuda")
 def ayuda(message):
@@ -355,9 +405,9 @@ def manejar_texto(message):
     botones = [
         "💎 Ver Planes",
         "🎬 Beneficios VIP",
-        "🇵🇪 Pago en Soles",
-        "💳 Pago en Dólares",
-        "👤 Mi Perfil",
+        "⭐ Testimonios",
+        "🎞 Pedir Película",
+        "📱 Mini App Vip",
         "🆘 Ayuda"
     ]
 
