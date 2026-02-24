@@ -529,7 +529,8 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function(reset = true) {
+window.buscarContenido = async function(reset = false) {
+
     if (cargando || noHayMas) return;
 
     const busqueda = document.getElementById('buscarInput')?.value || '';
@@ -542,6 +543,10 @@ window.buscarContenido = async function(reset = true) {
 
     cargando = true;
 
+    const offset = paginaActual * LIMITE;
+
+    console.log("📦 Pidiendo offset:", offset);
+
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -549,7 +554,7 @@ window.buscarContenido = async function(reset = true) {
             busqueda,
             tipo: tipoActual,
             limit: LIMITE,
-            offset: paginaActual * LIMITE
+            offset: offset
         })
     });
 
@@ -558,9 +563,6 @@ window.buscarContenido = async function(reset = true) {
 
     if (!data || data.length === 0) {
         noHayMas = true;
-        if (paginaActual === 0) {
-            grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
-        }
         cargando = false;
         return;
     }
@@ -583,7 +585,8 @@ window.buscarContenido = async function(reset = true) {
         grid.appendChild(tarjeta);
     });
 
-    paginaActual++;
+    paginaActual++; // 🔥 IMPORTANTE: AUMENTA DESPUÉS DE CARGAR
+
     cargando = false;
 };
 
@@ -591,7 +594,8 @@ window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
-    buscarContenido();
+
+    buscarContenido(true); // SOLO AQUÍ RESET
 };
 
 window.abrirVideo = function(enlace) {
@@ -774,13 +778,14 @@ function bajarPlan() {
 }
 
 window.addEventListener("scroll", () => {
+
     if (cargando || noHayMas) return;
 
     const scrollTop = window.scrollY;
     const windowHeight = window.innerHeight;
     const fullHeight = document.body.offsetHeight;
 
-    if (scrollTop + windowHeight >= fullHeight - 200) {
+    if (scrollTop + windowHeight >= fullHeight - 150) {
         buscarContenido(false);
     }
 });
