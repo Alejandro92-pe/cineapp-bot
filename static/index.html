@@ -15,7 +15,7 @@
         }
         
         #contenido {
-            padding-bottom: 80px; /* igual o un poco más que el footer */
+            padding-bottom: 15px; /* igual o un poco más que el footer */
 }
         body {
             background: #0a0a0f;
@@ -29,6 +29,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin: auto;
+            width: 100%;
+            max-width: 1200px;
             margin-bottom: 20px;
         }
         
@@ -52,7 +55,12 @@
             border-radius: 12px;
             display: flex;
             gap: 10px;
+            margin: auto;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
             margin-bottom: 20px;
+            box-sizing: border-box;
         }
         
         .buscador input {
@@ -73,14 +81,17 @@
             display: flex;
             gap: 10px;
             overflow-x: auto;
-            margin-bottom: 20px;
             scrollbar-width: none;
+            margin: auto;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 30px;
         }
         
         .tab {
             background: #1e1e2a;
             padding: 8px 20px;
-            border-radius: 20px;
+            border-radius: 10px;
             white-space: nowrap;
             cursor: pointer;
         }
@@ -95,6 +106,9 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: 14px;
+            width: 100%;
+            max-width: 1200px;
+            margin: auto;
         }
         
         @media (min-width: 400px) and (max-width: 600px) {
@@ -143,7 +157,10 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
-            margin-bottom: 30px;
+            margin: auto;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 30px;
         }
         
         .plan {
@@ -153,11 +170,19 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin: auto;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            box-sizing: border-box;
         }
         
         .plan-info {
             flex: 1;
             padding-right: 10px;
+            margin: auto;
+            width: 100%;
+            max-width: 250px;
         }
         
         .plan-nombre {
@@ -264,7 +289,10 @@
             padding: 20px;
             border-radius: 12px;
             text-align: center;
-            margin: 15px;
+            margin: auto;
+            width: 100%;
+            max-width: 600px;
+            box-sizing: border-box;
         }
         
         .perfil-item {
@@ -282,7 +310,7 @@
     width: 100%;
     height: 70px;
     display: flex;
-    justify-content: space-around;
+    justify-content: space-evenly;
     align-items: center;
     background: #0f172a;
     border-top: 1px solid #1e293b;
@@ -352,6 +380,7 @@
         gap: 10px;
         margin-top: 12px;
         width: 100%;
+        max-width: 350px;
     }
 
     .btn-comprar {
@@ -393,8 +422,11 @@
     padding: 12px;
     border-radius: 12px;
     border: none;
+    margin: auto;
     width: 100%;
+    max-width: 600px;
     margin-top: 20px;
+    display: block;
 }
 
 .logo img {
@@ -464,6 +496,12 @@
     border-radius: 8px;
     color: white;
     cursor: pointer;
+}
+
+.btn-pedir.disabled {
+    background: #334155;
+    color: #94a3b8;
+    cursor: not-allowed;
 }
 
 .btn-secondary {

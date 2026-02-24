@@ -226,15 +226,30 @@ window.cambiarVista = async function(vista) {
 
         // Si ya no quedan pedidos
         if (restantes <= 0) {
-            contenedor.innerHTML = `
-                <div class="perfil-card">
-                    <p>📊 Usados: ${usados}/${limiteTotal}</p>
-                    <p class="text-gris">⚠️ Alcanzaste el límite de tu plan</p>
-                </div>
-            `;
-            return;
-        }
 
+    contenedor.innerHTML = `
+        <div class="perfil-card">
+            <p>📊 Usados: ${usados}/${limiteTotal}</p>
+            <p class="text-gris">⚠️ Alcanzaste el límite de tu plan</p>
+        </div>
+
+        <div class="pedidos-form">
+            <h3>🎬 Pedir Película/Serie</h3>
+            <input type="text" disabled placeholder="Límite alcanzado">
+            <select disabled>
+                <option>Película</option>
+            </select>
+            <button disabled class="btn-pedir disabled">
+                Límite alcanzado
+            </button>
+        </div>
+
+        <div id="listaPedidos"></div>
+    `;
+
+    cargarPedidos();
+    return;
+        }
         // Mostrar formulario de pedido
         contenedor.innerHTML = `
             <div class="perfil-card">
