@@ -581,9 +581,13 @@ window.buscarContenido = async function(pagina = 1) {
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">${item.tipo}</div>
+                <div class="tarjeta-detalle">
+                ${item.tipo}
+                ${item.año ? ` • ${item.año}` : ''}
+                ${item.genero ? ` • ${item.genero}` : ''}
+                 </div>
             </div>
-        </div>
+        </div>  
     `).join('');
 
     renderPaginacion();
