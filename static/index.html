@@ -215,6 +215,45 @@
             cursor: pointer;
             margin-top: 10px;
         }
+
+.paginacion-contenedor {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: #1f2937;
+    color: #fff;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 14px;
+}
+
+.page-btn:hover {
+    background: #374151;
+}
+
+.page-btn.active {
+    background: #f97316;
+    font-weight: bold;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dots {
+    align-self: center;
+    padding: 0 5px;
+    color: #999;
+}
         
         /* Perfil */
         .perfil-card {

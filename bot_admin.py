@@ -1565,13 +1565,13 @@ def api_planes():
 @app.route("/api/contenido", methods=["POST"])
 def api_contenido():
     data = request.get_json()
-    
+
     busqueda = data.get("busqueda", "")
     tipo = data.get("tipo", "todo")
     limit = int(data.get("limit", 20))
     offset = int(data.get("offset", 0))
 
-    query = supabase_service.table("contenido").select("*")
+    query = supabase_service.table("contenido").select("*", count="exact")
 
     if tipo != "todo":
         query = query.eq("tipo", tipo)
@@ -1586,7 +1586,10 @@ def api_contenido():
         .execute()
     )
 
-    return jsonify(resultados.data)
+    return jsonify({
+        "data": resultados.data,
+        "total": resultados.count
+    })
 
 @app.route("/api/admin/pagos", methods=["POST"])
 def api_admin_pagos():

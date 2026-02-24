@@ -15,6 +15,7 @@ let planesMembresias = [];
 let paginaActual = 1;
 const LIMITE = 20;
 let busquedaActual = "";
+let totalPaginas = 1;
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -547,9 +548,12 @@ window.buscarContenido = async function(pagina = 1) {
         })
     });
 
-    const data = await response.json();
-    const grid = document.getElementById('resultados');
+    const result = await response.json();
+    const data = result.data;
+    const totalRegistros = result.total;
+    totalPaginas = Math.ceil(totalRegistros / LIMITE);
 
+    const grid = document.getElementById('resultados');
     if (!data || data.length === 0) {
         grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
         return;
@@ -760,21 +764,53 @@ function renderPaginacion() {
 
     const paginacion = document.getElementById("paginacion");
 
-    paginacion.innerHTML = `
-        <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
-            <button onclick="buscarContenido(${paginaActual - 1})" 
-                ${paginaActual <= 1 ? "disabled" : ""}>
-                ⬅ Anterior
-            </button>
+    let html = `<div class="paginacion-contenedor">`;
 
-            <span style="align-self:center;">Página ${paginaActual}</span>
-
-            <button onclick="buscarContenido(${paginaActual + 1})">
-                Siguiente ➡
-            </button>
-        </div>
+    // Botón anterior
+    html += `
+        <button class="page-btn" 
+            ${paginaActual === 1 ? "disabled" : ""}
+            onclick="buscarContenido(${paginaActual - 1})">
+            ◀
+        </button>
     `;
-}   
+
+    // Mostrar máximo 5 páginas alrededor
+    let inicio = Math.max(1, paginaActual - 2);
+    let fin = Math.min(totalPaginas, paginaActual + 2);
+
+    if (inicio > 1) {
+        html += `<button class="page-btn" onclick="buscarContenido(1)">1</button>`;
+        if (inicio > 2) html += `<span class="dots">...</span>`;
+    }
+
+    for (let i = inicio; i <= fin; i++) {
+        html += `
+            <button class="page-btn ${i === paginaActual ? 'active' : ''}"
+                onclick="buscarContenido(${i})">
+                ${i}
+            </button>
+        `;
+    }
+
+    if (fin < totalPaginas) {
+        if (fin < totalPaginas - 1) html += `<span class="dots">...</span>`;
+        html += `<button class="page-btn" onclick="buscarContenido(${totalPaginas})">${totalPaginas}</button>`;
+    }
+
+    // Botón siguiente
+    html += `
+        <button class="page-btn"
+            ${paginaActual === totalPaginas ? "disabled" : ""}
+            onclick="buscarContenido(${paginaActual + 1})">
+            ▶
+        </button>
+    `;
+
+    html += `</div>`;
+
+    paginacion.innerHTML = html;
+}
 
 // ============ INICIAR ============
 iniciar();
