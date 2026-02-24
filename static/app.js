@@ -12,6 +12,11 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
+let paginaActual = 0;
+let cargando = false;
+let noHayMas = false;
+const LIMITE = 20;
+let scrollActivo = false;
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -87,20 +92,26 @@ window.cambiarVista = async function(vista) {
     const contenedor = document.getElementById('contenido');
     
     if (vista === 'inicio') {
-        contenedor.innerHTML = `
-            <div class="buscador">
-                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido()">
-                <span>🔍</span>
-            </div>
-            <div class="tabs">
-                <div class="tab activo" onclick="cambiarTipo('todo', event)">Todo</div>
-                <div class="tab" onclick="cambiarTipo('pelicula', event)">Películas</div>
-                <div class="tab" onclick="cambiarTipo('serie', event)">Series</div>
-            </div>
-            <div id="resultados" class="grid"></div>
-        `;
-        buscarContenido();
-    }
+
+    contenedor.innerHTML = `
+        <div class="buscador">
+            <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido(true)">
+            <span>🔍</span>
+        </div>
+        <div class="tabs">
+            <div class="tab activo" onclick="cambiarTipo('todo', event)">Todo</div>
+            <div class="tab" onclick="cambiarTipo('pelicula', event)">Películas</div>
+            <div class="tab" onclick="cambiarTipo('serie', event)">Series</div>
+        </div>
+        <div id="resultados" class="grid"></div>
+    `;
+
+    paginaActual = 0;
+    noHayMas = false;
+    buscarContenido(true);
+
+    activarScrollInfinito(); // 🔥 SOLO AQUÍ
+}
     
     else if (vista === 'membresias') {
         let html = '<div class="planes">';
@@ -525,24 +536,48 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function() {
+window.buscarContenido = async function(reset = false) {
+
+    if (cargando || noHayMas) return;
+
     const busqueda = document.getElementById('buscarInput')?.value || '';
-    
+
+    if (reset) {
+        paginaActual = 0;
+        noHayMas = false;
+        document.getElementById('resultados').innerHTML = '';
+    }
+
+    cargando = true;
+
+    const offset = paginaActual * LIMITE;
+
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ busqueda, tipo: tipoActual })
+        body: JSON.stringify({
+            busqueda,
+            tipo: tipoActual,
+            limit: LIMITE,
+            offset: offset
+        })
     });
+
     const data = await response.json();
-    
     const grid = document.getElementById('resultados');
+
     if (!data || data.length === 0) {
-        grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
+        noHayMas = true;
+        cargando = false;
         return;
     }
-    
-    grid.innerHTML = data.map(item => `
-        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
+
+    data.forEach(item => {
+        const tarjeta = document.createElement('div');
+        tarjeta.className = 'tarjeta';
+        tarjeta.onclick = () => abrirVideo(item.enlace_canal);
+
+        tarjeta.innerHTML = `
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" alt="${item.titulo}" />
             </div>
@@ -550,8 +585,13 @@ window.buscarContenido = async function() {
                 <div class="tarjeta-titulo">${item.titulo}</div>
                 <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
             </div>
-        </div>
-    `).join('');
+        `;
+
+        grid.appendChild(tarjeta);
+    });
+
+    paginaActual++;
+    cargando = false;
 };
 
 window.cambiarTipo = function(tipo, e) {
@@ -560,6 +600,29 @@ window.cambiarTipo = function(tipo, e) {
     if (e) e.target.classList.add('activo');
     buscarContenido();
 };
+
+function activarScrollInfinito() {
+
+    if (scrollActivo) return;
+    scrollActivo = true;
+
+    const contenedor = document.getElementById("contenido");
+
+    if (!contenedor) return;
+
+    contenedor.addEventListener("scroll", () => {
+
+        if (cargando || noHayMas) return;
+
+        const scrollTop = contenedor.scrollTop;
+        const heightVisible = contenedor.clientHeight;
+        const heightTotal = contenedor.scrollHeight;
+
+        if (scrollTop + heightVisible >= heightTotal - 150) {
+            buscarContenido(false);
+        }
+    });
+}
 
 window.abrirVideo = function(enlace) {
     if (enlace) tg.openLink(enlace);
