@@ -12,10 +12,6 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
-let paginaActual = 0;
-let cargando = false;
-let noHayMas = false;
-const LIMITE = 20;
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -29,7 +25,7 @@ async function iniciar() {
     if (userId) {
         const userRes = await fetch(`${API_BASE_URL}/api/usuario`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },    
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ telegram_id: userId })
         });
         const userData = await userRes.json();
@@ -93,7 +89,7 @@ window.cambiarVista = async function(vista) {
     if (vista === 'inicio') {
         contenedor.innerHTML = `
             <div class="buscador">
-                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido(true)">
+                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido()">
                 <span>🔍</span>
             </div>
             <div class="tabs">
@@ -103,7 +99,7 @@ window.cambiarVista = async function(vista) {
             </div>
             <div id="resultados" class="grid"></div>
         `;
-        buscarContenido(true);
+        buscarContenido();
     }
     
     else if (vista === 'membresias') {
@@ -529,50 +525,24 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function(reset = false) {
-
-    if (cargando || noHayMas) return;
-
+window.buscarContenido = async function() {
     const busqueda = document.getElementById('buscarInput')?.value || '';
-
-    if (reset) {
-        paginaActual = 0;
-        noHayMas = false;
-        document.getElementById('resultados').innerHTML = '';
-    }
-
-    cargando = true;
-
-    const offset = paginaActual * LIMITE;
-
-    console.log("📦 Pidiendo offset:", offset);
-
+    
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            busqueda,
-            tipo: tipoActual,
-            limit: LIMITE,
-            offset: offset
-        })
+        body: JSON.stringify({ busqueda, tipo: tipoActual })
     });
-
     const data = await response.json();
+    
     const grid = document.getElementById('resultados');
-
     if (!data || data.length === 0) {
-        noHayMas = true;
-        cargando = false;
+        grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
         return;
     }
-
-    data.forEach(item => {
-        const tarjeta = document.createElement('div');
-        tarjeta.className = 'tarjeta';
-        tarjeta.onclick = () => abrirVideo(item.enlace_canal);
-
-        tarjeta.innerHTML = `
+    
+    grid.innerHTML = data.map(item => `
+        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" alt="${item.titulo}" />
             </div>
@@ -580,22 +550,15 @@ window.buscarContenido = async function(reset = false) {
                 <div class="tarjeta-titulo">${item.titulo}</div>
                 <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
             </div>
-        `;
-
-        grid.appendChild(tarjeta);
-    });
-
-    paginaActual++; // 🔥 IMPORTANTE: AUMENTA DESPUÉS DE CARGAR
-
-    cargando = false;
+        </div>
+    `).join('');
 };
 
 window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
-
-    buscarContenido(true); // SOLO AQUÍ RESET
+    buscarContenido();
 };
 
 window.abrirVideo = function(enlace) {
@@ -777,17 +740,5 @@ function bajarPlan() {
     });
 }
 
-window.addEventListener("scroll", () => {
-
-    if (cargando || noHayMas) return;
-
-    const scrollTop = window.scrollY;
-    const windowHeight = window.innerHeight;
-    const fullHeight = document.body.offsetHeight;
-
-    if (scrollTop + windowHeight >= fullHeight - 150) {
-        buscarContenido(false);
-    }
-});
 // ============ INICIAR ============
 iniciar();
