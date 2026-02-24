@@ -530,20 +530,18 @@ async function cargarUsuariosAdmin(contenedor) {
 let tipoActual = 'todo';
 
 window.buscarContenido = async function(reset = false) {
-    // Si es una nueva búsqueda o cambio de filtro, reiniciamos
+    // Si reset es true, reiniciamos la paginación (útil para nuevas búsquedas o cambios de filtro)
     if (reset) {
         paginaActual = 0;
         todoContenido = [];
         noMasContenido = false;
-        document.getElementById('resultados').innerHTML = ''; // Limpiar grid
     }
-    
+
     if (cargando || noMasContenido) return;
-    
     cargando = true;
-    
+
     const busqueda = document.getElementById('buscarInput')?.value || '';
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/api/contenido`, {
             method: "POST",
@@ -555,28 +553,48 @@ window.buscarContenido = async function(reset = false) {
                 limit: 18
             })
         });
-        
-        const result = await response.json();
-        
-        if (result.data && result.data.length > 0) {
-            todoContenido = [...todoContenido, ...result.data];
-            renderizarContenido(todoContenido);
-            paginaActual++;
-            noMasContenido = !result.hasMore; // Si hasMore es false, ya no hay más
-        } else {
-            noMasContenido = true;
-            if (paginaActual === 0) {
-                // Si no hay resultados en la primera página
-                document.getElementById('resultados').innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
-            }
-        }
-        
+
+        const result = await response.json(); // result = { data: [...], total, hasMore, ... }
+
+        if (!response.ok) throw new Error(result.error || 'Error al cargar contenido');
+
+        // Acumulamos los nuevos items
+        todoContenido = [...todoContenido, ...result.data];
+        paginaActual++;
+        noMasContenido = !result.hasMore;
+
+        // Renderizamos usando la variable global todoContenido
+        renderizarContenido(todoContenido);
+
     } catch (error) {
-        console.error("Error cargando contenido:", error);
+        console.error("Error en buscarContenido:", error);
     } finally {
         cargando = false;
     }
 };
+
+// Función auxiliar para renderizar el contenido en el grid
+function renderizarContenido(items) {
+    const grid = document.getElementById('resultados');
+    if (!grid) return;
+
+    if (items.length === 0) {
+        grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
+        return;
+    }
+
+    grid.innerHTML = items.map(item => `
+        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
+            <div class="tarjeta-imagen">
+                <img src="${item.imagen_url}" alt="${item.titulo}" />
+            </div>
+            <div class="tarjeta-info">
+                <div class="tarjeta-titulo">${item.titulo}</div>
+                <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
+            </div>
+        </div>
+    `).join('');
+}
 
 function renderizarContenido(items) {
     const grid = document.getElementById('resultados');
@@ -601,15 +619,12 @@ function renderizarContenido(items) {
 }
 
 window.addEventListener('scroll', () => {
-    // Evitar cargas si ya estamos cargando o no hay más contenido
-    if (cargando || noMasContenido) return;
-    
     const scrollTop = window.scrollY;
     const windowHeight = window.innerHeight;
     const documentHeight = document.documentElement.scrollHeight;
-    
-    // Cuando el usuario está cerca del final (últimos 300px)
-    if (scrollTop + windowHeight >= documentHeight - 300) {
+
+    // Cuando el usuario está cerca del final (últimos 200px)
+    if (scrollTop + windowHeight >= documentHeight - 200) {
         window.buscarContenido();
     }
 });
@@ -618,9 +633,9 @@ window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
-    // Reiniciamos la paginación y cargamos de nuevo
-    window.buscarContenido(true);
+    buscarContenido(true); // Reinicia con el nuevo filtro
 };
+
 
 window.abrirVideo = function(enlace) {
     if (enlace) tg.openLink(enlace);
