@@ -14,6 +14,9 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
+        #contenido {
+            padding-bottom: 80px; /* igual o un poco más que el footer */
+}
         body {
             background: #0a0a0f;
             color: white;
@@ -272,12 +275,17 @@
         
         /* Footer */
 .footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
     display: flex;
     justify-content: space-around;
     align-items: center;
     background: #0f172a;
-    padding: 10px 0;
     border-top: 1px solid #1e293b;
+    z-index: 1000;
 }
 
 .footer-item {

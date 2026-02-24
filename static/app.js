@@ -733,22 +733,16 @@ function subirPlan() {
         ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
         : 'desconocida';
 
-    tg.showPopup({
-        title: '⬆️ Subir de plan',
-        message: `Al mejorar tu plan se mantendrán los días restantes (hasta ${vence}).\n\n¿Quieres ver los planes disponibles?`,
-        buttons: [
-            { id: 'ok', type: 'default', text: 'Ver planes' },
-            { type: 'cancel' }
-        ]
-    }, function(buttonId) {
-
-        if (buttonId === 'ok') {
-            setTimeout(() => {
-                window.cambiarVista('membresias');
-            }, 100);
+    tg.showConfirm(
+        `Al mejorar tu plan se mantendrán los días restantes (hasta ${vence}).\n\n¿Quieres ver los planes disponibles?`,
+        function(confirmed) {
+            if (confirmed) {
+                setTimeout(() => {
+                    window.cambiarVista('membresias');
+                }, 100);
+            }
         }
-
-    });
+    );
 }
 
 // ============ BAJAR DE PLAN ============
@@ -758,22 +752,16 @@ function bajarPlan() {
         ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
         : 'desconocida';
 
-    tg.showPopup({
-        title: '⬇️ Bajar de plan',
-        message: `Espera a que termine (${vence}) y luego podrás elegir otro plan.\n\n¿Quieres ver los planes disponibles?`,
-        buttons: [
-            { id: 'ok', type: 'default', text: 'Ver planes' },
-            { type: 'cancel' }
-        ]
-    }, function(buttonId) {
-
-        if (buttonId === 'ok') {
-            setTimeout(() => {
-                window.cambiarVista('membresias');
-            }, 100);
+    tg.showConfirm(
+        `Espera a que termine (${vence}) y luego podrás elegir otro plan.\n\n¿Quieres ver planes disponibles?`,
+        function(confirmed) {
+            if (confirmed) {
+                setTimeout(() => {
+                    window.cambiarVista('membresias');
+                }, 100);
+            }
         }
-
-    });
+    );
 }
 
 function renderPaginacion() {
