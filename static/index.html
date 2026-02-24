@@ -271,26 +271,39 @@
         }
         
         /* Footer */
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #0a0a0f;
-            padding: 12px 24px;
-            display: flex;
-            justify-content: space-around;
-            border-top: 1px solid #1e1e2a;
-        }
-        
-        .footer-item {
-            color: #666;
-            cursor: pointer;
-        }
-        
-        .footer-item.activo {
-            color: #ffd966;
-        }
+.footer {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: #0f172a;
+    padding: 10px 0;
+    border-top: 1px solid #1e293b;
+}
+
+.footer-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 12px;
+    color: #64748b;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.footer-item .icon {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+    margin-bottom: 4px;
+}
+
+.footer-item.activo {
+    color: #f97316;
+}
+
+.footer-item:hover {
+    color: #ffffff;
+}
         
         .tarjeta-imagen img {
              width: 100%;

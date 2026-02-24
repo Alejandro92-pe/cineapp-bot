@@ -728,49 +728,51 @@ window.verificarCompra = function() {
 
 // ============ SUBIR DE PLAN ============
 function subirPlan() {
+
     const vence = membresiaActiva?.fecha_fin
         ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
         : 'desconocida';
 
     tg.showPopup({
         title: '⬆️ Subir de plan',
-        message: `Al mejorar a un plan superior, se te sumarán los días restantes (hasta el ${vence}).\n\n¿Quieres continuar?`,
+        message: `Al mejorar tu plan se mantendrán los días restantes (hasta ${vence}).\n\n¿Quieres ver los planes disponibles?`,
         buttons: [
             { id: 'ok', type: 'default', text: 'Ver planes' },
-            { id: 'cancel', type: 'destructive', text: 'Cancelar' }
+            { type: 'cancel' }
         ]
-    });
+    }, function(buttonId) {
 
-    tg.onEvent('popupClosed', function(eventData) {
-        if (eventData.button_id === 'ok') {
+        if (buttonId === 'ok') {
             setTimeout(() => {
                 window.cambiarVista('membresias');
-            }, 50);
+            }, 100);
         }
+
     });
 }
 
 // ============ BAJAR DE PLAN ============
 function bajarPlan() {
+
     const vence = membresiaActiva?.fecha_fin
         ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
         : 'desconocida';
 
     tg.showPopup({
         title: '⬇️ Bajar de plan',
-        message: `Espera a que termine (${vence}) y luego podrás contratar otro plan.\n\n¿Quieres ver planes disponibles?`,
+        message: `Espera a que termine (${vence}) y luego podrás elegir otro plan.\n\n¿Quieres ver los planes disponibles?`,
         buttons: [
             { id: 'ok', type: 'default', text: 'Ver planes' },
-            { id: 'cancel', type: 'destructive', text: 'Cancelar' }
+            { type: 'cancel' }
         ]
-    });
+    }, function(buttonId) {
 
-    tg.onEvent('popupClosed', function(eventData) {
-        if (eventData.button_id === 'ok') {
+        if (buttonId === 'ok') {
             setTimeout(() => {
                 window.cambiarVista('membresias');
-            }, 50);
+            }, 100);
         }
+
     });
 }
 
