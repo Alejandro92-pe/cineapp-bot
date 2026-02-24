@@ -1567,14 +1567,21 @@ def api_contenido():
     data = request.get_json()
     busqueda = data.get("busqueda", "")
     tipo = data.get("tipo", "todo")
+    pagina = int(data.get("pagina", 1))
+
+    limite = 21
+    offset = (pagina - 1) * limite
 
     query = supabase_service.table("contenido").select("*")
+
     if tipo != "todo":
         query = query.eq("tipo", tipo)
+
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
-    
-    resultados = query.limit(20).execute()
+
+    resultados = query.range(offset, offset + limite - 1).execute()
+
     return jsonify(resultados.data)
 
 @app.route("/api/admin/pagos", methods=["POST"])

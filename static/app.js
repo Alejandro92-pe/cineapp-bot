@@ -12,6 +12,9 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
+let paginaActual = 1;
+let cargando = false;
+let hayMasContenido = true;
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -678,6 +681,57 @@ async function cargarPedidos() {
     } catch (error) {
         console.error("Error:", error);
     }
+}
+
+async function cargarContenido(inicial = false) {
+
+    if (cargando || !hayMasContenido) return;
+
+    cargando = true;
+
+    const res = await fetch(API_BASE_URL + "/api/contenido", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            tipo: filtroActual,
+            busqueda: busquedaActual,
+            pagina: paginaActual
+        })
+    });
+
+    const data = await res.json();
+
+    if (data.length === 0) {
+        hayMasContenido = false;
+        cargando = false;
+        return;
+    }
+
+    renderContenido(data, inicial);
+
+    paginaActual++;
+    cargando = false;
+}
+
+window.addEventListener("scroll", () => {
+
+    if (
+        window.innerHeight + window.scrollY >=
+        document.body.offsetHeight - 200
+    ) {
+        cargarContenido();
+    }
+
+});
+
+function resetearContenido() {
+
+    paginaActual = 1;
+    hayMasContenido = true;
+
+    document.querySelector(".grid").innerHTML = "";
+
+    cargarContenido(true);
 }
 
 window.aprobarPago = async function(pagoId) {
