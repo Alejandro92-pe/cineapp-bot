@@ -12,10 +12,6 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
-let paginaActual = 0;
-let cargando = false;
-let noMasContenido = false;
-let todoContenido = [];
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -103,7 +99,7 @@ window.cambiarVista = async function(vista) {
             </div>
             <div id="resultados" class="grid"></div>
         `;
-        window.buscarContenido(true);
+        buscarContenido();
     }
     
     else if (vista === 'membresias') {
@@ -529,61 +525,23 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function(reset = false) {
-    // Si reset es true, reiniciamos la paginación (útil para nuevas búsquedas o cambios de filtro)
-    if (reset) {
-        paginaActual = 0;
-        todoContenido = [];
-        noMasContenido = false;
-    }
-
-    if (cargando || noMasContenido) return;
-    cargando = true;
-
+window.buscarContenido = async function() {
     const busqueda = document.getElementById('buscarInput')?.value || '';
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/contenido`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                busqueda, 
-                tipo: tipoActual,
-                page: paginaActual,
-                limit: 18
-            })
-        });
-
-        const result = await response.json(); // result = { data: [...], total, hasMore, ... }
-
-        if (!response.ok) throw new Error(result.error || 'Error al cargar contenido');
-
-        // Acumulamos los nuevos items
-        todoContenido = [...todoContenido, ...result.data];
-        paginaActual++;
-        noMasContenido = !result.hasMore;
-
-        // Renderizamos usando la variable global todoContenido
-        renderizarContenido(todoContenido);
-
-    } catch (error) {
-        console.error("Error en buscarContenido:", error);
-    } finally {
-        cargando = false;
-    }
-};
-
-// Función auxiliar para renderizar el contenido en el grid
-function renderizarContenido(items) {
+    
+    const response = await fetch(`${API_BASE_URL}/api/contenido`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ busqueda, tipo: tipoActual })
+    });
+    const data = await response.json();
+    
     const grid = document.getElementById('resultados');
-    if (!grid) return;
-
-    if (items.length === 0) {
+    if (!data || data.length === 0) {
         grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
         return;
     }
-
-    grid.innerHTML = items.map(item => `
+    
+    grid.innerHTML = data.map(item => `
         <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" alt="${item.titulo}" />
@@ -594,48 +552,14 @@ function renderizarContenido(items) {
             </div>
         </div>
     `).join('');
-}
-
-function renderizarContenido(items) {
-    const grid = document.getElementById('resultados');
-    if (!grid) return;
-    
-    if (items.length === 0) {
-        grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
-        return;
-    }
-    
-    grid.innerHTML = items.map(item => `
-        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
-            <div class="tarjeta-imagen">
-                <img src="${item.imagen_url}" alt="${item.titulo}" loading="lazy" />
-            </div>
-            <div class="tarjeta-info">
-                <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
-            </div>
-        </div>
-    `).join('');
-}
-
-window.addEventListener('scroll', () => {
-    const scrollTop = window.scrollY;
-    const windowHeight = window.innerHeight;
-    const documentHeight = document.documentElement.scrollHeight;
-
-    // Cuando el usuario está cerca del final (últimos 200px)
-    if (scrollTop + windowHeight >= documentHeight - 200) {
-        window.buscarContenido();
-    }
-});
+};
 
 window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
-    buscarContenido(true); // Reinicia con el nuevo filtro
+    buscarContenido();
 };
-
 
 window.abrirVideo = function(enlace) {
     if (enlace) tg.openLink(enlace);
