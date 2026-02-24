@@ -12,11 +12,9 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
-let paginaActual = 0;
-let cargando = false;
-let noHayMas = false;
+let paginaActual = 1;
 const LIMITE = 20;
-let scrollActivo = false;
+let busquedaActual = "";
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -92,26 +90,21 @@ window.cambiarVista = async function(vista) {
     const contenedor = document.getElementById('contenido');
     
     if (vista === 'inicio') {
-
-    contenedor.innerHTML = `
-        <div class="buscador">
-            <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido(true)">
-            <span>🔍</span>
-        </div>
-        <div class="tabs">
-            <div class="tab activo" onclick="cambiarTipo('todo', event)">Todo</div>
-            <div class="tab" onclick="cambiarTipo('pelicula', event)">Películas</div>
-            <div class="tab" onclick="cambiarTipo('serie', event)">Series</div>
-        </div>
-        <div id="resultados" class="grid"></div>
-    `;
-
-    paginaActual = 0;
-    noHayMas = false;
-    buscarContenido(true);
-
-    activarScrollInfinito(); // 🔥 SOLO AQUÍ
-}
+        contenedor.innerHTML = `
+            <div class="buscador">
+                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido(1)">
+                <span>🔍</span>
+            </div>
+            <div class="tabs">
+                <div class="tab activo" onclick="cambiarTipo('todo', event)">Todo</div>
+                <div class="tab" onclick="cambiarTipo('pelicula', event)">Películas</div>
+                <div class="tab" onclick="cambiarTipo('serie', event)">Series</div>
+            </div>
+            <div id="resultados" class="grid"></div>
+            <div id="paginacion" class="paginacion"></div>
+        `;
+        buscarContenido();
+    }
     
     else if (vista === 'membresias') {
         let html = '<div class="planes">';
@@ -536,27 +529,18 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function(reset = false) {
+window.buscarContenido = async function(pagina = 1) {
 
-    if (cargando || noHayMas) return;
+    paginaActual = pagina;
+    busquedaActual = document.getElementById('buscarInput')?.value || '';
 
-    const busqueda = document.getElementById('buscarInput')?.value || '';
-
-    if (reset) {
-        paginaActual = 0;
-        noHayMas = false;
-        document.getElementById('resultados').innerHTML = '';
-    }
-
-    cargando = true;
-
-    const offset = paginaActual * LIMITE;
+    const offset = (paginaActual - 1) * LIMITE;
 
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            busqueda,
+            busqueda: busquedaActual,
             tipo: tipoActual,
             limit: LIMITE,
             offset: offset
@@ -567,62 +551,31 @@ window.buscarContenido = async function(reset = false) {
     const grid = document.getElementById('resultados');
 
     if (!data || data.length === 0) {
-        noHayMas = true;
-        cargando = false;
+        grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
         return;
     }
 
-    data.forEach(item => {
-        const tarjeta = document.createElement('div');
-        tarjeta.className = 'tarjeta';
-        tarjeta.onclick = () => abrirVideo(item.enlace_canal);
-
-        tarjeta.innerHTML = `
+    grid.innerHTML = data.map(item => `
+        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
             <div class="tarjeta-imagen">
-                <img src="${item.imagen_url}" alt="${item.titulo}" />
+                <img src="${item.imagen_url}" />
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
+                <div class="tarjeta-detalle">${item.tipo}</div>
             </div>
-        `;
+        </div>
+    `).join('');
 
-        grid.appendChild(tarjeta);
-    });
-
-    paginaActual++;
-    cargando = false;
+    renderPaginacion();
 };
 
 window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
-    buscarContenido();
+    buscarContenido(1);
 };
-
-function activarScrollInfinito() {
-
-    if (scrollActivo) return;
-    scrollActivo = true;
-
-    const contenedor = document.getElementById("contenido");
-
-    if (!contenedor) return;
-
-    contenedor.addEventListener("scroll", () => {
-
-        if (cargando || noHayMas) return;
-
-        const scrollTop = contenedor.scrollTop;
-        const heightVisible = contenedor.clientHeight;
-        const heightTotal = contenedor.scrollHeight;
-
-        if (scrollTop + heightVisible >= heightTotal - 150) {
-            buscarContenido(false);
-        }
-    });
-}
 
 window.abrirVideo = function(enlace) {
     if (enlace) tg.openLink(enlace);
@@ -802,6 +755,26 @@ function bajarPlan() {
         }
     });
 }
+
+function renderPaginacion() {
+
+    const paginacion = document.getElementById("paginacion");
+
+    paginacion.innerHTML = `
+        <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
+            <button onclick="buscarContenido(${paginaActual - 1})" 
+                ${paginaActual <= 1 ? "disabled" : ""}>
+                ⬅ Anterior
+            </button>
+
+            <span style="align-self:center;">Página ${paginaActual}</span>
+
+            <button onclick="buscarContenido(${paginaActual + 1})">
+                Siguiente ➡
+            </button>
+        </div>
+    `;
+}   
 
 // ============ INICIAR ============
 iniciar();
