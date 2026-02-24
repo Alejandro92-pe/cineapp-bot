@@ -17,15 +17,14 @@ const LIMITE = 20;
 let busquedaActual = "";
 let totalPaginas = 1;
 
+// ============ correccion hasta qui esta bien ============
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
     console.log("🎬 Iniciando app...");
 
-    // Cargar planes desde el backend
     const planesRes = await fetch(`${API_BASE_URL}/api/planes`);
     planesMembresias = await planesRes.json();
 
-    // Cargar usuario y membresía
     if (userId) {
         const userRes = await fetch(`${API_BASE_URL}/api/usuario`, {
             method: "POST",
@@ -37,7 +36,6 @@ async function iniciar() {
         membresiaActiva = userData.membresia;
     }
 
-    // Actualizar badge
     const badge = document.getElementById('badge');
     if (badge) {
         badge.innerText = membresiaActiva
@@ -46,29 +44,36 @@ async function iniciar() {
     }
 
     configurarFooter();
+
+    // 🔥 AQUÍ VA
+    document.querySelectorAll('.footer-item').forEach(item => {
+    item.addEventListener('click', () => {
+        const vista = item.dataset.destino || item.dataset.vista;
+        window.cambiarVista(vista);
+    });
+  });
+
     cambiarVista('inicio');
 }
 
 // ============ CONFIGURAR FOOTER ============
 function configurarFooter() {
-    const footer = document.querySelector('.footer');
-    if (!footer) return;
+    const items = document.querySelectorAll('.footer-item');
 
-    const items = footer.querySelectorAll('.footer-item');
-    
-    if (userId == ADMIN_ID) {
-        // Admin: reemplazar "Pedidos" por "ADMIN"
-        if (items.length >= 4) {
-            items[2].innerHTML = '👑 ADMIN';
-            items[2].setAttribute('onclick', "cambiarVista('admin')");
+    items.forEach(item => {
+        if (item.dataset.vista === 'pedidos') {
+
+            const span = item.querySelector('span');
+
+            if (userId == ADMIN_ID) {
+                span.innerText = 'Admin';
+                item.dataset.destino = 'admin';
+            } else {
+                span.innerText = 'Pedidos';
+                item.dataset.destino = 'pedidos';
+            }
         }
-    } else {
-        // Usuario normal: aseguramos que "Pedidos" esté correcto
-        if (items.length >= 4) {
-            items[2].innerHTML = '📦 Pedidos';
-            items[2].setAttribute('onclick', "cambiarVista('pedidos')");
-        }
-    }
+    });
 }
 
 // ============ CAMBIAR VISTA ============
@@ -77,15 +82,10 @@ window.cambiarVista = async function(vista) {
     
     // Actualizar clase activa en footer
     document.querySelectorAll('.footer-item').forEach(el => {
-        el.classList.remove('activo');
-        let texto = el.innerText.trim();
-        if ((vista === 'inicio' && texto.includes('Inicio')) ||
-            (vista === 'membresias' && texto.includes('Membresías')) ||
-            (vista === 'pedidos' && texto.includes('Pedidos')) ||
-            (vista === 'admin' && texto.includes('ADMIN')) ||
-            (vista === 'perfil' && texto.includes('Perfil'))) {
-            el.classList.add('activo');
-        }
+    el.classList.remove('activo');
+    if (el.dataset.vista === vista) {
+        el.classList.add('activo');
+    }
     });
     
     const contenedor = document.getElementById('contenido');
@@ -728,34 +728,48 @@ window.verificarCompra = function() {
 
 // ============ SUBIR DE PLAN ============
 function subirPlan() {
-    const vence = membresiaActiva?.fecha_fin ? new Date(membresiaActiva.fecha_fin).toLocaleDateString() : 'desconocida';
+    const vence = membresiaActiva?.fecha_fin
+        ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
+        : 'desconocida';
+
     tg.showPopup({
         title: '⬆️ Subir de plan',
-        message: `Al mejorar a un plan superior, se te sumarán los días restantes de tu membresía actual (hasta el ${vence}) y los pedidos no usados a tu nuevo plan.\n\n¿Quieres continuar?`,
+        message: `Al mejorar a un plan superior, se te sumarán los días restantes (hasta el ${vence}).\n\n¿Quieres continuar?`,
         buttons: [
             { id: 'ok', type: 'default', text: 'Ver planes' },
             { id: 'cancel', type: 'destructive', text: 'Cancelar' }
         ]
-    }, (buttonId) => {
-        if (buttonId === 'ok') {
-            cambiarVista('membresias');
+    });
+
+    tg.onEvent('popupClosed', function(eventData) {
+        if (eventData.button_id === 'ok') {
+            setTimeout(() => {
+                window.cambiarVista('membresias');
+            }, 50);
         }
     });
 }
 
 // ============ BAJAR DE PLAN ============
 function bajarPlan() {
-    const vence = membresiaActiva?.fecha_fin ? new Date(membresiaActiva.fecha_fin).toLocaleDateString() : 'desconocida';
+    const vence = membresiaActiva?.fecha_fin
+        ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
+        : 'desconocida';
+
     tg.showPopup({
         title: '⬇️ Bajar de plan',
-        message: `Para cambiar a un plan inferior, espera a que tu membresía actual termine (${vence}). Serás expulsado de los canales y luego podrás contratar el nuevo plan desde la sección de membresías.\n\n¿Quieres ver los planes disponibles?`,
+        message: `Espera a que termine (${vence}) y luego podrás contratar otro plan.\n\n¿Quieres ver planes disponibles?`,
         buttons: [
             { id: 'ok', type: 'default', text: 'Ver planes' },
             { id: 'cancel', type: 'destructive', text: 'Cancelar' }
         ]
-    }, (buttonId) => {
-        if (buttonId === 'ok') {
-            cambiarVista('membresias');
+    });
+
+    tg.onEvent('popupClosed', function(eventData) {
+        if (eventData.button_id === 'ok') {
+            setTimeout(() => {
+                window.cambiarVista('membresias');
+            }, 50);
         }
     });
 }

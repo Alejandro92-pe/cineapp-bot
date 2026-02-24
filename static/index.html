@@ -494,11 +494,36 @@
     <div id="contenido"></div>
 
     <div class="footer">
-        <div class="footer-item activo" onclick="cambiarVista('inicio')">🏠 Inicio</div>
-        <div class="footer-item" onclick="cambiarVista('membresias')">💎 Membresías</div>
-        <div class="footer-item" onclick="cambiarVista('pedidos')">📦 Pedidos</div>
-        <div class="footer-item" onclick="cambiarVista('perfil')">👤 Perfil</div>
+
+    <div class="footer-item activo" data-vista="inicio">
+        <svg class="icon" viewBox="0 0 24 24">
+            <path d="M3 10L12 3L21 10V21H14V14H10V21H3V10Z"/>
+        </svg>
+        <span>Inicio</span>
     </div>
+
+    <div class="footer-item" data-vista="membresias">
+        <svg class="icon" viewBox="0 0 24 24">
+            <path d="M12 1L15 8H22L17 12L19 19L12 15L5 19L7 12L2 8H9L12 1Z"/>
+        </svg>
+        <span>Membresías</span>
+    </div>
+
+    <div class="footer-item" data-vista="pedidos">
+        <svg class="icon" viewBox="0 0 24 24">
+            <path d="M6 2H18L21 7V22H3V7L6 2Z"/>
+        </svg>
+        <span>Pedidos</span>
+    </div>
+
+    <div class="footer-item" data-vista="perfil">
+        <svg class="icon" viewBox="0 0 24 24">
+            <path d="M12 12C15 12 18 14 18 17V19H6V17C6 14 9 12 12 12ZM12 2C14 2 16 4 16 6C16 8 14 10 12 10C10 10 8 8 8 6C8 4 10 2 12 2Z"/>
+        </svg>
+        <span>Perfil</span>
+    </div>
+
+</div>
 
     <script src="/static/app.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
