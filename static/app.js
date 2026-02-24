@@ -12,9 +12,10 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
-let paginaActual = 1;
+let paginaActual = 0;
 let cargando = false;
-let hayMasContenido = true;
+let noMasContenido = false;
+let todoContenido = [];
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -102,7 +103,7 @@ window.cambiarVista = async function(vista) {
             </div>
             <div id="resultados" class="grid"></div>
         `;
-        buscarContenido();
+        window.buscarContenido(true);
     }
     
     else if (vista === 'membresias') {
@@ -528,26 +529,68 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function() {
+window.buscarContenido = async function(reset = false) {
+    // Si es una nueva búsqueda o cambio de filtro, reiniciamos
+    if (reset) {
+        paginaActual = 0;
+        todoContenido = [];
+        noMasContenido = false;
+        document.getElementById('resultados').innerHTML = ''; // Limpiar grid
+    }
+    
+    if (cargando || noMasContenido) return;
+    
+    cargando = true;
+    
     const busqueda = document.getElementById('buscarInput')?.value || '';
     
-    const response = await fetch(`${API_BASE_URL}/api/contenido`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ busqueda, tipo: tipoActual })
-    });
-    const data = await response.json();
-    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                busqueda, 
+                tipo: tipoActual,
+                page: paginaActual,
+                limit: 18
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.data && result.data.length > 0) {
+            todoContenido = [...todoContenido, ...result.data];
+            renderizarContenido(todoContenido);
+            paginaActual++;
+            noMasContenido = !result.hasMore; // Si hasMore es false, ya no hay más
+        } else {
+            noMasContenido = true;
+            if (paginaActual === 0) {
+                // Si no hay resultados en la primera página
+                document.getElementById('resultados').innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
+            }
+        }
+        
+    } catch (error) {
+        console.error("Error cargando contenido:", error);
+    } finally {
+        cargando = false;
+    }
+};
+
+function renderizarContenido(items) {
     const grid = document.getElementById('resultados');
-    if (!data || data.length === 0) {
+    if (!grid) return;
+    
+    if (items.length === 0) {
         grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
         return;
     }
     
-    grid.innerHTML = data.map(item => `
+    grid.innerHTML = items.map(item => `
         <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
             <div class="tarjeta-imagen">
-                <img src="${item.imagen_url}" alt="${item.titulo}" />
+                <img src="${item.imagen_url}" alt="${item.titulo}" loading="lazy" />
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
@@ -555,13 +598,28 @@ window.buscarContenido = async function() {
             </div>
         </div>
     `).join('');
-};
+}
+
+window.addEventListener('scroll', () => {
+    // Evitar cargas si ya estamos cargando o no hay más contenido
+    if (cargando || noMasContenido) return;
+    
+    const scrollTop = window.scrollY;
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    
+    // Cuando el usuario está cerca del final (últimos 300px)
+    if (scrollTop + windowHeight >= documentHeight - 300) {
+        window.buscarContenido();
+    }
+});
 
 window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
-    buscarContenido();
+    // Reiniciamos la paginación y cargamos de nuevo
+    window.buscarContenido(true);
 };
 
 window.abrirVideo = function(enlace) {
@@ -681,51 +739,6 @@ async function cargarPedidos() {
     } catch (error) {
         console.error("Error:", error);
     }
-}
-
-async function cargarContenido(inicial = false) {
-
-    if (cargando || !hayMasContenido) return;
-
-    cargando = true;
-
-    const res = await fetch(API_BASE_URL + "/api/contenido", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            tipo: filtroActual,
-            busqueda: busquedaActual,
-            pagina: paginaActual
-        })
-    });
-
-    const data = await res.json();
-
-    if (data.length === 0) {
-        hayMasContenido = false;
-        cargando = false;
-        return;
-    }
-
-    renderContenido(data, inicial);
-
-    paginaActual++;
-    cargando = false;
-
-    // 🔥 ESTA ES LA CLAVE
-    if (document.body.offsetHeight <= window.innerHeight && hayMasContenido) {
-        cargarContenido();
-    }
-}
-
-function resetearContenido() {
-
-    paginaActual = 1;
-    hayMasContenido = true;
-
-    document.querySelector(".grid").innerHTML = "";
-
-    cargarContenido(true);
 }
 
 window.aprobarPago = async function(pagoId) {

@@ -1567,22 +1567,37 @@ def api_contenido():
     data = request.get_json()
     busqueda = data.get("busqueda", "")
     tipo = data.get("tipo", "todo")
-    pagina = int(data.get("pagina", 1))
+    page = data.get("page", 0)  # Página actual (0-indexada)
+    limit = data.get("limit", 18)  # Elementos por página
 
-    limite = 21
-    offset = (pagina - 1) * limite
+    # Calcular rango
+    from_row = page * limit
+    to_row = from_row + limit - 1
 
     query = supabase_service.table("contenido").select("*")
-
     if tipo != "todo":
         query = query.eq("tipo", tipo)
-
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
 
-    resultados = query.range(offset, offset + limite - 1).execute()
+    # Aplicar paginación con orden consistente
+    resultados = query.order("id", desc=True).range(from_row, to_row).execute()
 
-    return jsonify(resultados.data)
+    # También podemos devolver el total de elementos para saber si hay más
+    count_query = supabase_service.table("contenido").select("*", count="exact")
+    if tipo != "todo":
+        count_query = count_query.eq("tipo", tipo)
+    if busqueda:
+        count_query = count_query.ilike("titulo", f"%{busqueda}%")
+    total_count = count_query.execute().count
+
+    return jsonify({
+        "data": resultados.data,
+        "total": total_count,
+        "page": page,
+        "limit": limit,
+        "hasMore": (from_row + len(resultados.data)) < total_count
+    })
 
 @app.route("/api/admin/pagos", methods=["POST"])
 def api_admin_pagos():
