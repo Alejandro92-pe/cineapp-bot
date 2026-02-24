@@ -1622,20 +1622,32 @@ def api_admin_usuarios():
 def api_mis_pedidos():
     data = request.get_json()
     telegram_id = data.get("telegram_id")
+
     if not telegram_id:
         return jsonify({"error": "telegram_id requerido"}), 400
 
+    # Obtener pedidos del usuario
     pedidos = supabase_service.table("pedidos") \
         .select("*") \
         .eq("usuario_id", telegram_id) \
         .order("fecha_pedido", desc=True) \
         .execute()
 
+    pedidos_data = pedidos.data or []
+
     # Formatear fechas
-    for p in pedidos.data:
-        p["fecha"] = datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M")
-    
-    return jsonify({"pedidos": pedidos.data})
+    for p in pedidos_data:
+        p["fecha"] = datetime.fromisoformat(
+            p["fecha_pedido"].replace("Z", "")
+        ).strftime("%d/%m/%Y %H:%M")
+
+    # 🔥 CONTAR TODOS LOS PEDIDOS (si tu plan es mensual, aquí ajustamos luego)
+    usados = len(pedidos_data)
+
+    return jsonify({
+        "pedidos": pedidos_data,
+        "usados": usados
+    })
 
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")

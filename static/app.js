@@ -221,7 +221,7 @@ window.cambiarVista = async function(vista) {
             return fecha >= inicio && fecha <= fin;
         });
 
-        const usados = pedidosPeriodo.length;
+        const usados = pedidosData.usados || 0;
         const restantes = limiteTotal - usados;
 
         // Si ya no quedan pedidos
@@ -733,15 +733,10 @@ function subirPlan() {
         ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
         : 'desconocida';
 
-    tg.showConfirm(
-        `Al mejorar tu plan se mantendrán los días restantes (hasta ${vence}).\n\n¿Quieres ver los planes disponibles?`,
-        function(confirmed) {
-            if (confirmed) {
-                setTimeout(() => {
-                    window.cambiarVista('membresias');
-                }, 100);
-            }
-        }
+    mostrarModal(
+        "⬆️ Subir de plan",
+        `Al mejorar tu plan se mantendrán los días restantes hasta ${vence}.\n\n¿Quieres ver los planes disponibles?`,
+        () => cambiarVista('membresias')
     );
 }
 
@@ -752,15 +747,10 @@ function bajarPlan() {
         ? new Date(membresiaActiva.fecha_fin).toLocaleDateString()
         : 'desconocida';
 
-    tg.showConfirm(
-        `Espera a que termine (${vence}) y luego podrás elegir otro plan.\n\n¿Quieres ver planes disponibles?`,
-        function(confirmed) {
-            if (confirmed) {
-                setTimeout(() => {
-                    window.cambiarVista('membresias');
-                }, 100);
-            }
-        }
+    mostrarModal(
+        "⬇️ Bajar de plan",
+        `Debes esperar a que termine tu plan actual (${vence}).\n\n¿Quieres ver los planes disponibles?`,
+        () => cambiarVista('membresias')
     );
 }
 
@@ -814,6 +804,27 @@ function renderPaginacion() {
     html += `</div>`;
 
     paginacion.innerHTML = html;
+}
+function mostrarModal(titulo, mensaje, callback) {
+    const modal = document.getElementById("modal");
+    const title = document.getElementById("modal-title");
+    const message = document.getElementById("modal-message");
+    const btnOk = document.getElementById("modal-ok");
+    const btnCancel = document.getElementById("modal-cancel");
+
+    title.innerText = titulo;
+    message.innerText = mensaje;
+
+    modal.classList.remove("hidden");
+
+    btnOk.onclick = () => {
+        modal.classList.add("hidden");
+        if (callback) callback();
+    };
+
+    btnCancel.onclick = () => {
+        modal.classList.add("hidden");
+    };
 }
 
 // ============ INICIAR ============

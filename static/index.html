@@ -264,6 +264,7 @@
             padding: 20px;
             border-radius: 12px;
             text-align: center;
+            margin: 15px;
         }
         
         .perfil-item {
@@ -423,6 +424,63 @@
     transition: all 0.3s;
 }
 
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 350px;
+    text-align: center;
+    color: white;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.modal-buttons {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.btn-primary {
+    flex: 1;
+    background: #f97316;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+}
+
+.btn-secondary {
+    flex: 1;
+    background: #334155;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
 .pedido-item:hover {
     background: rgba(255,255,255,0.05);
 }
@@ -552,5 +610,15 @@
   window.Telegram.WebApp.ready();
   // Opcional: personalizar el botón de cierre, colores, etc.
 </script>
+<div id="modal" class="modal hidden">
+    <div class="modal-content">
+        <h3 id="modal-title"></h3>
+        <p id="modal-message"></p>
+        <div class="modal-buttons">
+            <button id="modal-cancel" class="btn-secondary">Cancelar</button>
+            <button id="modal-ok" class="btn-primary">Ver planes</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
