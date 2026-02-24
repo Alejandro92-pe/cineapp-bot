@@ -12,11 +12,10 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 // Variables globales
 let usuarioActual = null;
 let planesMembresias = [];
-// ===== SCROLL INFINITO =====
-let paginaActual = 1;
+let paginaActual = 0;
 let cargando = false;
-let hayMasContenido = true;
-let contenidoAcumulado = [];
+let noHayMas = false;
+const LIMITE = 20;
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
@@ -104,7 +103,7 @@ window.cambiarVista = async function(vista) {
             </div>
             <div id="resultados" class="grid"></div>
         `;
-        cargarContenido(true);
+        buscarContenido(true);
     }
     
     else if (vista === 'membresias') {
@@ -423,81 +422,6 @@ async function cargarPedidosAdmin(contenedor) {
     }
 }
 
-async function cargarContenido(reset = false) {
-
-    if (reset) {
-        paginaActual = 1;
-        hayMasContenido = true;
-        contenidoAcumulado = [];
-        document.getElementById("resultados").innerHTML = "";
-    }
-
-    if (cargando || !hayMasContenido) return;
-
-    cargando = true;
-
-    const res = await fetch(API_BASE_URL + "/api/contenido", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            tipo: filtroActual,
-            busqueda: busquedaActual,
-            pagina: paginaActual
-        })
-    });
-
-    const data = await res.json();
-
-    if (!data || data.length === 0) {
-        hayMasContenido = false;
-        cargando = false;
-        return;
-    }
-
-    // Acumulamos contenido
-    contenidoAcumulado = [...contenidoAcumulado, ...data];
-
-    renderContenido(contenidoAcumulado);
-
-    paginaActual++;
-
-    // Si vino menos de 21 (tu límite backend)
-    if (data.length < 21) {
-        hayMasContenido = false;
-    }
-
-    cargando = false;
-}
-
-function renderContenido(items) {
-
-    const grid = document.getElementById("resultados");
-    if (!grid) return;
-
-    if (!items || items.length === 0) {
-        grid.innerHTML = `
-            <div class="text-center p-20 text-gris">
-                😢 No se encontraron resultados
-            </div>
-        `;
-        return;
-    }
-
-    grid.innerHTML = items.map(item => `
-        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
-            <div class="tarjeta-imagen">
-                <img src="${item.imagen_url}" alt="${item.titulo}">
-            </div>
-            <div class="tarjeta-info">
-                <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">
-                    ${item.tipo} • ${item.año || ''}
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
 window.filtrarPedidos = function(filtro) {
     window.filtroPedidos = filtro;
     const lista = document.getElementById('pedidos-lista');
@@ -605,24 +529,48 @@ async function cargarUsuariosAdmin(contenedor) {
 // ============ BUSCADOR ============
 let tipoActual = 'todo';
 
-window.buscarContenido = async function() {
+window.buscarContenido = async function(reset = true) {
+    if (cargando || noHayMas) return;
+
     const busqueda = document.getElementById('buscarInput')?.value || '';
-    
+
+    if (reset) {
+        paginaActual = 0;
+        noHayMas = false;
+        document.getElementById('resultados').innerHTML = '';
+    }
+
+    cargando = true;
+
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ busqueda, tipo: tipoActual })
+        body: JSON.stringify({
+            busqueda,
+            tipo: tipoActual,
+            limit: LIMITE,
+            offset: paginaActual * LIMITE
+        })
     });
+
     const data = await response.json();
-    
     const grid = document.getElementById('resultados');
+
     if (!data || data.length === 0) {
-        grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
+        noHayMas = true;
+        if (paginaActual === 0) {
+            grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
+        }
+        cargando = false;
         return;
     }
-    
-    grid.innerHTML = data.map(item => `
-        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
+
+    data.forEach(item => {
+        const tarjeta = document.createElement('div');
+        tarjeta.className = 'tarjeta';
+        tarjeta.onclick = () => abrirVideo(item.enlace_canal);
+
+        tarjeta.innerHTML = `
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" alt="${item.titulo}" />
             </div>
@@ -630,8 +578,13 @@ window.buscarContenido = async function() {
                 <div class="tarjeta-titulo">${item.titulo}</div>
                 <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
             </div>
-        </div>
-    `).join('');
+        `;
+
+        grid.appendChild(tarjeta);
+    });
+
+    paginaActual++;
+    cargando = false;
 };
 
 window.cambiarTipo = function(tipo, e) {
@@ -820,5 +773,16 @@ function bajarPlan() {
     });
 }
 
+window.addEventListener("scroll", () => {
+    if (cargando || noHayMas) return;
+
+    const scrollTop = window.scrollY;
+    const windowHeight = window.innerHeight;
+    const fullHeight = document.body.offsetHeight;
+
+    if (scrollTop + windowHeight >= fullHeight - 200) {
+        buscarContenido(false);
+    }
+});
 // ============ INICIAR ============
 iniciar();
