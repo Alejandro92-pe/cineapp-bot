@@ -711,18 +711,12 @@ async function cargarContenido(inicial = false) {
 
     paginaActual++;
     cargando = false;
-}
 
-window.addEventListener("scroll", () => {
-
-    if (
-        window.innerHeight + window.scrollY >=
-        document.body.offsetHeight - 200
-    ) {
+    // 🔥 ESTA ES LA CLAVE
+    if (document.body.offsetHeight <= window.innerHeight && hayMasContenido) {
         cargarContenido();
     }
-
-});
+}
 
 function resetearContenido() {
 
