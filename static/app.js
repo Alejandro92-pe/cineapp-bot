@@ -93,7 +93,7 @@ window.cambiarVista = async function(vista) {
     if (vista === 'inicio') {
         contenedor.innerHTML = `
             <div class="buscador">
-                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido()">
+                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido(true)">
                 <span>🔍</span>
             </div>
             <div class="tabs">
