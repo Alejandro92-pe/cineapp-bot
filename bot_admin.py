@@ -443,8 +443,9 @@ def manejar_texto(message):
     # ==============================
     # PALABRAS CLAVE
     # ==============================
-    for keyword, reply in KEYWORD_REPLIES.items():
+    for keyword in sorted(KEYWORD_REPLIES.keys(), key=len, reverse=True):
         if keyword in text:
+            reply = KEYWORD_REPLIES[keyword]
             bot.send_message(chat_id, reply, parse_mode="Markdown")
             return
 
@@ -456,123 +457,141 @@ def manejar_texto(message):
 
 # ============ SISTEMA DE RESPUESTAS AUTOMÁTICAS (KEYWORD REPLIES) ============
 KEYWORD_REPLIES = {
-    # Saludos y presentación
-    "hola": "👋 ¡Hola! Bienvenido a QuehayApp VIP. ¿Te gustaría conocer nuestros planes?",
-    "buenos días": "¡Buenos días! ⭐ ¿En qué puedo ayudarte hoy?",
-    "buenas tardes": "¡Buenas tardes! ¿Necesitas información sobre las membresías?",
-    "buenas noches": "¡Buenas noches! Aunque sea tarde, siempre estamos para servirte.",
 
-    # Consultas sobre planes
-    "planes": (
-    "💎✨ *PLANES VIP DISPONIBLES* ✨💎\n\n"
-    "🥉 *COPPER* — S/22 | $5.99\n"
-    "🔓 Acceso a canales (sin pedidos)\n\n"
-    "🥈 *SILVER* — S/33 | $8.99\n"
-    "📦 2 pedidos por mes\n\n"
-    "🥇 *GOLD* — S/85 | $22.99\n"
-    "🎬 3 pedidos cada 3 meses\n\n"
-    "🏆 *PLATINUM* — S/163 | $43.99\n"
-    "🚀 5 pedidos cada 6 meses\n\n"
-    "💠 *DIAMOND* — S/348 | $93.99\n"
-    "👑 8 pedidos al año\n\n"
-    "💳 ¿Te gustaría pagar en *soles* o en *dólares*?"
-    ),
-    "bro":  (
+# ==============================
+# 🟢 INTENCIÓN DIRECTA DE COMPRA (ALTA PRIORIDAD)
+# ==============================
+
+"quiero comprar": "🛒 ¡Perfecto! ¿Qué plan deseas activar? Silver, Gold, Platinum o Diamond.\n\nPuedes pagar en *soles* (Yape/Plin) o en *dólares* (tarjeta automática).",
+"quiero el plan": "🛒 ¡Genial! ¿Qué plan deseas activar? Silver, Gold, Platinum o Diamond.",
+"como compro": "🛒 Para activar tu membresía escribe 'planes' o abre la MiniApp y selecciona tu plan.",
+"como comprar": "🛒 Para activar tu membresía escribe 'planes' o abre la MiniApp y selecciona tu plan.",
+"comprar": (
+    "🛒 *¡Genial! Elige tu método de pago:*\n\n"
+    "🇵🇪 *Yape/Plin* (pago en soles)\n"
+    "💳 *Tarjeta internacional* (dólares, activación automática)\n\n"
+    "¿Cuál prefieres?"
+),
+
+# ==============================
+# 💎 PLANES ESPECÍFICOS
+# ==============================
+
+"silver": "🥈 *SILVER* incluye 2 pedidos por mes.\n\n¿Quieres pagar en *soles* o en *dólares*?",
+"gold": "🥇 *GOLD* incluye 3 pedidos cada 3 meses.\n\n¿Quieres pagar en *soles* o en *dólares*?",
+"platinum": "🏆 *PLATINUM* incluye 5 pedidos cada 6 meses.\n\n¿Quieres pagar en *soles* o en *dólares*?",
+"diamond": "💠 *DIAMOND* incluye 8 pedidos al año.\n\n¿Quieres pagar en *soles* o en *dólares*?",
+"copper": "🥉 *COPPER* incluye acceso a canales sin pedidos.\n\n¿Quieres pagar en *soles* o en *dólares*?",
+
+# ==============================
+# 💳 MÉTODOS DE PAGO
+# ==============================
+
+"como pago": "💳 Puedes pagar en soles con Yape/Plin o en dólares con tarjeta automática.",
+"soles": "🇵🇪 Para pagar en soles usa Yape o Plin desde la MiniApp.",
+"dólares": "💳 Para pagar en dólares usa tarjeta (Buy Me a Coffee). Activación automática.",
+"yape": "🇵🇪 Usa la MiniApp → Membresías → Selecciona tu plan → Yape/Plin → Envía voucher.",
+"plin": "🇵🇪 El proceso es igual que Yape desde la MiniApp.",
+"tarjeta": "💳 Pago con tarjeta es automático. Solo asegúrate de escribir tu email correctamente.",
+
+# ==============================
+# ⏳ IMPACIENCIA / ACTIVACIÓN
+# ==============================
+
+"ya pagué": "📩 Si ya enviaste tu voucher, no es necesario enviarlo nuevamente. Será verificado manualmente.",
+"ya pague": "📩 Si ya enviaste tu voucher, no es necesario enviarlo nuevamente. Será verificado manualmente.",
+"cuanto demora": "⏳ Pagos con tarjeta son automáticos. Pagos por Yape/Plin se verifican manualmente.",
+"no me activan": "🔍 Los pagos por Yape/Plin se revisan manualmente. Si pagaste en madrugada se activará desde las 7:00 AM.",
+"porque no activan": "🔍 Los pagos por Yape/Plin se revisan manualmente. Si pagaste en madrugada se activará desde las 7:00 AM.",
+"horario": "🕒 Activaciones manuales se revisan desde las 7:00 AM si el pago fue en madrugada.",
+
+# ==============================
+# 🔐 CONFIANZA / SEGURIDAD
+# ==============================
+
+"es seguro": "🔐 Sí. Todos los pagos se verifican manualmente antes de activar membresías.",
+"es real": "💜 Somos un servicio activo. Todos los pagos son verificados manualmente.",
+"es estafa": "🔒 No realizamos estafas. Todos los pagos se validan manualmente antes de activar acceso.",
+"confiable": "🔐 Servicio activo con verificación manual para mayor seguridad.",
+
+# ==============================
+# 📱 MINIAPP / ACCESO
+# ==============================
+
+"miniapp": "📱 La MiniApp está dentro del bot, en la parte inferior izquierda.",
+"no veo miniapp": "🔎 Asegúrate de estar dentro del bot oficial para ver la MiniApp.",
+"enlace": "🔗 Si tienes membresía activa, los enlaces se enviaron automáticamente al activarse.",
+"no me llegaron los enlaces": "Indica tu ID de Telegram para que soporte revise tu acceso.",
+"telegram": "📲 Es obligatorio tener Telegram para activar membresía VIP.",
+
+# ==============================
+# 📦 PEDIDOS
+# ==============================
+
+"pedido": "📦 Para pedir películas necesitas membresía Silver o superior. Hazlo desde la MiniApp → Pedidos.",
+"mis pedidos": "Puedes revisar el estado en la MiniApp → Pedidos.",
+"tienen": "Si eres VIP puedes solicitar películas desde la MiniApp en la sección Pedidos.",
+
+# ==============================
+# 🎬 BENEFICIOS
+# ==============================
+
+"beneficios": (
+    "✨ *BENEFICIOS VIP* ✨\n\n"
+    "🔐 Acceso privado\n"
+    "📥 Descarga directa en Telegram\n"
+    "🚫 Sin publicidad\n"
+    "🎞 Contenido exclusivo\n"
+    "📦 Pedidos según plan\n"
+    "🤖 Bot asistente\n\n"
+    "Escribe 'planes' para ver membresías."
+),
+
+"que incluye": "Incluye acceso privado y pedidos según plan. Escribe 'beneficios' para más detalles.",
+
+# ==============================
+# 📞 SOPORTE
+# ==============================
+
+"ayuda": "🆘 Describe tu problema y soporte te responderá lo antes posible.",
+"soporte": "📞 Indica tu ID de Telegram y el detalle del problema para ayudarte.",
+"problema": "Cuéntanos el problema con detalle para ayudarte mejor.",
+"error": "Describe el error para que podamos revisarlo.",
+
+# ==============================
+# 💰 PLANES GENERALES
+# ==============================
+
+"planes": (
+    "💎 *PLANES DISPONIBLES* 💎\n\n"
+    "🥉 COPPER — S/22 | $5.99\n"
+    "🥈 SILVER — S/33 | $8.99\n"
+    "🥇 GOLD — S/85 | $22.99\n"
+    "🏆 PLATINUM — S/163 | $43.99\n"
+    "💠 DIAMOND — S/348 | $93.99\n\n"
+    "¿Te gustaría pagar en soles o en dólares?"
+),
+
+"precio": "💰 Escribe 'planes' para ver precios actualizados.",
+"costo": "💰 Escribe 'planes' para ver costos detallados.",
+
+# ==============================
+# 👋 SALUDOS (AL FINAL)
+# ==============================
+"bro":  (
     "😎 ¡Habla bro! ¿Qué necesitas hoy?\n\n"
     "💎 Escribe *planes* para ver membresías\n"
     "💳 Escribe *comprar* para activar tu acceso\n"
     "🆘 Escribe *ayuda* si tienes un problema"
     ),
-    "precio": (
-        "💰 *Precios actualizados*\n\n"
-        "🥉 COPPER: S/22 / $5.99 · 🥈 SILVER: S/33 / $8.99 · 🥇 GOLD: S/85 / $22.99 · "
-        "🏆 PLATINUM: S/163 / $43.99 ·💠 DIAMOND: S/348 / $93.99"
-    ),
-    "membresía": "Para ver nuestras membresías, escribe 'planes' o haz clic en el botón '💎 Ver Planes'.",
-    "costo": "Los costos están en soles y dólares. Escribí 'planes' para ver el detalle.",
+"membresía": "Para ver nuestras membresías, escribe 'planes' o haz clic en el botón '💎 Ver Planes'.",
 
-    # Intención de compra
-    "comprar": (
-        "🛒 *¡Genial! Elige tu método de pago:*\n\n"
-        "🇵🇪 *Yape/Plin* (pago en soles)\n"
-        "💳 *Tarjeta internacional* (dólares, vía Buy Me a Coffee)\n\n"
-        "¿Cuál prefieres?"
-    ),
-    "quiero comprar": "Perfecto. Primero, ¿quieres pagar en soles o en dólares?",
-    "yape": (
-        "🇵🇪 *Pago con Yape/Plin*\n\n"
-        "1. Abre la mini app y selecciona el plan que deseas.\n"
-        "2. Presiona '🇵🇪 Yape / Plin'.\n"
-        "3. Sigue las instrucciones y envía el voucher.\n\n"
-        "¿Ya tienes la mini app abierta?"
-    ),
-    "plin": "El proceso es el mismo que con Yape. Usa la mini app para generar el pedido de pago.",
-    "tarjeta": (
-        "💳 *Pago con tarjeta internacional*\n\n"
-        "1. Elige el plan en la mini app.\n"
-        "2. Presiona '💳 Tarjeta Gpay ApplePay y mas'.\n"
-        "3. Serás redirigido a Buy Me a Coffee para completar el pago.\n"
-        "4. Al finalizar, tu membresía se activará automáticamente.\n\n"
-        "¿Listo para continuar?"
-    ),
-
-    # Beneficios
-    "beneficios": (
-    "✨🎬 *BENEFICIOS DE SER VIP* 🎬✨\n\n"
-    "🔐 *Ingreso VIP al canal privado de Telegram*\n"
-    "📥 Ver y descargar directamente en Telegram\n"
-    "🔗 Enlaces directos sin complicaciones\n"
-    "🚫 Libre de publicidad\n"
-    "🎞 Contenido exclusivo actualizado\n"
-    "📺 Incluye series completas\n"
-    "📦 Incluye pedidos en algunos planes\n"
-    "🤖 Bot asistente inteligente\n"
-    "📲 MiniApp integrada en Telegram\n"
-    "🛟 Soporte básico y avanzado\n\n"
-    "💎 ¿Te gustaría ver los planes disponibles?"
-     ),
-    "que incluye": "Los beneficios incluyen acceso a canales privados y la posibilidad de pedir películas. Escribe 'beneficios' para más detalles.",
-
-    # Soporte y ayuda
-    "ayuda": (
-        "🆘 *¿Necesitas ayuda?*\n\n"
-        "• Para ver planes, escribe 'planes'\n"
-        "• Para comprar, escribe 'comprar'\n"
-        "• Para problemas con pagos, escribe 'soporte'\n"
-        "• Para contactar a un humano, describe tu problema y te responderemos."
-    ),
-    "soporte": (
-        "📞 *Contacta con soporte*\n\n"
-        "Cuéntanos tu problema con el mayor detalle posible:\n"
-        "- ID de Telegram (lo ves en tu perfil de la mini app)\n"
-        "- Tipo de problema (pago, acceso, pedidos, etc.)\n"
-        "- Captura de pantalla si es necesario.\n\n"
-        "Un administrador te responderá a la brevedad."
-    ),
-    "problema": "Lamento el inconveniente. Por favor, explícanos qué sucede para poder ayudarte.",
-    "error": "Parece que algo no funcionó. ¿Puedes darnos más detalles?",
-
-    # Pedidos
-    "pedido": (
-        "📦 *Solicitar película/serie*\n\n"
-        "1. Debes tener una membresía activa (Silver o superior).\n"
-        "2. Abre la mini app y ve a 'Pedidos'.\n"
-        "3. Completa el formulario con el título y tipo.\n\n"
-        "¿Tienes membresía activa?"
-    ),
-    "mis pedidos": "Puedes ver el estado de tus pedidos en la mini app, sección 'Pedidos'. Allí aparecen los que has solicitado.",
-
-    # Enlaces y acceso
-    "enlace": (
-        "🔗 *Acceso a los canales*\n\n"
-        "Si ya tienes una membresía activa, los enlaces de acceso se te enviaron automáticamente al activarla.\n"
-        "Si no los recibiste, escribe 'no me llegaron los enlaces'."
-    ),
-    "no me llegaron los enlaces": "Revisaremos tu caso. Por favor, indícanos tu ID de Telegram (lo encuentras en el perfil de la mini app) para que un admin te ayude.",
-
-    # Agradecimientos y despedida
-    "gracias": "😊 ¡A ti por confiar en nosotros! Disfruta del contenido.",
-    "chau": "👋 ¡Hasta pronto! Vuelve cuando quieras a ver más películas."
+"hola": "👋 ¡Hola! ¿Quieres activar una membresía VIP? Escribe 'planes' para empezar.",
+"buenos días": "☀️ ¡Buenos días! ¿Quieres ver los planes disponibles?",
+"buenas tardes": "🌤 ¡Buenas tardes! ¿Te gustaría activar una membresía VIP?",
+"buenas noches": "🌙 ¡Buenas noches! ¿Quieres ver los planes disponibles?",
+"gracias": "😊 ¡Gracias por confiar en nosotros!",
+"chau": "👋 ¡Hasta pronto!"
 }
 
 # ============ FUNCIÓN DE ACTIVACIÓN REUTILIZABLE ============
