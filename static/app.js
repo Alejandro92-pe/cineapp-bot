@@ -601,8 +601,18 @@ window.cambiarTipo = function(tipo, e) {
 };
 
 window.abrirVideo = function(enlace) {
+
+    if (!membresiaActiva) {
+        document.getElementById("modal-vip-bloqueo").classList.add("active");
+        return;
+    }
+
     if (enlace) tg.openLink(enlace);
 };
+
+function cerrarModalVIP(){
+    document.getElementById("modal-vip-bloqueo").classList.remove("active");
+}
 
 // ============ PAGOS ============
 window.pagarPeru = function(plan, precio) {

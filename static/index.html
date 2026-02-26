@@ -607,6 +607,75 @@
     }
 }
 
+.modal-vip {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.75);
+    justify-content:center;
+    align-items:center;
+    z-index:99999;
+}
+
+.modal-vip.active {
+    display:flex;
+}
+
+.modal-vip-content {
+    background:#1e293b;
+    padding:25px;
+    border-radius:16px;
+    width:90%;
+    max-width:380px;
+    text-align:center;
+    color:white;
+}
+
+.modal-icon {
+    font-size:28px;
+    margin-bottom:10px;
+}
+
+.modal-title {
+    margin-top:0;
+    margin-bottom:10px;
+}
+
+.btn-vip {
+    margin-top:15px;
+    width:100%;
+    background:#f97316;
+    border:none;
+    padding:12px;
+    border-radius:10px;
+    color:white;
+    font-weight:600;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:6px;
+    cursor:pointer;
+}
+
+.btn-vip:hover {
+    background:#ea580c;
+}
+
+.btn-cancelar {
+    margin-top:10px;
+    background:transparent;
+    border:none;
+    color:#94a3b8;
+    cursor:pointer;
+}
+.modal-vip-content {
+    animation:scaleIn 0.2s ease;
+}
+
+@keyframes scaleIn {
+    from { transform:scale(0.9); opacity:0; }
+    to { transform:scale(1); opacity:1; }
+}
 
 </style>
 
@@ -667,6 +736,34 @@
             <button id="modal-ok" class="btn-primary">Ver planes</button>
         </div>
     </div>
+</div>
+
+<div id="modal-vip-bloqueo" class="modal-vip">
+  <div class="modal-vip-content">
+    
+    <div class="modal-icon">
+      ✋
+    </div>
+
+    <h3 class="modal-title">Contenido VIP</h3>
+
+    <p>
+      Esta película está disponible solo para miembros VIP.
+      Activa tu membresía y accede sin publicidad.
+    </p>
+
+    <button onclick="cambiarVista('membresias')" class="btn-vip">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+        <path d="M2 7l5 5 5-9 5 9 5-5-2 13H4L2 7z"/>
+      </svg>
+      Hazte VIP
+    </button>
+
+    <button onclick="cerrarModalVIP()" class="btn-cancelar">
+      Cancelar
+    </button>
+
+  </div>
 </div>
 </body>
 </html>
