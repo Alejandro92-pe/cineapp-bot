@@ -614,6 +614,11 @@ function cerrarModalVIP(){
     document.getElementById("modal-vip-bloqueo").classList.remove("active");
 }
 
+function irAMembresias(){
+    cerrarModalVIP();
+    cambiarVista('membresias');
+}
+
 // ============ PAGOS ============
 window.pagarPeru = function(plan, precio) {
     tg.openTelegramLink(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=pago_${plan}_${precio}`);
