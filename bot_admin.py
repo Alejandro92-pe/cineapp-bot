@@ -1669,17 +1669,6 @@ def api_mis_pedidos():
         "usados": usados
     })
 
-@app.route("/api/tendencias", methods=["GET"])
-def api_tendencias():
-    resultados = supabase_service.table("contenido") \
-        .select("*") \
-        .eq("destacado", True) \
-        .order("orden_destacado") \
-        .limit(5) \
-        .execute()
-
-    return jsonify(resultados.data)
-
 if __name__ == "__main__":
     print("🚀 Bot iniciado con Webhook...")
 

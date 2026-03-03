@@ -100,7 +100,6 @@ window.cambiarVista = async function(vista) {
                 <div class="tab activo" onclick="cambiarTipo('todo', event)">Todo</div>
                 <div class="tab" onclick="cambiarTipo('pelicula', event)">Películas</div>
                 <div class="tab" onclick="cambiarTipo('serie', event)">Series</div>
-                <div class="tab" onclick="cambiarTipo('biblico', event)">Bíblico</div>
             </div>
             <div id="resultados" class="grid"></div>
             <div id="paginacion" class="paginacion"></div>
@@ -733,22 +732,6 @@ async function cargarPedidos() {
     } catch (error) {
         console.error("Error:", error);
     }
-}
-
-async function cargarTendencias() {
-    const res = await fetch(`${API_BASE_URL}/api/tendencias`);
-    const data = await res.json();
-
-    const container = document.getElementById("tendencias");
-
-    if (!data || data.length === 0) return;
-
-    container.innerHTML = data.map((item, index) => `
-        <div class="tendencia-item" onclick="abrirVideo('${item.enlace_canal}')">
-            <span class="numero">${index + 1}</span>
-            <img src="${item.imagen_url}" alt="${item.titulo}">
-        </div>
-    `).join('');
 }
 
 window.aprobarPago = async function(pagoId) {
