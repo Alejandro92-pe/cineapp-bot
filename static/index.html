@@ -672,6 +672,34 @@
     animation:scaleIn 0.2s ease;
 }
 
+.tendencias-container {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 10px;
+}
+
+.tendencia-item {
+    position: relative;
+    min-width: 140px;
+    cursor: pointer;
+}
+
+.tendencia-item img {
+    width: 100%;
+    border-radius: 10px;
+}
+
+.numero {
+    position: absolute;
+    left: -10px;
+    bottom: -15px;
+    font-size: 80px;
+    font-weight: bold;
+    color: rgba(255,255,255,0.15);
+    z-index: 1;
+}
+
 @keyframes scaleIn {
     from { transform:scale(0.9); opacity:0; }
     to { transform:scale(1); opacity:1; }
