@@ -107,7 +107,8 @@ window.cambiarVista = async function(vista) {
             <div id="resultados" class="grid"></div>
             <div id="paginacion" class="paginacion"></div>
         `;
-        buscarContenido();
+        cargarTendencias();
+        buscarContenido(1);
     }
     
     else if (vista === 'membresias') {
