@@ -700,6 +700,69 @@
     z-index: 1;
 }
 
+/* Modal fondo */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* tarjeta del modal */
+.modal-card {
+    background: #0f172a;
+    border-radius: 14px;
+    max-width: 420px;
+    width: 100%;
+    padding: 18px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    text-align: center;
+}
+
+/* imagen grande */
+.modal-card img {
+    width: 100%;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+/* titulo */
+.modal-card h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+/* sinopsis */
+.modal-card p {
+    font-size: 13px;
+    color: #cbd5e1;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+/* boton ver */
+.modal-card button {
+    background: #f97316;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+    width: 100%;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* boton cerrar */
+.modal-card .cerrar {
+    background: transparent;
+    color: #94a3b8;
+    margin-top: 8px;
+}
+
 @keyframes scaleIn {
     from { transform:scale(0.9); opacity:0; }
     to { transform:scale(1); opacity:1; }
@@ -745,6 +808,24 @@
             <path d="M12 12C15 12 18 14 18 17V19H6V17C6 14 9 12 12 12ZM12 2C14 2 16 4 16 6C16 8 14 10 12 10C10 10 8 8 8 6C8 4 10 2 12 2Z"/>
         </svg>
         <span>Perfil</span>
+    </div>
+
+    <!-- MODAL CONTENIDO -->
+  <div id="modalContenido" class="modal">
+    <div class="modal-card">
+
+      <img id="modalImagen">
+
+      <h2 id="modalTitulo"></h2>
+
+      <p id="modalSinopsis"></p>
+
+      <button id="btnVerAhora">
+          ▶ Ver ahora
+      </button>
+
+      <button onclick="cerrarModal()">Cerrar</button>
+
     </div>
 
 </div>
