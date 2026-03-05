@@ -909,6 +909,15 @@ function verAhora(item){
 
 }
 
+function abrirModalContenido(data){
+
+document.getElementById("modalTitulo").innerText = data.titulo;
+document.getElementById("modalImagen").src = data.imagen_url;
+document.getElementById("modalSinopsis").innerText = data.sinopsis;
+
+document.getElementById("modalContenido").style.display = "flex";
+
+}
 function cerrarModal(){
     document.getElementById("modalContenido").style.display = "none";
 }

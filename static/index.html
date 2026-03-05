@@ -466,16 +466,6 @@
     transition: all 0.3s;
 }
 
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.65);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-}
-
 .modal.hidden {
     display: none;
 }
@@ -607,14 +597,16 @@
     }
 }
 
+.modal-contenido,
+.modal-general,
 .modal-vip {
     display:none;
     position:fixed;
     inset:0;
-    background:rgba(0,0,0,0.75);
+    background:rgba(0,0,0,0.85);
+    z-index:9999;
     justify-content:center;
     align-items:center;
-    z-index:99999;
 }
 
 .modal-vip.active {
@@ -700,17 +692,7 @@
     z-index: 1;
 }
 
-/* Modal fondo */
-.modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
+/* Modal fondo *
 
 /* tarjeta del modal */
 .modal-card {
@@ -809,9 +791,11 @@
         </svg>
         <span>Perfil</span>
     </div>
+</div>
+
 
     <!-- MODAL CONTENIDO -->
-  <div id="modalContenido" class="modal">
+  <div id="modalContenido" class="modal-contenido">
     <div class="modal-card">
 
       <img id="modalImagen">
@@ -828,15 +812,13 @@
 
     </div>
 
-</div>
-
     <script src="/static/app.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
   window.Telegram.WebApp.ready();
   // Opcional: personalizar el botón de cierre, colores, etc.
 </script>
-<div id="modal" class="modal hidden">
+<div id="modal" class="modal-general hidden">
     <div class="modal-content">
         <h3 id="modal-title"></h3>
         <p id="modal-message"></p>
