@@ -899,26 +899,6 @@ function cerrarModalContenido() {
     contenidoSeleccionado = null;
 }
 
-// ============ FUNCIÓN DE PANTALLA COMPLETA (usando el nuevo SDK) ============
-import { viewport } from '@telegram-apps/sdk';
-
-async function activarFullscreenReal() {
-  try {
-    // Verificar si el método está disponible
-    if (viewport.requestFullscreen.isAvailable()) {
-      await viewport.requestFullscreen();
-      console.log("📱 Fullscreen real activado");
-      
-      // Verificar si está en fullscreen
-      if (viewport.isFullscreen()) {
-        console.log("✅ Ahora sí, sin elementos del sistema");
-      }
-    }
-  } catch (error) {
-    console.error("Error al activar fullscreen:", error);
-  }
-}
-
 // Configurar el botón "Ver ahora"
 document.addEventListener('DOMContentLoaded', function() {
     const btnVer = document.getElementById('btnVerAhora');
