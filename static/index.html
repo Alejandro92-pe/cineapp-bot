@@ -779,9 +779,6 @@ h2.titulo-seccion {
     z-index: 100000;
     display: none;
     flex-direction: column;
-    /* Cubrir también las safe areas en iOS */
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
 }
 
 .reproductor-contenedor {
@@ -794,48 +791,62 @@ h2.titulo-seccion {
 }
 
 #iframeReproductor {
-    flex: 1;
     width: 100%;
-    height: calc(100% - 60px); /* Deja espacio para el botón */
+    height: calc(100% - 44px); /* Mismo alto que el botón */
     border: none;
     background: #000;
+    display: block;
 }
 
-/* Botón de cerrar en la parte inferior */
+/* Botón cerrar: esquina superior derecha, pequeño y semitransparente */
 .reproductor-cerrar-bottom {
-    height: 60px;
-    background: #1a1a1a;
-    color: white;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100002;
+    height: 44px;
+    background: rgba(15, 15, 15, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: none;
-    border-top: 1px solid #333;
-    font-size: 16px;
-    font-weight: 500;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    color: white;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: background 0.2s;
-    width: 100%;
+    font-size: 14px;
+    font-weight: 500;
     padding: 0 20px;
+    transition: background 0.2s;
 }
 
-.reproductor-cerrar-bottom:hover {
-    background: #2a2a2a;
+.reproductor-cerrar-bottom:hover,
+.reproductor-cerrar-bottom:active {
+    background: rgba(180, 0, 0, 0.85);
 }
 
 .reproductor-cerrar-bottom svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
-/* Ajuste para cuando el iframe está en pantalla completa */
-#iframeReproductor:fullscreen {
-    height: 100vh;
+.reproductor-cerrar-bottom svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
-#iframeReproductor:-webkit-full-screen {
-    height: 100vh;
+.reproductor-cerrar-bottom:hover {
+    background: rgba(200, 0, 0, 0.7);
+}
+
+/* Auto-ocultar el botón después de 3s de inactividad */
+.reproductor-cerrar-bottom.oculto {
+    opacity: 0.15;
 }
 
 @keyframes scaleIn {

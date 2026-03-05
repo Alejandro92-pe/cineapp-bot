@@ -960,20 +960,14 @@ function abrirReproductorVimeus(item) {
     const iframe = document.getElementById('iframeReproductor');
     iframe.src = embedUrl;
     
-    // Mostrar el modal
     document.getElementById('modalReproductor').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     
-    // ✅ CLAVE: Expandir la Mini App al máximo con la API de Telegram
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-        tg.expand(); // Expande la mini app a pantalla completa
-        
-        // Bot API 7.8+: solicitar fullscreen real si está disponible
-        if (typeof tg.requestFullscreen === 'function') {
-            tg.requestFullscreen();
-        }
-    }
+    // ✅ SIN expand() ni requestFullscreen() automático
+    // El usuario decide si quiere expandir desde los controles de Vimeus
+    
+    // Auto-ocultar botón cerrar después de 3 segundos
+    iniciarAutoOcultarBoton();
 }
 
 function cerrarReproductor() {
@@ -983,15 +977,57 @@ function cerrarReproductor() {
         document.exitFullscreen();
     }
     
-    iframe.src = '';
-    document.getElementById('modalReproductor').style.display = 'none';
-    document.body.style.overflow = '';
-    
-    // ✅ CLAVE: Al cerrar, salir del fullscreen de Telegram si aplica
+    // Salir de fullscreen de Telegram si estaba activo
     const tg = window.Telegram?.WebApp;
     if (tg && typeof tg.exitFullscreen === 'function') {
         tg.exitFullscreen();
     }
+    
+    iframe.src = '';
+    document.getElementById('modalReproductor').style.display = 'none';
+    document.body.style.overflow = '';
+    clearTimeout(window._ocultarBtnTimer);
 }
+
+// ✅ Auto-ocultar el botón cerrar para no tapar controles
+let _ocultarBtnTimer = null;
+
+function iniciarAutoOcultarBoton() {
+    const btn = document.querySelector('.reproductor-cerrar-bottom');
+    if (!btn) return;
+    
+    // Mostrar botón
+    btn.classList.remove('oculto');
+    clearTimeout(_ocultarBtnTimer);
+    
+    // Ocultar tras 3 segundos
+    _ocultarBtnTimer = setTimeout(() => {
+        btn.classList.add('oculto');
+    }, 3000);
+    
+    // Al tocar el modal, mostrar el botón nuevamente
+    const modal = document.getElementById('modalReproductor');
+    modal.addEventListener('click', mostrarBtnCerrar, { once: false });
+}
+
+function mostrarBtnCerrar() {
+    const btn = document.querySelector('.reproductor-cerrar-bottom');
+    if (!btn) return;
+    btn.classList.remove('oculto');
+    clearTimeout(_ocultarBtnTimer);
+    _ocultarBtnTimer = setTimeout(() => {
+        btn.classList.add('oculto');
+    }, 3000);
+}
+
+// Cerrar con Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('modalReproductor');
+        if (modal.style.display === 'flex') {
+            cerrarReproductor();
+        }
+    }
+});
 // ============ INICIAR ============
 iniciar();
