@@ -747,7 +747,7 @@ async function cargarTendencias() {
     if (!data || data.length === 0) return;
 
     container.innerHTML = data.map((item, index) => `
-        <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
+        <div class="tendencia-item" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <span class="numero">${index + 1}</span>
             <img src="${item.imagen_url}" alt="${item.titulo}">
         </div>
@@ -934,15 +934,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ============ REPRODUCTOR VIMEUS ============
+// ============ REPRODUCTOR VIMEUS (VERSIÓN CORREGIDA) ============
 function abrirReproductorVimeus(item) {
-    if (!item.tmdb_id) return;
+    if (!item.tmdb_id) {
+        console.error("❌ No hay tmdb_id");
+        return;
+    }
     
     const tipo = item.tipo || 'pelicula';
     const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
     let embedUrl = '';
     
-    // Construir URL según el tipo (usando la documentación de Vimeus)
+    // Construir URL según la documentación
     if (tipo === 'pelicula') {
         embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     } else if (tipo === 'serie') {
@@ -951,17 +954,21 @@ function abrirReproductorVimeus(item) {
         embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     }
     
-    // Añadir parámetros de personalización
-    embedUrl += '&theme=blue&title=QueHay';
+    // Parámetros de personalización
+    embedUrl += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
     
-    // Cargar en el iframe
-    document.getElementById('iframeReproductor').src = embedUrl;
+    console.log("🎬 Abriendo reproductor con URL:", embedUrl);
+    
+    const iframe = document.getElementById('iframeReproductor');
+    iframe.src = embedUrl;
+    
+    // Mostrar el modal
     document.getElementById('modalReproductor').style.display = 'flex';
 }
 
 function cerrarReproductor() {
     const iframe = document.getElementById('iframeReproductor');
-    iframe.src = ''; // Limpiar para detener el video
+    iframe.src = ''; // Detener el video
     document.getElementById('modalReproductor').style.display = 'none';
 }
 // ============ INICIAR ============
