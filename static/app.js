@@ -936,79 +936,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ============ REPRODUCTOR VIMEUS MEJORADO ============
 function abrirReproductorVimeus(item) {
-    if (!item.tmdb_id) return;
-    
-    const tg = window.Telegram.WebApp;
-    const platform = tg.platform;
-    const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
-    
-    function construirUrl() {
-        const tipo = item.tipo || 'pelicula';
-        let url = '';
-        
-        if (tipo === 'pelicula') {
-            url = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-        } else if (tipo === 'serie') {
-            url = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-        } else {
-            url = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-        }
-        
-        url += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
-        return url;
-    }
-    
-    const url = construirUrl();
-    
-    // ===== MÓVIL: ventana personalizada con iframe =====
-    if (platform === 'ios' || platform === 'android') {
-        console.log("📱 Modo móvil: ventana personalizada");
-        
-        // Crear un modal especial para móvil
-        const modal = document.getElementById('modalReproductorMobile');
-        const iframeMobile = document.getElementById('iframeReproductorMobile');
-        
-        if (!modal) {
-            // Crear el modal si no existe
-            const nuevoModal = document.createElement('div');
-            nuevoModal.id = 'modalReproductorMobile';
-            nuevoModal.className = 'modal-reproductor-mobile';
-            nuevoModal.innerHTML = `
-                <div class="reproductor-contenedor-mobile">
-                    <iframe id="iframeReproductorMobile" 
-                            src="" 
-                            frameborder="0" 
-                            allow="autoplay; fullscreen; encrypted-media"
-                            allowfullscreen>
-                    </iframe>
-                    <button onclick="cerrarReproductorMobile()" class="reproductor-cerrar-mobile">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-            `;
-            document.body.appendChild(nuevoModal);
-        }
-        
-        document.getElementById('iframeReproductorMobile').src = url;
-        document.getElementById('modalReproductorMobile').style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+    if (!item.tmdb_id) {
+        console.error("❌ No hay tmdb_id");
         return;
     }
     
-    // ===== DESKTOP: usar iframe normal =====
-    document.getElementById('iframeReproductor').src = url;
+    const tipo = item.tipo || 'pelicula';
+    const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
+    let embedUrl = '';
+    
+    if (tipo === 'pelicula') {
+        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    } else if (tipo === 'serie') {
+        embedUrl = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    } else if (tipo === 'anime') {
+        embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    } else {
+        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    }
+    
+    embedUrl += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
+    
+    const iframe = document.getElementById('iframeReproductor');
+    iframe.src = embedUrl;
+    
+    // Mostrar el modal
     document.getElementById('modalReproductor').style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    
+    // ✅ CLAVE: Expandir la Mini App al máximo con la API de Telegram
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+        tg.expand(); // Expande la mini app a pantalla completa
+        
+        // Bot API 7.8+: solicitar fullscreen real si está disponible
+        if (typeof tg.requestFullscreen === 'function') {
+            tg.requestFullscreen();
+        }
+    }
 }
 
-function cerrarReproductorMobile() {
-    const modal = document.getElementById('modalReproductorMobile');
-    const iframe = document.getElementById('iframeReproductorMobile');
-    if (iframe) iframe.src = '';
-    if (modal) modal.style.display = 'none';
+function cerrarReproductor() {
+    const iframe = document.getElementById('iframeReproductor');
+    
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    
+    iframe.src = '';
+    document.getElementById('modalReproductor').style.display = 'none';
     document.body.style.overflow = '';
+    
+    // ✅ CLAVE: Al cerrar, salir del fullscreen de Telegram si aplica
+    const tg = window.Telegram?.WebApp;
+    if (tg && typeof tg.exitFullscreen === 'function') {
+        tg.exitFullscreen();
+    }
 }
 // ============ INICIAR ============
 iniciar();
