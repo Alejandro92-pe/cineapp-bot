@@ -747,7 +747,7 @@ async function cargarTendencias() {
     if (!data || data.length === 0) return;
 
     container.innerHTML = data.map((item, index) => `
-        <div class="tendencia-item" onclick="abrirVideo('${item.enlace_canal}')">
+        <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <span class="numero">${index + 1}</span>
             <img src="${item.imagen_url}" alt="${item.titulo}">
         </div>
@@ -915,47 +915,54 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            const tg = window.Telegram.WebApp;
-            
             // ===== CASO 1: CONTENIDO DE CANAL =====
-            if (item.fuente === 'canal' && item.enlace_canal) {
-                console.log("Abriendo canal:", item.enlace_canal);
-                
-                // Usar openTelegramLink para enlaces de Telegram
+            if ((!item.fuente || item.fuente === 'canal') && item.enlace_canal) {
                 if (item.enlace_canal.includes('t.me')) {
-                    tg.openTelegramLink(item.enlace_canal);
+                    window.Telegram.WebApp.openTelegramLink(item.enlace_canal);
                 } else {
-                    tg.openLink(item.enlace_canal);
+                    window.Telegram.WebApp.openLink(item.enlace_canal);
                 }
                 return;
             } 
             
             // ===== CASO 2: CONTENIDO DE VIMEUS =====
             else if (item.fuente === 'vimeus' && item.tmdb_id) {
-                let link = '';
-                const tipo = item.tipo || 'pelicula';
-                const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w'; // ⚠️ CAMBIA ESTO
-                
-                if (tipo === 'pelicula') {
-                    link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-                } else if (tipo === 'serie') {
-                    link = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-                } else if (tipo === 'anime') {
-                    link = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-                } else {
-                    link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-                }
-                
-                // Añadir parámetros de diseño
-                link += '&title=QueHay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
-                
-                console.log("Abriendo Vimeus:", link);
-                
-                // Intentar abrir con Instant View para ocultar la barra de direcciones
-                tg.openLink(link, { try_instant_view: true });
+                abrirReproductorVimeus(item);
+                return;
             }
         });
     }
 });
+
+// ============ REPRODUCTOR VIMEUS ============
+function abrirReproductorVimeus(item) {
+    if (!item.tmdb_id) return;
+    
+    const tipo = item.tipo || 'pelicula';
+    const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
+    let embedUrl = '';
+    
+    // Construir URL según el tipo (usando la documentación de Vimeus)
+    if (tipo === 'pelicula') {
+        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    } else if (tipo === 'serie') {
+        embedUrl = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    } else if (tipo === 'anime') {
+        embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    }
+    
+    // Añadir parámetros de personalización
+    embedUrl += '&theme=blue&title=QueHay';
+    
+    // Cargar en el iframe
+    document.getElementById('iframeReproductor').src = embedUrl;
+    document.getElementById('modalReproductor').style.display = 'flex';
+}
+
+function cerrarReproductor() {
+    const iframe = document.getElementById('iframeReproductor');
+    iframe.src = ''; // Limpiar para detener el video
+    document.getElementById('modalReproductor').style.display = 'none';
+}
 // ============ INICIAR ============
 iniciar();
