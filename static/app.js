@@ -936,64 +936,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ============ REPRODUCTOR VIMEUS MEJORADO ============
 function abrirReproductorVimeus(item) {
-    if (!item.tmdb_id) {
-        console.error("❌ No hay tmdb_id");
+    if (!item.tmdb_id) return;
+    
+    const tg = window.Telegram.WebApp;
+    const platform = tg.platform;
+    const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
+    
+    function construirUrl() {
+        const tipo = item.tipo || 'pelicula';
+        let url = '';
+        
+        if (tipo === 'pelicula') {
+            url = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+        } else if (tipo === 'serie') {
+            url = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+        } else {
+            url = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+        }
+        
+        url += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
+        return url;
+    }
+    
+    // ===== MÓVIL: usar openLink (funciona fullscreen) =====
+    if (platform === 'ios' || platform === 'android' || platform === 'unknown') {
+        console.log("📱 Modo móvil: abriendo en navegador interno");
+        tg.openLink(construirUrl(), { try_instant_view: true });
         return;
     }
     
-    const tipo = item.tipo || 'pelicula';
-    const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
-    let embedUrl = '';
-    
-    // Construir URL según la documentación
-    if (tipo === 'pelicula') {
-        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    } else if (tipo === 'serie') {
-        embedUrl = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    } else if (tipo === 'anime') {
-        embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    } else {
-        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    }
-    
-    // Parámetros de personalización (los que ya tenías)
-    embedUrl += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
-    
-    console.log("🎬 Abriendo reproductor con URL:", embedUrl);
-    
-    const iframe = document.getElementById('iframeReproductor');
-    iframe.src = embedUrl;
-    
-    // Mostrar el modal
+    // ===== DESKTOP: usar iframe =====
+    console.log("💻 Modo desktop: usando iframe");
+    const url = construirUrl();
+    document.getElementById('iframeReproductor').src = url;
     document.getElementById('modalReproductor').style.display = 'flex';
-    
-    // Prevenir que el body tenga scroll mientras el modal está abierto
     document.body.style.overflow = 'hidden';
+    
+    // Botón para expandir (simula fullscreen)
+    mostrarBotonExpandir();
 }
-
-function cerrarReproductor() {
-    const iframe = document.getElementById('iframeReproductor');
-    
-    // Salir de pantalla completa si está activada
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    }
-    
-    iframe.src = ''; // Detener el video
-    document.getElementById('modalReproductor').style.display = 'none';
-    
-    // Restaurar scroll del body
-    document.body.style.overflow = '';
-}
-
-// Opcional: Permitir cerrar con la tecla Escape
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        const modal = document.getElementById('modalReproductor');
-        if (modal.style.display === 'flex') {
-            cerrarReproductor();
-        }
-    }
-});
 // ============ INICIAR ============
 iniciar();
