@@ -16,7 +16,6 @@ let paginaActual = 1;
 const LIMITE = 20;
 let busquedaActual = "";
 let totalPaginas = 1;
-let contenidoGlobal = [];
 
 // ============ correccion hasta qui esta bien ============
 // ============ INICIALIZACIÓN ============
@@ -579,24 +578,21 @@ window.buscarContenido = async function(pagina = 1) {
         return;
     }
 
-    grid.innerHTML = items.map(item => {
-    // Guardar el item en contenidoGlobal (si no está ya)
-    if (!contenidoGlobal.find(i => i.id === item.id)) {
-        contenidoGlobal.push(item);
-    }
-    
-    return `
-        <div class="tarjeta" onclick="abrirModalContenido(contenidoGlobal.find(i => i.id === ${item.id}))">
+    grid.innerHTML = data.map(item => `
+        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
             <div class="tarjeta-imagen">
-                <img src="${item.imagen_url}" alt="${item.titulo}" />
+                <img src="${item.imagen_url}" />
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">${item.tipo} • ${item.año || ''}</div>
+                <div class="tarjeta-detalle">
+                ${item.tipo}
+                ${item.año ? ` • ${item.año}` : ''}
+                ${item.genero ? ` • ${item.genero}` : ''}
+                 </div>
             </div>
-        </div>
-    `;
-     }).join('');
+        </div>  
+    `).join('');
 
     renderPaginacion();
 };
@@ -885,60 +881,5 @@ function mostrarModal(titulo, mensaje, callback) {
     };
 }
 
-// ============ FUNCIONES DEL MODAL ============
-function abrirModalContenido(item) {
-    // Asignar datos a los elementos del modal
-    document.getElementById('modalTitulo').innerText = item.titulo;
-    document.getElementById('modalImagen').src = item.imagen_url;
-    document.getElementById('modalSinopsis').innerText = item.sinopsis || 'Sin sinopsis disponible.';
-    
-    // Guardar el item seleccionado para usarlo en el botón "Ver ahora"
-    window.contenidoSeleccionado = item;
-    
-    // Mostrar el modal
-    document.getElementById('modalContenido').style.display = 'flex';
-}
-
-function cerrarModal() {
-    document.getElementById('modalContenido').style.display = 'none';
-}
-
-// Configurar el botón del modal cuando la página carga
-document.addEventListener('DOMContentLoaded', function() {
-    const btnVerAhora = document.getElementById('btnVerAhora');
-    if (btnVerAhora) {
-        btnVerAhora.addEventListener('click', function() {
-            const item = window.contenidoSeleccionado;
-            if (!item) return;
-            
-            cerrarModal();
-            
-            const tg = window.Telegram.WebApp;
-            
-            // Parámetros de diseño de Vimeus
-            const paramsDiseno = '&title=QueHay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
-            
-            if (item.fuente === 'canal') {
-                tg.openLink(item.enlace_canal);
-            } 
-            else if (item.fuente === 'vimeus') {
-                let baseLink = '';
-                
-                if (item.tipo === 'pelicula') {
-                    baseLink = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=TUVIEWKEY`;
-                } 
-                else if (item.tipo === 'serie') {
-                    baseLink = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=TUVIEWKEY`;
-                } 
-                else if (item.tipo === 'anime') {
-                    baseLink = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=TUVIEWKEY`;
-                }
-                
-                const linkCompleto = baseLink + paramsDiseno;
-                tg.openLink(linkCompleto);
-            }
-        });
-    }
-});
 // ============ INICIAR ============
 iniciar();
