@@ -934,7 +934,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ============ REPRODUCTOR VIMEUS (VERSIÓN CORREGIDA) ============
+// ============ REPRODUCTOR VIMEUS MEJORADO ============
 function abrirReproductorVimeus(item) {
     if (!item.tmdb_id) {
         console.error("❌ No hay tmdb_id");
@@ -952,9 +952,11 @@ function abrirReproductorVimeus(item) {
         embedUrl = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     } else if (tipo === 'anime') {
         embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    } else {
+        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     }
     
-    // Parámetros de personalización
+    // Parámetros de personalización (los que ya tenías)
     embedUrl += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
     
     console.log("🎬 Abriendo reproductor con URL:", embedUrl);
@@ -964,12 +966,34 @@ function abrirReproductorVimeus(item) {
     
     // Mostrar el modal
     document.getElementById('modalReproductor').style.display = 'flex';
+    
+    // Prevenir que el body tenga scroll mientras el modal está abierto
+    document.body.style.overflow = 'hidden';
 }
 
 function cerrarReproductor() {
     const iframe = document.getElementById('iframeReproductor');
+    
+    // Salir de pantalla completa si está activada
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    
     iframe.src = ''; // Detener el video
     document.getElementById('modalReproductor').style.display = 'none';
+    
+    // Restaurar scroll del body
+    document.body.style.overflow = '';
 }
+
+// Opcional: Permitir cerrar con la tecla Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('modalReproductor');
+        if (modal.style.display === 'flex') {
+            cerrarReproductor();
+        }
+    }
+});
 // ============ INICIAR ============
 iniciar();
