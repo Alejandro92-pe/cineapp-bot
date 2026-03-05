@@ -579,7 +579,7 @@ window.buscarContenido = async function(pagina = 1) {
     }
 
     grid.innerHTML = data.map(item => `
-        <div class="tarjeta" onclick="abrirModal(${item.id})">
+        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" />
             </div>
@@ -747,7 +747,7 @@ async function cargarTendencias() {
     if (!data || data.length === 0) return;
 
     container.innerHTML = data.map((item, index) => `
-        <div class="tendencia-item" onclick="abrirModal(${item.id})">
+        <div class="tendencia-item" onclick="abrirVideo('${item.enlace_canal}')">
             <span class="numero">${index + 1}</span>
             <img src="${item.imagen_url}" alt="${item.titulo}">
         </div>
@@ -879,47 +879,6 @@ function mostrarModal(titulo, mensaje, callback) {
     btnCancel.onclick = () => {
         modal.classList.add("hidden");
     };
-}
-
-function verAhora(item){
-
-    let link = "";
-
-    if(item.fuente === "canal"){
-        link = item.enlace_canal;
-    }
-
-    if(item.fuente === "vimeus"){
-
-        if(item.tipo === "pelicula"){
-            link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=TUKEY`;
-        }
-
-        if(item.tipo === "serie"){
-            link = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=TUKEY`;
-        }
-
-        if(item.tipo === "anime"){
-            link = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=TUKEY`;
-        }
-
-    }
-
-    tg.openLink(link);
-
-}
-
-function abrirModalContenido(data){
-
-document.getElementById("modalTitulo").innerText = data.titulo;
-document.getElementById("modalImagen").src = data.imagen_url;
-document.getElementById("modalSinopsis").innerText = data.sinopsis;
-
-document.getElementById("modalContenido").style.display = "flex";
-
-}
-function cerrarModal(){
-    document.getElementById("modalContenido").style.display = "none";
 }
 
 // ============ INICIAR ============

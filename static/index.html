@@ -466,6 +466,16 @@
     transition: all 0.3s;
 }
 
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
 .modal.hidden {
     display: none;
 }
@@ -597,16 +607,14 @@
     }
 }
 
-.modal-contenido,
-.modal-general,
 .modal-vip {
     display:none;
     position:fixed;
     inset:0;
-    background:rgba(0,0,0,0.85);
-    z-index:9999;
+    background:rgba(0,0,0,0.75);
     justify-content:center;
     align-items:center;
+    z-index:99999;
 }
 
 .modal-vip.active {
@@ -692,59 +700,6 @@
     z-index: 1;
 }
 
-/* Modal fondo *
-
-/* tarjeta del modal */
-.modal-card {
-    background: #0f172a;
-    border-radius: 14px;
-    max-width: 420px;
-    width: 100%;
-    padding: 18px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-    text-align: center;
-}
-
-/* imagen grande */
-.modal-card img {
-    width: 100%;
-    border-radius: 10px;
-    margin-bottom: 10px;
-}
-
-/* titulo */
-.modal-card h2 {
-    font-size: 18px;
-    margin-bottom: 8px;
-}
-
-/* sinopsis */
-.modal-card p {
-    font-size: 13px;
-    color: #cbd5e1;
-    margin-bottom: 15px;
-    line-height: 1.4;
-}
-
-/* boton ver */
-.modal-card button {
-    background: #f97316;
-    border: none;
-    padding: 12px;
-    border-radius: 8px;
-    color: white;
-    width: 100%;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-/* boton cerrar */
-.modal-card .cerrar {
-    background: transparent;
-    color: #94a3b8;
-    margin-top: 8px;
-}
-
 @keyframes scaleIn {
     from { transform:scale(0.9); opacity:0; }
     to { transform:scale(1); opacity:1; }
@@ -791,26 +746,8 @@
         </svg>
         <span>Perfil</span>
     </div>
+
 </div>
-
-
-    <!-- MODAL CONTENIDO -->
-  <div id="modalContenido" class="modal-contenido">
-    <div class="modal-card">
-
-      <img id="modalImagen">
-
-      <h2 id="modalTitulo"></h2>
-
-      <p id="modalSinopsis"></p>
-
-      <button id="btnVerAhora">
-          ▶ Ver ahora
-      </button>
-
-      <button onclick="cerrarModal()">Cerrar</button>
-
-    </div>
 
     <script src="/static/app.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -818,7 +755,7 @@
   window.Telegram.WebApp.ready();
   // Opcional: personalizar el botón de cierre, colores, etc.
 </script>
-<div id="modal" class="modal-general hidden">
+<div id="modal" class="modal hidden">
     <div class="modal-content">
         <h3 id="modal-title"></h3>
         <p id="modal-message"></p>
