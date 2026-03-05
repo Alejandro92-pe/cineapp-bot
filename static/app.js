@@ -958,22 +958,57 @@ function abrirReproductorVimeus(item) {
         return url;
     }
     
-    // ===== MÓVIL: usar openLink (funciona fullscreen) =====
-    if (platform === 'ios' || platform === 'android' || platform === 'unknown') {
-        console.log("📱 Modo móvil: abriendo en navegador interno");
-        tg.openLink(construirUrl(), { try_instant_view: true });
+    const url = construirUrl();
+    
+    // ===== MÓVIL: ventana personalizada con iframe =====
+    if (platform === 'ios' || platform === 'android') {
+        console.log("📱 Modo móvil: ventana personalizada");
+        
+        // Crear un modal especial para móvil
+        const modal = document.getElementById('modalReproductorMobile');
+        const iframeMobile = document.getElementById('iframeReproductorMobile');
+        
+        if (!modal) {
+            // Crear el modal si no existe
+            const nuevoModal = document.createElement('div');
+            nuevoModal.id = 'modalReproductorMobile';
+            nuevoModal.className = 'modal-reproductor-mobile';
+            nuevoModal.innerHTML = `
+                <div class="reproductor-contenedor-mobile">
+                    <iframe id="iframeReproductorMobile" 
+                            src="" 
+                            frameborder="0" 
+                            allow="autoplay; fullscreen; encrypted-media"
+                            allowfullscreen>
+                    </iframe>
+                    <button onclick="cerrarReproductorMobile()" class="reproductor-cerrar-mobile">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(nuevoModal);
+        }
+        
+        document.getElementById('iframeReproductorMobile').src = url;
+        document.getElementById('modalReproductorMobile').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
         return;
     }
     
-    // ===== DESKTOP: usar iframe =====
-    console.log("💻 Modo desktop: usando iframe");
-    const url = construirUrl();
+    // ===== DESKTOP: usar iframe normal =====
     document.getElementById('iframeReproductor').src = url;
     document.getElementById('modalReproductor').style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    
-    // Botón para expandir (simula fullscreen)
-    mostrarBotonExpandir();
+}
+
+function cerrarReproductorMobile() {
+    const modal = document.getElementById('modalReproductorMobile');
+    const iframe = document.getElementById('iframeReproductorMobile');
+    if (iframe) iframe.src = '';
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
 }
 // ============ INICIAR ============
 iniciar();
