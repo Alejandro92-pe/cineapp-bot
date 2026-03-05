@@ -962,12 +962,67 @@ function abrirReproductorVimeus(item) {
     
     document.getElementById('modalReproductor').style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    
-    // ✅ SIN expand() ni requestFullscreen() automático
-    // El usuario decide si quiere expandir desde los controles de Vimeus
-    
-    // Auto-ocultar botón cerrar después de 3 segundos
-    iniciarAutoOcultarBoton();
+
+    // ✅ Escuchar cuando Vimeus intenta activar fullscreen
+    escucharFullscreenVimeus();
+}
+
+function escucharFullscreenVimeus() {
+    const tg = window.Telegram?.WebApp;
+
+    // Método 1: Interceptar el evento fullscreenchange del documento
+    document.addEventListener('fullscreenchange', manejarFullscreen);
+    document.addEventListener('webkitfullscreenchange', manejarFullscreen);
+
+    // Método 2: Escuchar mensajes postMessage de Vimeus (si los envía)
+    window.addEventListener('message', function(e) {
+        if (!e.data) return;
+        const data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+        
+        // Detectar si Vimeus manda señal de fullscreen
+        if (data.includes('fullscreen') || data.includes('expand') || data.includes('landscape')) {
+            activarFullscreenTelegram();
+        }
+    });
+}
+
+function manejarFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+        // Vimeus activó fullscreen — activar también en Telegram
+        activarFullscreenTelegram();
+    } else {
+        // Salió de fullscreen
+        desactivarFullscreenTelegram();
+    }
+}
+
+function activarFullscreenTelegram() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+
+    // Pedir fullscreen real a Telegram (Bot API 7.8+)
+    if (typeof tg.requestFullscreen === 'function') {
+        tg.requestFullscreen();
+    }
+
+    // Forzar orientación horizontal si está disponible
+    if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('landscape').catch(() => {});
+    }
+}
+
+function desactivarFullscreenTelegram() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+
+    if (typeof tg.exitFullscreen === 'function') {
+        tg.exitFullscreen();
+    }
+
+    // Volver a portrait
+    if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('portrait').catch(() => {});
+    }
 }
 
 function cerrarReproductor() {
@@ -976,48 +1031,16 @@ function cerrarReproductor() {
     if (document.fullscreenElement) {
         document.exitFullscreen();
     }
-    
-    // Salir de fullscreen de Telegram si estaba activo
-    const tg = window.Telegram?.WebApp;
-    if (tg && typeof tg.exitFullscreen === 'function') {
-        tg.exitFullscreen();
-    }
-    
+
+    desactivarFullscreenTelegram();
+
+    // Limpiar listeners
+    document.removeEventListener('fullscreenchange', manejarFullscreen);
+    document.removeEventListener('webkitfullscreenchange', manejarFullscreen);
+
     iframe.src = '';
     document.getElementById('modalReproductor').style.display = 'none';
     document.body.style.overflow = '';
-    clearTimeout(window._ocultarBtnTimer);
-}
-
-// ✅ Auto-ocultar el botón cerrar para no tapar controles
-let _ocultarBtnTimer = null;
-
-function iniciarAutoOcultarBoton() {
-    const btn = document.querySelector('.reproductor-cerrar-bottom');
-    if (!btn) return;
-    
-    // Mostrar botón
-    btn.classList.remove('oculto');
-    clearTimeout(_ocultarBtnTimer);
-    
-    // Ocultar tras 3 segundos
-    _ocultarBtnTimer = setTimeout(() => {
-        btn.classList.add('oculto');
-    }, 3000);
-    
-    // Al tocar el modal, mostrar el botón nuevamente
-    const modal = document.getElementById('modalReproductor');
-    modal.addEventListener('click', mostrarBtnCerrar, { once: false });
-}
-
-function mostrarBtnCerrar() {
-    const btn = document.querySelector('.reproductor-cerrar-bottom');
-    if (!btn) return;
-    btn.classList.remove('oculto');
-    clearTimeout(_ocultarBtnTimer);
-    _ocultarBtnTimer = setTimeout(() => {
-        btn.classList.add('oculto');
-    }, 3000);
 }
 
 // Cerrar con Escape
