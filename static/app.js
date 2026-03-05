@@ -899,7 +899,7 @@ function cerrarModalContenido() {
     contenidoSeleccionado = null;
 }
 
-// Configurar el botón "Ver ahora" (se ejecuta una sola vez al cargar la página)
+// Configurar el botón "Ver ahora"
 document.addEventListener('DOMContentLoaded', function() {
     const btnVer = document.getElementById('btnVerAhora');
     if (btnVer) {
@@ -917,15 +917,24 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const tg = window.Telegram.WebApp;
             
-            // Caso 1: Es contenido de canal
+            // ===== CASO 1: CONTENIDO DE CANAL =====
             if (item.fuente === 'canal' && item.enlace_canal) {
-                tg.openLink(item.enlace_canal);
+                console.log("Abriendo canal:", item.enlace_canal);
+                
+                // Usar openTelegramLink para enlaces de Telegram
+                if (item.enlace_canal.includes('t.me')) {
+                    tg.openTelegramLink(item.enlace_canal);
+                } else {
+                    tg.openLink(item.enlace_canal);
+                }
+                return;
             } 
-            // Caso 2: Es contenido de Vimeus
+            
+            // ===== CASO 2: CONTENIDO DE VIMEUS =====
             else if (item.fuente === 'vimeus' && item.tmdb_id) {
                 let link = '';
                 const tipo = item.tipo || 'pelicula';
-                const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w'; // ⚠️ CAMBIA ESTO POR TU CLAVE REAL
+                const viewKey = 'TUVIEWKEY'; // ⚠️ CAMBIA ESTO
                 
                 if (tipo === 'pelicula') {
                     link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
@@ -940,7 +949,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Añadir parámetros de diseño
                 link += '&title=QueHay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
                 
-                tg.openLink(link);
+                console.log("Abriendo Vimeus:", link);
+                
+                // Intentar abrir con Instant View para ocultar la barra de direcciones
+                tg.openLink(link, { try_instant_view: true });
             }
         });
     }
