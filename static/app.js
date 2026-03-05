@@ -628,7 +628,7 @@ window.pagarPeru = function(plan, precio) {
     tg.openTelegramLink(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=pago_${plan}_${precio}`);
     tg.showPopup({
         title: '🟣 Pago por Yape/Plin',
-        message: 'Serás redirigido al bot.\n\nSigue las instrucciones.',
+        message: 'Serás redirigido al bot, si no eres redrigido minimiza la MiniApp y ve al Bot y.\n\nSigue las instrucciones y completa el pago.',
         buttons: [{type: 'ok'}]
     });
 };
@@ -934,7 +934,7 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (item.fuente === 'vimeus' && item.tmdb_id) {
                 let link = '';
                 const tipo = item.tipo || 'pelicula';
-                const viewKey = 'TUVIEWKEY'; // ⚠️ CAMBIA ESTO
+                const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w'; // ⚠️ CAMBIA ESTO
                 
                 if (tipo === 'pelicula') {
                     link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
