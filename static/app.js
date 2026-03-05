@@ -962,132 +962,50 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ============ REPRODUCTOR VIMEUS MEJORADO ============
 function abrirReproductorVimeus(item) {
-    if (!item.tmdb_id) {
-        console.error("❌ No hay tmdb_id");
-        return;
-    }
+    if (!item.tmdb_id) return;
     
-    const tipo = item.tipo || 'pelicula';
+    const tg = window.Telegram.WebApp; // El objeto original
     const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
-    let embedUrl = '';
     
-    if (tipo === 'pelicula') {
-        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    } else if (tipo === 'serie') {
-        embedUrl = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    } else if (tipo === 'anime') {
-        embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
-    } else {
-        embedUrl = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+    function construirUrl() {
+        const tipo = item.tipo || 'pelicula';
+        let url = '';
+        
+        if (tipo === 'pelicula') {
+            url = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+        } else if (tipo === 'serie') {
+            url = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+        } else {
+            url = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+        }
+        
+        url += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
+        return url;
     }
     
-    embedUrl += '&theme=blue&title=QueHay&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
+    const url = construirUrl();
+    
+    // ===== USAR IFRAME PARA TODAS LAS PLATAFORMAS =====
+    console.log("🎬 Abriendo reproductor con iframe");
     
     const iframe = document.getElementById('iframeReproductor');
-    iframe.src = embedUrl;
+    iframe.src = url;
     
+    // Mostrar el modal
     document.getElementById('modalReproductor').style.display = 'flex';
     document.body.style.overflow = 'hidden';
-
-    // ✅ Escuchar cuando Vimeus intenta activar fullscreen
-    escucharFullscreenVimeus();
-}
-
-function escucharFullscreenVimeus() {
-    const tg = window.Telegram?.WebApp;
-
-    // Método 1: Interceptar el evento fullscreenchange del documento
-    document.addEventListener('fullscreenchange', manejarFullscreen);
-    document.addEventListener('webkitfullscreenchange', manejarFullscreen);
-
-    // Método 2: Escuchar mensajes postMessage de Vimeus (si los envía)
-    window.addEventListener('message', function(e) {
-        if (!e.data) return;
-        const data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
-        
-        // Detectar si Vimeus manda señal de fullscreen
-        if (data.includes('fullscreen') || data.includes('expand') || data.includes('landscape')) {
-            activarFullscreenTelegram();
-        }
-    });
-}
-
-function manejarFullscreen() {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-        // Vimeus activó fullscreen — activar también en Telegram
-        activarFullscreenTelegram();
-    } else {
-        // Salió de fullscreen
-        desactivarFullscreenTelegram();
-    }
-}
-
-function activarFullscreenTelegram() {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
-
-    // Verificar versión
-    if (parseFloat(tg.version) < 7.8) {
-        console.log("ℹ️ Versión antigua, fullscreen no soportado");
-        return;
-    }
-
-    // Pequeño delay para estabilidad
-    setTimeout(() => {
-        if (typeof tg.requestFullscreen === 'function') {
-            tg.requestFullscreen();
-            console.log("📱 Fullscreen Telegram activado");
-        }
-    }, 100);
-
-    // Orientación landscape
-    if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        screen.orientation.lock('landscape').catch(e => 
-            console.log("ℹ️ No se pudo bloquear orientación")
-        );
-    }
-}
-
-function desactivarFullscreenTelegram() {
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return;
-
-    if (typeof tg.exitFullscreen === 'function') {
-        tg.exitFullscreen();
-    }
-
-    // Volver a portrait
-    if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        screen.orientation.lock('portrait').catch(() => {});
-    }
-}
-
-function cerrarReproductor() {
-    const iframe = document.getElementById('iframeReproductor');
     
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
-    }
-
-    desactivarFullscreenTelegram();
-
-    // Limpiar listeners
-    document.removeEventListener('fullscreenchange', manejarFullscreen);
-    document.removeEventListener('webkitfullscreenchange', manejarFullscreen);
-
-    iframe.src = '';
-    document.getElementById('modalReproductor').style.display = 'none';
-    document.body.style.overflow = '';
-}
-
-// Cerrar con Escape
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        const modal = document.getElementById('modalReproductor');
-        if (modal.style.display === 'flex') {
-            cerrarReproductor();
+    // SOLICITAR PANTALLA COMPLETA usando el SDK
+    setTimeout(async () => {
+        if (window.solicitarFullscreenSDK) {
+            await window.solicitarFullscreenSDK();
+        } else {
+            // Fallback al método tradicional
+            if (tg.requestFullscreen) {
+                tg.requestFullscreen();
+            }
         }
-    }
-});
+    }, 500);
+}
 // ============ INICIAR ============
 iniciar();
