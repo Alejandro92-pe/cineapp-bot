@@ -579,7 +579,7 @@ window.buscarContenido = async function(pagina = 1) {
     }
 
     grid.innerHTML = data.map(item => `
-        <div class="tarjeta" onclick="abrirVideo('${item.enlace_canal}')">
+          <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" />
             </div>
@@ -881,5 +881,69 @@ function mostrarModal(titulo, mensaje, callback) {
     };
 }
 
+// ============ FUNCIONES DEL MODAL DE CONTENIDO ============
+let contenidoSeleccionado = null;
+
+function abrirModalContenido(item) {
+    contenidoSeleccionado = item;
+    
+    document.getElementById('modalTitulo').innerText = item.titulo || 'Sin título';
+    document.getElementById('modalImagen').src = item.imagen_url || '';
+    document.getElementById('modalSinopsis').innerText = item.sinopsis || 'Sin sinopsis disponible.';
+    
+    document.getElementById('modalContenido').style.display = 'flex';
+}
+
+function cerrarModalContenido() {
+    document.getElementById('modalContenido').style.display = 'none';
+    contenidoSeleccionado = null;
+}
+
+// Configurar el botón "Ver ahora" (se ejecuta una sola vez al cargar la página)
+document.addEventListener('DOMContentLoaded', function() {
+    const btnVer = document.getElementById('btnVerAhora');
+    if (btnVer) {
+        btnVer.addEventListener('click', function() {
+            const item = contenidoSeleccionado;
+            if (!item) return;
+            
+            cerrarModalContenido();
+            
+            // Si no tiene membresía, mostrar modal VIP
+            if (!membresiaActiva) {
+                document.getElementById("modal-vip-bloqueo").classList.add("active");
+                return;
+            }
+            
+            const tg = window.Telegram.WebApp;
+            
+            // Caso 1: Es contenido de canal
+            if (item.fuente === 'canal' && item.enlace_canal) {
+                tg.openLink(item.enlace_canal);
+            } 
+            // Caso 2: Es contenido de Vimeus
+            else if (item.fuente === 'vimeus' && item.tmdb_id) {
+                let link = '';
+                const tipo = item.tipo || 'pelicula';
+                const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w'; // ⚠️ CAMBIA ESTO POR TU CLAVE REAL
+                
+                if (tipo === 'pelicula') {
+                    link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+                } else if (tipo === 'serie') {
+                    link = `https://vimeus.com/e/serie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+                } else if (tipo === 'anime') {
+                    link = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+                } else {
+                    link = `https://vimeus.com/e/movie?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
+                }
+                
+                // Añadir parámetros de diseño
+                link += '&title=QueHay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v3&playUI=v3&epanel=v1&splash=v1';
+                
+                tg.openLink(link);
+            }
+        });
+    }
+});
 // ============ INICIAR ============
 iniciar();
