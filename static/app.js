@@ -112,7 +112,6 @@ window.cambiarVista = async function(vista) {
     }
     
     else if (vista === 'membresias') {
-    // Primero, agregamos el banner del contador
     let html = `
         <!-- CONTADOR DE OFERTA ESPECIAL (50% OFF) -->
         <div id="ofert-counter" class="oferta-banner">
@@ -124,6 +123,14 @@ window.cambiarVista = async function(vista) {
                 </div>
             </div>
         </div>
+        
+        <!-- 🆕 CÓDIGO DE DESCUENTO PARA TARJETA -->
+        <div class="cupon-banner">
+            <div class="cupon-titulo">🎟️ CÓDIGO DE DESCUENTO</div>
+            <div class="cupon-codigo" onclick="copiarCodigo('QH50OFF')">QH50OFF</div>
+            <div class="cupon-instruccion">Usa este código al pagar con tarjeta</div>
+        </div>
+        
         <div class="planes">
     `;
     
@@ -985,10 +992,10 @@ function abrirReproductorVimeus(item) {
         tg.showPopup({
             title: '📱 Modo móvil',
             message: '🎬 Reproductor Vimeus\n\n' +
-                     '⚠️ Este video puede contener publicidad.\n' +
+                     '⚠️ Esta película o serie puede contener publicidad lo controla vimeus no nosotros.\n' +
                      '❌ En móvil no hay pantalla completa.\n\n' +
-                     '💻 Usa Desktop para mejor experiencia.\n\n' +
-                     '¿Continuar?',
+                     '💻 Usa Telegam web o Desktop para mejor experiencia y sin publicidad.\n\n' +
+                     '¿Quieres Continuar?',
             buttons: [
                 { id: 'continuar', type: 'default', text: '▶ Continuar' },
                 { id: 'cancelar', type: 'destructive', text: 'Cancelar' }
@@ -1185,6 +1192,32 @@ function iniciarContadorOferta() {
     setInterval(actualizarContador, 1000);
 }
 
+// ============ COPIAR CÓDIGO DE DESCUENTO ============
+function copiarCodigo(codigo) {
+    // Crear un elemento temporal
+    const input = document.createElement('input');
+    input.value = codigo;
+    document.body.appendChild(input);
+    
+    // Seleccionar y copiar
+    input.select();
+    document.execCommand('copy');
+    
+    // Eliminar el elemento temporal
+    document.body.removeChild(input);
+    
+    // Mostrar notificación (puedes usar el popup de Telegram)
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+        tg.showPopup({
+            title: '✅ Código copiado',
+            message: 'El código QH50OFF ha sido copiado. Úsalo al pagar con tarjeta.',
+            buttons: [{ type: 'ok' }]
+        });
+    } else {
+        alert('Código copiado: QH50OFF');
+    }
+}
 // iniciarContadorOferta();
 // ============ INICIAR ============
 iniciar();

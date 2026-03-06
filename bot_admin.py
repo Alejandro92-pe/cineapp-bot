@@ -22,8 +22,8 @@ MINIAPP_URL = "cineapp-bot.onrender.com"
 BMC_URL = "https://buymeacoffee.com/quehay/membership"
 
 BMC_LINKS = {
-    "copper": "https://buymeacoffee.com/quehay/membership",
-    "silver": "https://buymeacoffee.com/quehay/membership",
+    "copper": "https://buymeacoffee.com/quehay/e/517243",
+    "silver": "https://buymeacoffee.com/quehay/e/517244",
     "gold": "https://buymeacoffee.com/quehay/e/510546",
     "platinum": "https://buymeacoffee.com/quehay/e/510549",
     "diamond": "https://buymeacoffee.com/quehay/e/510552"
@@ -565,11 +565,11 @@ KEYWORD_REPLIES = {
 
 "planes": (
     "💎 *PLANES DISPONIBLES — 50% OFF POR TIEMPO LIMITADO* 💎\n\n"
-    "🥉 COPPER — ~~S/22~~ S/11 | ~~$6.00~~ $3.00\n"
-    "🥈 SILVER — ~~S/33~~ S/16.50 | ~~$9.00~~ $4.50\n"
-    "🥇 GOLD — ~~S/85~~ S/42.50 | ~~$22.99~~ $11.49\n"
-    "🏆 PLATINUM — ~~S/163~~ S/81.50 | ~~$43.99~~ $21.99\n"
-    "💠 DIAMOND — ~~S/348~~ S/174 | ~~$93.99~~ $46.99\n\n"
+    "🥉 COPPER — ~~S/22~~ S/11 | ~~$6\\.00~~ $3\\.00\n"
+    "🥈 SILVER — ~~S/33~~ S/16\\.50 | ~~$9\\.00~~ $4\\.50\n"
+    "🥇 GOLD — ~~S/85~~ S/42\\.50 | ~~$22\\.99~~ $11\\.50\n"
+    "🏆 PLATINUM — ~~S/163~~ S/81\\.50 | ~~$43\\.99~~ $22\\.00\n"
+    "💠 DIAMOND — ~~S/348~~ S/174 | ~~$93\\.99~~ $47\\.00\n\n"
     "⏳ Oferta especial por tiempo limitado.\n"
     "¿Te gustaría pagar en soles o en dólares?"
 ),
