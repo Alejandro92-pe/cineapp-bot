@@ -112,32 +112,62 @@ window.cambiarVista = async function(vista) {
     }
     
     else if (vista === 'membresias') {
-        let html = '<div class="planes">';
-        planesMembresias.forEach(p => {
-            html += `
-                <div class="plan">
-                    <div class="plan-info">
-                        <div class="plan-nombre">${p.nombre.toUpperCase()}</div>
-                        <div class="plan-duracion">${p.duracion_dias} días • ${p.pedidos_por_mes} pedidos</div>
-                        <div class="plan-precio">
-                            $${p.precio_dolares}
-                            <span class="precio-pen">S/${p.precio_soles}</span>
-                        </div>
-                    </div>
-                    <div class="botones-plan">
-                        <button class="btn-comprar" onclick="pagarPeru('${p.nombre}', ${p.precio_soles})">
-                            🇵🇪 Yape / Plin
-                        </button>
-                        <button class="btn-comprar tarjeta" onclick="pagarInternacional('${p.nombre}')">
-                            💳 Tarjeta Gpay ApplePay y mas
-                        </button>
+    // Primero, agregamos el banner del contador
+    let html = `
+        <!-- CONTADOR DE OFERTA ESPECIAL (50% OFF) -->
+        <div id="ofert-counter" class="oferta-banner">
+            <div class="oferta-titulo">🔥 OFERTA ESPECIAL 50% DE DESCUENTO 🔥</div>
+            <div class="oferta-tiempo">
+                <span>¡Oferta termina en:</span>
+                <div class="contador">
+                    <span id="horas">24</span>h <span id="minutos">00</span>m <span id="segundos">00</span>s
+                </div>
+            </div>
+        </div>
+        <div class="planes">
+    `;
+    
+    // Ahora generamos cada plan
+    planesMembresias.forEach(p => {
+        // 🔴 NUEVO: Calculamos los precios con 50% descuento
+        const precioSolesOriginal = p.precio_soles;
+        const precioDolaresOriginal = p.precio_dolares;
+        
+        const precioSolesDescuento = Math.round(precioSolesOriginal * 0.5);
+        const precioDolaresDescuento = (precioDolaresOriginal * 0.5).toFixed(2);
+        
+        html += `
+            <div class="plan">
+                <div class="plan-info">
+                    <div class="plan-nombre">${p.nombre.toUpperCase()}</div>
+                    <div class="plan-duracion">${p.duracion_dias} días • ${p.pedidos_por_mes} pedidos</div>
+                    <div class="plan-precio">
+                        <!-- 🟢 NUEVA FORMA DE MOSTRAR PRECIOS -->
+                        <span class="precio-original">$${precioDolaresOriginal}</span>
+                        <span class="precio-descuento">$${precioDolaresDescuento}</span>
+                        <br>
+                        <span class="precio-original">S/${precioSolesOriginal}</span>
+                        <span class="precio-descuento">S/${precioSolesDescuento}</span>
                     </div>
                 </div>
-            `;
-        });
-        html += '</div><button class="btn-verificar" onclick="verificarCompra()">🔎 Verificar compra</button>';
-        contenedor.innerHTML = html;
-    }
+                <div class="botones-plan">
+                    <button class="btn-comprar" onclick="pagarPeru('${p.nombre}', ${precioSolesDescuento})">
+                        🇵🇪 Yape / Plin
+                    </button>
+                    <button class="btn-comprar tarjeta" onclick="pagarInternacional('${p.nombre}')">
+                        💳 Tarjeta Gpay ApplePay y mas
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div><button class="btn-verificar" onclick="verificarCompra()">🔎 Verificar compra</button>';
+    contenedor.innerHTML = html;
+    
+    // 🟢 NUEVO: Iniciamos el contador
+    iniciarContadorOferta();
+}
     
     else if (vista === 'pedidos') {
         // Si es admin, redirigir a admin
@@ -935,11 +965,54 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============ REPRODUCTOR VIMEUS MEJORADO ============
+
+// Función principal que decide qué hacer según la plataforma
 function abrirReproductorVimeus(item) {
     if (!item.tmdb_id) {
         console.error("❌ No hay tmdb_id");
         return;
     }
+    
+    const tg = window.Telegram?.WebApp;
+    const platform = tg?.platform || 'unknown';
+    
+    // ===== SI ES MÓVIL, MOSTRAR POPUP PRIMERO =====
+    if (platform === 'ios' || platform === 'android') {
+        tg.showPopup({
+            title: '📱 Modo móvil',
+            message: '🎬 *Reproductor Vimeus*\n\n' +
+                     '⚠️ Este video puede contener publicidad gestionada por Vimeus.\n' +
+                     '❌ En móvil **no está disponible** el modo pantalla completa.\n\n' +
+                     '💻 *Para mejor experiencia:*\n' +
+                     '• Usa Telegram Desktop o Web\n' +
+                     '• Sin publicidad\n' +
+                     '• Pantalla completa disponible\n\n' +
+                     '¿Quieres continuar de todas formas?',
+            buttons: [
+                { id: 'continuar', type: 'default', text: '▶ Continuar' },
+                { id: 'cancelar', type: 'destructive', text: 'Cancelar' }
+            ]
+        }, function(buttonId) {
+            if (buttonId === 'continuar') {
+                // Si acepta, abrimos el video
+                abrirReproductorVimeusContinuar(item);
+            }
+        });
+        return; // Importante: salir para que no abra el video automáticamente
+    }
+    
+    // ===== SI ES DESKTOP/WEB, MOSTRAR AVISO SUTIL =====
+    if (platform === 'web' || platform === 'desktop') {
+        mostrarAvisoDesktop();
+    }
+    
+    // ===== ABRIR VIDEO (tanto desktop como móvil si continuó) =====
+    abrirReproductorVimeusContinuar(item);
+}
+
+// Función que realmente abre el video (tu código original)
+function abrirReproductorVimeusContinuar(item) {
+    if (!item.tmdb_id) return;
     
     const tipo = item.tipo || 'pelicula';
     const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
@@ -965,6 +1038,16 @@ function abrirReproductorVimeus(item) {
 
     // ✅ Escuchar cuando Vimeus intenta activar fullscreen
     escucharFullscreenVimeus();
+}
+
+// ===== AVISO SUTIL PARA DESKTOP (solo crea el div, el CSS ya está en HTML) =====
+function mostrarAvisoDesktop() {
+    const aviso = document.createElement('div');
+    aviso.className = 'aviso-desktop'; // Usa la clase CSS que definiste en HTML
+    aviso.textContent = '💻 Desktop: Sin publicidad y fullscreen disponible';
+    document.body.appendChild(aviso);
+    
+    setTimeout(() => aviso.remove(), 4000);
 }
 
 function escucharFullscreenVimeus() {
@@ -1052,5 +1135,57 @@ document.addEventListener('keydown', function(event) {
         }
     }
 });
+
+// ============ FUNCIONES PARA EL CONTADOR DE OFERTA ============
+function iniciarContadorOferta() {
+    // Definimos la hora de finalización de la oferta
+    // Ejemplo: que termine a las 11:59 PM de hoy
+    const ahora = new Date();
+    const finOferta = new Date(ahora);
+    finOferta.setHours(23, 59, 59, 0); // Termina a las 23:59:59 de hoy
+    
+    // ----- OPCIÓN 2: Duración de 24 horas desde el primer click ----
+    // Si prefieres que dure 24 horas desde que alguien entra:
+    // const finOferta = new Date(ahora.getTime() + (24 * 60 * 60 * 1000));
+    
+    // Función para actualizar el contador
+    function actualizarContador() {
+        const ahoraActual = new Date();
+        const diferencia = finOferta - ahoraActual;
+        
+        const contenedorHoras = document.getElementById('horas');
+        const contenedorMinutos = document.getElementById('minutos');
+        const contenedorSegundos = document.getElementById('segundos');
+        
+        // Si los elementos del contador no existen (ej. no estamos en vista membresías), no hacer nada
+        if (!contenedorHoras || !contenedorMinutos || !contenedorSegundos) return;
+        
+        if (diferencia <= 0) {
+            // La oferta terminó
+            contenedorHoras.innerText = '00';
+            contenedorMinutos.innerText = '00';
+            contenedorSegundos.innerText = '00';
+            // Opcional: Ocultar el banner o mostrar un mensaje de "Oferta terminada"
+            // document.getElementById('ofert-counter').style.display = 'none';
+            return;
+        }
+        
+        // Calcular horas, minutos y segundos
+        const horas = Math.floor(diferencia / (1000 * 60 * 60));
+        const minutos = Math.floor((diferencia % (1000 * 60 * 60)) / (1000 * 60));
+        const segundos = Math.floor((diferencia % (1000 * 60)) / 1000);
+        
+        // Actualizar el HTML (con dos dígitos siempre)
+        contenedorHoras.innerText = horas.toString().padStart(2, '0');
+        contenedorMinutos.innerText = minutos.toString().padStart(2, '0');
+        contenedorSegundos.innerText = segundos.toString().padStart(2, '0');
+    }
+    
+    // Ejecutar inmediatamente y luego cada segundo
+    actualizarContador();
+    setInterval(actualizarContador, 1000);
+}
+
+// iniciarContadorOferta();
 // ============ INICIAR ============
 iniciar();

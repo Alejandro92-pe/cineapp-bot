@@ -854,6 +854,88 @@ h2.titulo-seccion {
     to { transform:scale(1); opacity:1; }
 }
 
+/* ===== AVISO PARA DESKTOP ===== */
+.aviso-desktop {
+    position: fixed;
+    bottom: 90px;
+    left: 20px;
+    right: 20px;
+    background: #1e293b;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 14px;
+    z-index: 100001;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    animation: fadeOut 4s forwards;
+    pointer-events: none;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; transform: translateY(0); }
+    70% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+}
+
+/* ===== ESTILOS PARA PRECIOS CON DESCUENTO ===== */
+.precio-original {
+    text-decoration: line-through;
+    color: #94a3b8;
+    font-size: 14px;
+    margin-right: 8px;
+}
+
+.precio-descuento {
+    color: #f97316;
+    font-weight: bold;
+    font-size: 24px;
+}
+
+/* ===== BANNER DE OFERTA ===== */
+.oferta-banner {
+    background: linear-gradient(145deg, #f97316, #c2410c);
+    color: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 600px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(249, 115, 22, 0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.oferta-titulo {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.oferta-tiempo {
+    font-size: 16px;
+}
+
+.contador {
+    display: inline-block;
+    background: rgba(0,0,0,0.3);
+    padding: 10px 15px;
+    border-radius: 50px;
+    font-size: 24px;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+.contador span {
+    background: #1e293b;
+    padding: 8px 12px;
+    border-radius: 12px;
+    margin: 0 3px;
+    display: inline-block;
+    min-width: 50px;
+}
+
 </style>
 
 </head>
@@ -938,7 +1020,7 @@ h2.titulo-seccion {
 
     <p>
       Esta película está disponible solo para miembros VIP.
-      Activa tu membresía y accede sin publicidad.
+      Activa tu membresía y accede ahora.
     </p>
 
     <button onclick="irAMembresias()" class="btn-vip">
