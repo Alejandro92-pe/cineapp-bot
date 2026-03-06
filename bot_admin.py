@@ -197,7 +197,7 @@ def testimonios(message):
         "⭐ *LO QUE DICEN NUESTROS MIEMBROS VIP*\n\n"
         "💬 “El mejor canal que encontré, siempre actualizan contenido.”\n\n"
         "💬 “Me encanta poder pedir películas y que las suban rápido.”\n\n"
-        "💬 “Vale totalmente la pena, sin publicidad y todo ordenado.”\n\n"
+        "💬 “Vale totalmente la pena, todo ordenado.”\n\n"
         "💎 ¿Te gustaría formar parte?\n"
         "Escribe *ver planes* para comenzar."
     )
@@ -541,7 +541,7 @@ KEYWORD_REPLIES = {
     "✨ *BENEFICIOS VIP* ✨\n\n"
     "🔐 Acceso privado\n"
     "📥 Descarga directa en Telegram\n"
-    "🚫 Sin publicidad\n"
+    "🚫 Sin publicidad en Telegram web y Desktop\n"
     "🎞 Contenido exclusivo\n"
     "📦 Pedidos según plan\n"
     "🤖 Bot asistente\n\n"
@@ -564,12 +564,13 @@ KEYWORD_REPLIES = {
 # ==============================
 
 "planes": (
-    "💎 *PLANES DISPONIBLES* 💎\n\n"
-    "🥉 COPPER — S/22 | $5.99\n"
-    "🥈 SILVER — S/33 | $8.99\n"
-    "🥇 GOLD — S/85 | $22.99\n"
-    "🏆 PLATINUM — S/163 | $43.99\n"
-    "💠 DIAMOND — S/348 | $93.99\n\n"
+    "💎 *PLANES DISPONIBLES — 50% OFF POR TIEMPO LIMITADO* 💎\n\n"
+    "🥉 COPPER — ~~S/22~~ S/11 | ~~$6.00~~ $3.00\n"
+    "🥈 SILVER — ~~S/33~~ S/16.50 | ~~$9.00~~ $4.50\n"
+    "🥇 GOLD — ~~S/85~~ S/42.50 | ~~$22.99~~ $11.49\n"
+    "🏆 PLATINUM — ~~S/163~~ S/81.50 | ~~$43.99~~ $21.99\n"
+    "💠 DIAMOND — ~~S/348~~ S/174 | ~~$93.99~~ $46.99\n\n"
+    "⏳ Oferta especial por tiempo limitado.\n"
     "¿Te gustaría pagar en soles o en dólares?"
 ),
 
