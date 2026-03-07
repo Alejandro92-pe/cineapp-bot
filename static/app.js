@@ -974,7 +974,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============ REPRODUCTOR VIMEUS COMPLETO ============
 
 // Función principal que decide según plataforma
-function abrirReproductorVimeus(item) {
+async function abrirReproductorVimeus(item) {
     console.log("🎬 abrirReproductorVimeus llamado con:", item);
     
     if (!item || !item.tmdb_id) {
@@ -992,33 +992,65 @@ function abrirReproductorVimeus(item) {
         tg.showPopup({
             title: '📱 Modo móvil',
             message: '🎬 Reproductor Vimeus\n\n' +
-                     '⚠️ Esta película o serie puede contener publicidad lo controla vimeus no nosotros.\n' +
+                     '⚠️ Este video puede contener publicidad.\n' +
                      '❌ En móvil no hay pantalla completa.\n\n' +
-                     '💻 Usa Telegam web o Desktop para mejor experiencia y sin publicidad.\n\n' +
-                     '¿Quieres Continuar?',
+                     '💻 Usa Desktop para mejor experiencia.\n\n' +
+                     '¿Continuar?',
             buttons: [
                 { id: 'continuar', type: 'default', text: '▶ Continuar' },
                 { id: 'cancelar', type: 'destructive', text: 'Cancelar' }
             ]
-        }, function(buttonId) {
+        }, async function(buttonId) {
             if (buttonId === 'continuar') {
-                abrirReproductorDirecto(item);
+                await abrirReproductorDirecto(item);
             }
         });
         return;
     }
     
-    // ===== SI ES DESKTOP, ABRIR DIRECTO (CON FULLSCREEN) =====
+    // ===== SI ES DESKTOP, ABRIR DIRECTO =====
     console.log("💻 Modo desktop, abriendo directo");
-    abrirReproductorDirecto(item);
+    await abrirReproductorDirecto(item);
 }
 
 // Función que abre el reproductor (con fullscreen)
-function abrirReproductorDirecto(item) {
+// Variable global para cachear la view_key
+let vimeusViewKey = null;
+
+// Función para obtener la view_key (con caché)
+async function obtenerVimeusViewKey() {
+    // Si ya la tenemos en caché, devolverla
+    if (vimeusViewKey) return vimeusViewKey;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/config/vimeus_key`);
+        const data = await response.json();
+        
+        if (data.view_key) {
+            vimeusViewKey = data.view_key;
+            return vimeusViewKey;
+        } else {
+            console.error("No se pudo obtener view_key");
+            return null;
+        }
+    } catch (error) {
+        console.error("Error obteniendo view_key:", error);
+        return null;
+    }
+}
+
+// Función modificada que ahora es async
+async function abrirReproductorDirecto(item) {
     console.log("🎬 abrirReproductorDirecto:", item);
     
+    // Obtener la view_key
+    const viewKey = await obtenerVimeusViewKey();
+    if (!viewKey) {
+        alert("Error de configuración. Contacta al soporte.");
+        return;
+    }
+    
     const tipo = item.tipo || 'pelicula';
-    const viewKey = 'rboejkuadL4_xhtVPfuM5HU43ddqqgQsbd2vboKcv2w';
     let embedUrl = '';
     
     if (tipo === 'pelicula') {
@@ -1029,7 +1061,7 @@ function abrirReproductorDirecto(item) {
         embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     }
     
-    embedUrl += '&theme=blue&title=QueHay';
+    embedUrl += '&title=quehay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v2&playUI=v3&epanel=v2&splash=v2';
     
     console.log("🔗 URL generada:", embedUrl);
     
@@ -1043,7 +1075,6 @@ function abrirReproductorDirecto(item) {
     document.getElementById('modalReproductor').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     
-    // ===== INICIAR DETECCIÓN DE FULLSCREEN PARA DESKTOP =====
     iniciarDeteccionFullscreen();
 }
 

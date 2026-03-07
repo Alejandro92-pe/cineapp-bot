@@ -540,7 +540,7 @@ KEYWORD_REPLIES = {
 "beneficios": (
     "✨ *BENEFICIOS VIP* ✨\n\n"
     "🔐 Acceso privado\n"
-    "📥 Descarga directa en Telegram\n"
+    "📥 Ingreso al panel de descargas\n"
     "🚫 Sin publicidad en Telegram web y Desktop\n"
     "🎞 Contenido exclusivo\n"
     "📦 Pedidos según plan\n"
@@ -565,11 +565,11 @@ KEYWORD_REPLIES = {
 
 "planes": (
     "💎 *PLANES DISPONIBLES — 50% OFF POR TIEMPO LIMITADO* 💎\n\n"
-    "🥉 COPPER — ~~S/22~~ S/11 | ~~$6\\.00~~ $3\\.00\n"
-    "🥈 SILVER — ~~S/33~~ S/16\\.50 | ~~$9\\.00~~ $4\\.50\n"
-    "🥇 GOLD — ~~S/85~~ S/42\\.50 | ~~$22\\.99~~ $11\\.50\n"
-    "🏆 PLATINUM — ~~S/163~~ S/81\\.50 | ~~$43\\.99~~ $22\\.00\n"
-    "💠 DIAMOND — ~~S/348~~ S/174 | ~~$93\\.99~~ $47\\.00\n\n"
+    "🥉 COPPER — ~~S/22~~ S/11 | ~~$6.00~~ $3.00\n"
+    "🥈 SILVER — ~~S/33~~ S/16.50 | ~~$9.00~~ $4.50\n"
+    "🥇 GOLD — ~~S/85~~ S/42.50 | ~~$22.99~~ $11.50\n"
+    "🏆 PLATINUM — ~~S/163~~ S/81.50 | ~~$43.99~~ $22.00\n"
+    "💠 DIAMOND — ~~S/348~~ S/174 | ~~$93.99~~ $47.00\n\n"
     "⏳ Oferta especial por tiempo limitado.\n"
     "¿Te gustaría pagar en soles o en dólares?"
 ),
@@ -1669,6 +1669,16 @@ def api_mis_pedidos():
         "pedidos": pedidos_data,
         "usados": usados
     })
+
+@app.route("/api/config/vimeus_key", methods=["GET"])
+def get_vimeus_key():
+    """Devuelve la view_key de Vimeus desde variables de entorno"""
+    view_key = os.getenv("VIMEUS_VIEW_KEY")
+    if view_key:
+        return jsonify({"view_key": view_key}), 200
+    else:
+        return jsonify({"error": "View key no configurada"}), 404
+    
 @app.route("/api/tendencias", methods=["GET"])
 def api_tendencias():
     resultados = supabase_service.table("contenido") \
