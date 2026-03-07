@@ -1061,7 +1061,7 @@ async function abrirReproductorDirecto(item) {
         embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     }
     
-    embedUrl += '&title=quehay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v2&playUI=v3&epanel=v2&splash=v2';
+    embedUrl += '&title=quehay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v2&playUI=v3&epanel=v1&splash=v2';
     
     console.log("🔗 URL generada:", embedUrl);
     
