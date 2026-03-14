@@ -1064,8 +1064,8 @@ def crear_pago_tarjeta():
 
         # 3️⃣ Links BuyMeACoffee
         links = {
-            "copper": "https://buymeacoffee.com/quehay/membership",
-            "silver": "https://buymeacoffee.com/quehay/membership",
+            "copper": "https://buymeacoffee.com/quehay/e/517243",
+            "silver": "https://buymeacoffee.com/quehay/e/517244",
             "gold": "https://buymeacoffee.com/quehay/e/510546",
             "platinum": "https://buymeacoffee.com/quehay/e/510549",
             "diamond": "https://buymeacoffee.com/quehay/e/510552"
@@ -1493,6 +1493,8 @@ def webhook_buymeacoffee():
                 product_id = str(extras[0].get("id"))
 
                 product_to_plan = {
+                    "517243": "copper",
+                    "517244": "silver",
                     "510546": "gold",
                     "510549": "platinum",
                     "510552": "diamond"
@@ -1685,7 +1687,7 @@ def api_tendencias():
         .select("*") \
         .eq("destacado", True) \
         .order("orden_destacado") \
-        .limit(5) \
+        .limit(10) \
         .execute()
 
     return jsonify(resultados.data)

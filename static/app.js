@@ -11,49 +11,164 @@ const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 
 // Variables globales
 let usuarioActual = null;
+let membresiaActiva = null;
 let planesMembresias = [];
 let paginaActual = 1;
 const LIMITE = 20;
 let busquedaActual = "";
 let totalPaginas = 1;
+let cargando = false;
+
+const LIMITE_INICIAL = 20;
+const LIMITE_SCROLL = 5;
+
+let limiteActual = LIMITE_INICIAL;
 
 // ============ correccion hasta qui esta bien ============
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
-    console.log("🎬 Iniciando app...");
 
-    const planesRes = await fetch(`${API_BASE_URL}/api/planes`);
-    planesMembresias = await planesRes.json();
+console.log("🎬 Iniciando app...");
 
-    if (userId) {
-        const userRes = await fetch(`${API_BASE_URL}/api/usuario`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ telegram_id: userId })
-        });
-        const userData = await userRes.json();
-        usuarioActual = userData.usuario;
-        membresiaActiva = userData.membresia;
-    }
+// Mostrar spinner de carga inicial
+const contenedor = document.getElementById('contenido');
+if (contenedor) {
+    contenedor.innerHTML = `<div class="app-loading"><div class="spinner"></div><span>Cargando...</span></div>`;
+}
 
-    const badge = document.getElementById('badge');
-    if (badge) {
-        badge.innerText = membresiaActiva
-            ? `⭐ ${membresiaActiva.membresias_planes?.nombre || 'Activa'}`
-            : '👤 Sin membresía';
-    }
+try {
 
-    configurarFooter();
+const planesRes = await fetch(`${API_BASE_URL}/api/planes`);
+planesMembresias = await planesRes.json();
 
-    // 🔥 AQUÍ VA
-    document.querySelectorAll('.footer-item').forEach(item => {
-    item.addEventListener('click', () => {
-        const vista = item.dataset.destino || item.dataset.vista;
-        window.cambiarVista(vista);
-    });
-  });
+if (userId) {
 
-    cambiarVista('inicio');
+const userRes = await fetch(`${API_BASE_URL}/api/usuario`, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ telegram_id: userId })
+});
+
+const userData = await userRes.json();
+
+usuarioActual = userData.usuario;
+membresiaActiva = userData.membresia;
+
+}
+
+const avatar = document.getElementById("avatarUsuario");
+const nombre = document.getElementById("nombreUsuario");
+
+if(tg.initDataUnsafe?.user){
+
+const user = tg.initDataUnsafe.user;
+
+nombre.innerText = user.first_name || "Usuario";
+
+if(user.photo_url){
+avatar.src = user.photo_url;
+}else{
+avatar.src = "https://i.pravatar.cc/100";
+}
+
+}
+
+} catch (error) {
+
+console.error("Error cargando datos:", error);
+
+}
+
+actualizarBadge();
+
+configurarFooter();
+
+configurarEventosFooter();
+
+cambiarVista('inicio');
+
+}
+
+function actualizarBadge(){
+
+const badge = document.getElementById('badge');
+
+if(!badge) return;
+
+badge.innerText = membresiaActiva
+? ` ${membresiaActiva.membresias_planes?.nombre || 'Activa'}`
+: ' Sin membresía';
+
+}
+
+function configurarEventosFooter(){
+
+document.querySelectorAll('.footer-item').forEach(item => {
+
+item.addEventListener('click', () => {
+
+const vista = item.dataset.destino || item.dataset.vista;
+
+if (vista === 'mas') {
+    abrirMenuMas();
+    return;
+}
+
+window.cambiarVista(vista);
+
+});
+
+});
+
+}
+
+function obtenerSaludo() {
+
+const hora = new Date().getHours();
+
+if (hora < 12) return "¡Buenos días!";
+if (hora < 19) return "¡Buenas tardes!";
+return "¡Buenas noches!";
+
+}
+
+function renderHero() {
+
+const saludo = obtenerSaludo();
+const nombre = usuarioActual?.nombre || "Usuario";
+
+let html = `
+<div class="hero" style="background-image:url('/static/hero-bg.jpg')">
+<div class="hero-content">
+`;
+
+if(membresiaActiva){
+
+html += `
+<h2>${saludo}</h2>
+<h1>${nombre}</h1>
+<p>Disfruta del contenido</p>
+`;
+
+}else{
+
+html += `
+<h1>BIENVENIDO</h1>
+<p>Disfruta de Series, Películas y más...</p>
+<button class="hero-btn" onclick="cambiarVista('membresias')">
+Accede Ahora
+</button>
+`;
+
+}
+
+html += `
+</div>
+</div>
+`;
+
+return html;
+
 }
 
 // ============ CONFIGURAR FOOTER ============
@@ -92,87 +207,122 @@ window.cambiarVista = async function(vista) {
     
     if (vista === 'inicio') {
         contenedor.innerHTML = `
+        ${renderHero()}
             <h2 class="titulo-seccion">Tendencias</h2>
             <div id="tendencias" class="tendencias-container"></div>
-            <div class="buscador">
-                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." onkeyup="buscarContenido(1)">
-                <span>🔍</span>
-            </div>
-            <div class="tabs">
-                <div class="tab activo" onclick="cambiarTipo('todo', event)">Todo</div>
-                <div class="tab" onclick="cambiarTipo('pelicula', event)">Películas</div>
-                <div class="tab" onclick="cambiarTipo('serie', event)">Series</div>
-                <div class="tab" onclick="cambiarTipo('biblico', event)">Bíblico</div>
-            </div>
-            <div id="resultados" class="grid"></div>
-            <div id="paginacion" class="paginacion"></div>
+            <div id="contenidoGeneros"></div>
         `;
         cargarTendencias();
+        cargarGeneros();
         buscarContenido(1);
+    }
+
+    else if (vista === 'explorar') {
+        // reset scroll state
+        tipoActual = tipoActual || 'todo';
+        const tipoInicial = tipoActual;
+        paginaActual = 1;
+        totalPaginas = 1;
+        cargando = false;
+
+        contenedor.innerHTML = `
+            <div class="buscador">
+                <input type="text" id="buscarInput" placeholder="Buscar película o serie..." oninput="onBuscarInput()">
+                <span>🔍</span>
+            </div>
+
+            <div class="tabs">
+                <div class="tab ${tipoInicial==='todo'?'activo':''}"     onclick="cambiarTipo('todo', event)">Todo</div>
+                <div class="tab ${tipoInicial==='pelicula'?'activo':''}" onclick="cambiarTipo('pelicula', event)">Películas</div>
+                <div class="tab ${tipoInicial==='serie'?'activo':''}"    onclick="cambiarTipo('serie', event)">Series</div>
+                <div class="tab ${tipoInicial==='anime'?'activo':''}"    onclick="cambiarTipo('anime', event)">Anime</div>
+                <div class="tab ${tipoInicial==='biblico'?'activo':''}"  onclick="cambiarTipo('biblico', event)">Bíblico</div>
+            </div>
+
+            <div id="generosExplorar"></div>
+            <div id="resultados" class="grid" style="display:none;"></div>
+            <div id="scroll-loader" class="scroll-loader" style="display:none;">
+                <div class="spinner"></div>
+            </div>
+        `;
+
+        cargarGenerosEnContenedor('generosExplorar');
+
+        if (tipoInicial !== 'todo') {
+            mostrarResultadosExplorar();
+        }
+
+        // Activar scroll infinito
+        activarScrollInfinito();
     }
     
     else if (vista === 'membresias') {
-    let html = `
-        <!-- CONTADOR DE OFERTA ESPECIAL (50% OFF) -->
-        <div id="ofert-counter" class="oferta-banner">
-            <div class="oferta-titulo">🔥 OFERTA ESPECIAL 50% DE DESCUENTO 🔥</div>
-            <div class="oferta-tiempo">
-                <span>¡Oferta termina en:</span>
-                <div class="contador">
-                    <span id="horas">24</span>h <span id="minutos">00</span>m <span id="segundos">00</span>s
+    let html = `<div class="membresias-wrap">
+
+        <!-- OFERTA ESPECIAL -->
+        <div class="mem-oferta-card">
+            <div class="mem-oferta-titulo">OFERTA ESPECIAL</div>
+            <div class="mem-oferta-subtitulo">Oferta termina en:</div>
+            <div class="mem-oferta-row">
+                <div class="mem-pct-wrap">
+                    <span class="mem-pct-num">50</span><span class="mem-pct-sym">%<br>OFF</span>
+                </div>
+                <div class="mem-contador">
+                    <div class="mem-bloque" id="horas">00</div>
+                    <span class="mem-sep">h</span>
+                    <div class="mem-bloque" id="minutos">00</div>
+                    <span class="mem-sep">m</span>
+                    <div class="mem-bloque" id="segundos">00</div>
+                    <span class="mem-sep">s</span>
                 </div>
             </div>
+            <div class="mem-cupon-row">
+                <span class="mem-cupon-label">Código de Dto</span>
+                <button class="mem-cupon-btn" onclick="copiarCodigo('QH50OFF')">
+                    <small>Copiar código</small>
+                    QH50OFF
+                </button>
+            </div>
+            <div class="mem-oferta-instruccion">Usa este código al pagar con tarjeta</div>
         </div>
-        
-        <!-- 🆕 CÓDIGO DE DESCUENTO PARA TARJETA -->
-        <div class="cupon-banner">
-            <div class="cupon-titulo">🎟️ CÓDIGO DE DESCUENTO</div>
-            <div class="cupon-codigo" onclick="copiarCodigo('QH50OFF')">QH50OFF</div>
-            <div class="cupon-instruccion">Usa este código al pagar con tarjeta</div>
-        </div>
-        
-        <div class="planes">
+
+        <div class="planes-nueva">
     `;
-    
-    // Ahora generamos cada plan
+
     planesMembresias.forEach(p => {
-        // 🔴 NUEVO: Calculamos los precios con 50% descuento
-        const precioSolesOriginal = p.precio_soles;
-        const precioDolaresOriginal = p.precio_dolares;
-        
-        const precioSolesDescuento = Math.round(precioSolesOriginal * 0.5);
+        const precioSolesOriginal    = p.precio_soles;
+        const precioDolaresOriginal  = p.precio_dolares;
+        const precioSolesDescuento   = Math.round(precioSolesOriginal * 0.5);
         const precioDolaresDescuento = (precioDolaresOriginal * 0.5).toFixed(2);
-        
+
         html += `
-            <div class="plan">
-                <div class="plan-info">
-                    <div class="plan-nombre">${p.nombre.toUpperCase()}</div>
-                    <div class="plan-duracion">${p.duracion_dias} días • ${p.pedidos_por_mes} pedidos</div>
-                    <div class="plan-precio">
-                        <!-- 🟢 NUEVA FORMA DE MOSTRAR PRECIOS -->
-                        <span class="precio-original">$${precioDolaresOriginal}</span>
-                        <span class="precio-descuento">$${precioDolaresDescuento}</span>
-                        <br>
-                        <span class="precio-original">S/${precioSolesOriginal}</span>
-                        <span class="precio-descuento">S/${precioSolesDescuento}</span>
-                    </div>
-                </div>
-                <div class="botones-plan">
-                    <button class="btn-comprar" onclick="pagarPeru('${p.nombre}', ${precioSolesDescuento})">
-                        🇵🇪 Yape / Plin
-                    </button>
-                    <button class="btn-comprar tarjeta" onclick="pagarInternacional('${p.nombre}')">
-                        💳 Tarjeta Gpay ApplePay y mas
-                    </button>
-                </div>
+        <div class="plan-nueva">
+            <div class="plan-nueva-nombre">${p.nombre.toUpperCase()}</div>
+            <div class="plan-nueva-dur">${p.duracion_dias} días . ${p.pedidos_por_mes} pedidos</div>
+            <div class="plan-nueva-precios">
+                <span class="pn-orig">$${precioDolaresOriginal}</span>
+                <span class="pn-desc">$${precioDolaresDescuento}</span>
+                <br>
+                <span class="pn-orig">S/${precioSolesOriginal}</span>
+                <span class="pn-desc">S/ ${precioSolesDescuento}</span>
             </div>
+            <div class="plan-nueva-btns">
+                <button class="btn-yape-plin" onclick="pagarPeru('${p.nombre}', ${precioSolesDescuento})">
+                    <span class="btn-paga-con">Paga con</span> <strong>Yape o Plin</strong>
+                </button>
+                <button class="btn-tarjeta-nueva" onclick="pagarInternacional('${p.nombre}')">
+                    <span class="btn-paga-con">Paga con</span> <strong>Tarjeta y mas</strong>
+                </button>
+            </div>
+        </div>
         `;
     });
-    
-    html += '</div><button class="btn-verificar" onclick="verificarCompra()">🔎 Verificar compra</button>';
+
+    html += `</div>
+        <button class="btn-verificar" onclick="verificarCompra()">🔎 Verificar compra</button>
+    </div>`;
+
     contenedor.innerHTML = html;
-    
-    // 🟢 NUEVO: Iniciamos el contador
     iniciarContadorOferta();
 }
     
@@ -312,40 +462,82 @@ window.cambiarVista = async function(vista) {
     }
     
     else if (vista === 'perfil') {
-    const membresiaNombre = membresiaActiva?.membresias_planes?.nombre?.toUpperCase() || 'Ninguna';
+    const membresiaNombre = membresiaActiva?.membresias_planes?.nombre?.toUpperCase() || 'Sin membresía';
     const estado = membresiaActiva ? '✅ Activa' : '❌ Inactiva';
-    const vence = membresiaActiva?.fecha_fin 
-        ? new Date(membresiaActiva.fecha_fin).toLocaleDateString() 
+    const vence = membresiaActiva?.fecha_fin
+        ? new Date(membresiaActiva.fecha_fin).toLocaleDateString('es-PE')
         : '-';
+
+    const user = tg.initDataUnsafe?.user;
+    const nombre = user?.first_name || usuarioActual?.nombre || 'Usuario';
+    const avatarSrc = user?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=1565C0&color=fff&size=128`;
 
     let botones = '';
     if (membresiaActiva) {
-        // Tiene membresía activa, mostrar botones de subir/bajar
         botones = `
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn-comprar" onclick="subirPlan()" style="flex:1;">⬆️ Subir de plan</button>
-                <button class="btn-comprar" onclick="bajarPlan()" style="flex:1;">⬇️ Bajar de plan</button>
-            </div>
-        `;
+        <div class="perfil-btns">
+            <button class="btn-perfil-accion" onclick="subirPlan()">Subir Plan</button>
+            <button class="btn-perfil-accion" onclick="bajarPlan()">Bajar Plan</button>
+        </div>`;
     } else {
-        // No tiene membresía, mostrar botón para comprar
-        botones = `
-            <button class="btn-comprar" onclick="cambiarVista('membresias')" style="margin-top:20px;">💎 Comprar membresía</button>
-        `;
+        botones = `<button class="btn-perfil-comprar" onclick="cambiarVista('membresias')">Comprar Membresía</button>`;
     }
 
     contenedor.innerHTML = `
-        <div class="perfil-card">
-            <h3>👤 Mi Perfil</h3>
-            <div class="perfil-item"><strong>ID:</strong> ${userId || 'No disponible'}</div>
-            <div class="perfil-item"><strong>Nombre:</strong> ${usuarioActual?.nombre || 'No disponible'}</div>
-            <div class="perfil-item"><strong>Membresía:</strong> ${membresiaNombre}</div>
-            <div class="perfil-item"><strong>Estado:</strong> ${estado}</div>
-            <div class="perfil-item"><strong>Vence:</strong> ${vence}</div>
+    <div class="perfil-wrap">
+        <div class="perfil-nueva-card">
+            <img class="perfil-nueva-avatar" src="${avatarSrc}" alt="${nombre}"
+                onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=1565C0&color=fff&size=128'">
+            <div class="perfil-nueva-nombre">${nombre}</div>
+            <div class="perfil-nueva-badge">${membresiaNombre}</div>
+
+            <div class="perfil-datos">
+                <div class="perfil-dato-row"><strong>ID:</strong> <span>${userId || '—'}</span></div>
+                <div class="perfil-dato-row"><strong>Membresía:</strong> <span>${membresiaNombre}</span></div>
+                <div class="perfil-dato-row"><strong>Estado:</strong> <span>${estado}</span></div>
+                <div class="perfil-dato-row"><strong>Vence:</strong> <span>${vence}</span></div>
+            </div>
+
             ${botones}
         </div>
-    `;
+    </div>`;
 }
+    
+    else if (vista === 'buscar') {
+    tipoActual = 'todo';
+    contenedor.innerHTML = `
+        <div class="buscador">
+            <input type="text" id="buscarInput" placeholder="Escribe Títulos o géneros" oninput="onBuscarInput()" autofocus>
+
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+        </div>
+
+        <!-- Categorías rápidas (se ocultan cuando hay texto) -->
+        <div id="categoriasBuscar" class="buscar-categorias">
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('disponible')">Disponible para descargar</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('serie')">Series Tv</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('accion')">Acción</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('anime')">Anime</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('ciencia ficcion')">Ciencia Ficción</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('comedia')">Comedias</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('drama')">Dramas</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('terror')">Terror Suspense</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('familia')">Familia Niños</div>
+        </div>
+
+        <!-- Resultados -->
+        <div id="resultados" class="grid" style="display:none;"></div>
+        <div id="paginacion"></div>
+    `;}
+
+    else if (vista === 'mas') {
+        // Mostrar overlay menú Más
+        abrirMenuMas();
+        return; // no actualizar footer
+    }
     
     else if (vista === 'admin') {
         if (userId != ADMIN_ID) {
@@ -373,6 +565,7 @@ window.cambiarVista = async function(vista) {
         cambiarAdminTab('membresias');
     }
 };
+
 
 // ============ FUNCIONES DE ADMIN ============
 window.cambiarAdminTab = async function(tab) {
@@ -583,25 +776,16 @@ async function cargarUsuariosAdmin(contenedor) {
     }
 }
 
-// ============ BUSCADOR ============
-let tipoActual = 'todo';
-
+// ============ BUSCADOR — carga inicial 20 + scroll de 5 ============
 window.buscarContenido = async function(pagina = 1) {
-
     paginaActual = pagina;
     busquedaActual = document.getElementById('buscarInput')?.value || '';
-
     const offset = (paginaActual - 1) * LIMITE;
 
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            busqueda: busquedaActual,
-            tipo: tipoActual,
-            limit: LIMITE,
-            offset: offset
-        })
+        body: JSON.stringify({ busqueda: busquedaActual, tipo: tipoActual, limit: LIMITE, offset })
     });
 
     const result = await response.json();
@@ -610,34 +794,44 @@ window.buscarContenido = async function(pagina = 1) {
     totalPaginas = Math.ceil(totalRegistros / LIMITE);
 
     const grid = document.getElementById('resultados');
+    if (!grid) return;
+
     if (!data || data.length === 0) {
         grid.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
         return;
     }
 
-    grid.innerHTML = data.map(item => `
-          <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
+    grid.innerHTML = data.map(item => tarjetaHTML(item)).join('');
+
+    // No renderizar paginación numérica — usa scroll infinito en explorar
+};
+
+function tarjetaHTML(item) {
+    return `
+        <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <div class="tarjeta-imagen">
-                <img src="${item.imagen_url}" />
+                <img src="${item.imagen_url}" loading="lazy">
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">
-                ${item.tipo}
-                ${item.año ? ` • ${item.año}` : ''}
-                ${item.genero ? ` • ${item.genero}` : ''}
-                 </div>
+                <div class="tarjeta-detalle">${item.tipo}${item.año ? ' • ' + item.año : ''}${item.genero ? ' • ' + item.genero : ''}</div>
             </div>
-        </div>  
-    `).join('');
-
-    renderPaginacion();
-};
+        </div>
+    `;
+}
 
 window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
+    paginaActual = 1;
+    totalPaginas = 1;
+    cargando = false;
+    busquedaActual = '';
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
     if (e) e.target.classList.add('activo');
+    const generosEl = document.getElementById('generosExplorar');
+    const resultadosEl = document.getElementById('resultados');
+    if (generosEl) generosEl.style.display = 'none';
+    if (resultadosEl) { resultadosEl.style.display = ''; resultadosEl.innerHTML = ''; }
     buscarContenido(1);
 };
 
@@ -661,13 +855,65 @@ function irAMembresias(){
 }
 
 // ============ PAGOS ============
-window.pagarPeru = function(plan, precio) {
-    tg.openTelegramLink(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=pago_${plan}_${precio}`);
-    tg.showPopup({
-        title: '🟣 Pago por Yape/Plin',
-        message: 'Serás redirigido al bot, si no eres redrigido minimiza la MiniApp y ve al Bot y.\n\nSigue las instrucciones y completa el pago.',
-        buttons: [{type: 'ok'}]
-    });
+let planPagoActual = null;
+
+window.pagarPeru = async function(plan, precio) {
+
+    planPagoActual = { plan, precio };
+
+    // abrir modal QR
+    document.getElementById('modalPago').classList.add('active');
+
+    try {
+
+        const response = await fetch(`${API_BASE_URL}/crear_pago_yape`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                telegram_id: userId,
+                plan: plan.toLowerCase(),
+                monto: precio
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error("Error registrando pago:", data);
+            return;
+        }
+
+        console.log("Pago registrado:", data);
+
+    } catch (error) {
+
+        console.error("Error conexión:", error);
+
+    }
+
+};
+
+window.cerrarModalPago = function() {
+    document.getElementById('modalPago').classList.remove('active');
+};
+
+window.irAlBot = function() {
+    cerrarModalPago();
+    try {
+        tg.openTelegramLink(`https://t.me/${TELEGRAM_BOT_USERNAME}`);
+    } catch (e) {
+        tg.openLink(`https://t.me/${TELEGRAM_BOT_USERNAME}`);
+    }
+};
+
+window.copiarNumero = function(num) {
+    try { navigator.clipboard.writeText(num); } catch(e) {}
+    const inp = document.createElement('input');
+    inp.value = num; document.body.appendChild(inp); inp.select();
+    document.execCommand('copy'); document.body.removeChild(inp);
+    try {
+        tg.showPopup({ title: '✅ Copiado', message: `Número ${num} copiado.`, buttons: [{ type: 'ok' }] });
+    } catch (e) { alert('Copiado: ' + num); }
 };
 
 window.pagarInternacional = async function(plan) {
@@ -845,57 +1091,245 @@ function bajarPlan() {
     );
 }
 
-function renderPaginacion() {
-
-    const paginacion = document.getElementById("paginacion");
-
-    let html = `<div class="paginacion-contenedor">`;
-
-    // Botón anterior
-    html += `
-        <button class="page-btn" 
-            ${paginaActual === 1 ? "disabled" : ""}
-            onclick="buscarContenido(${paginaActual - 1})">
-            ◀
-        </button>
-    `;
-
-    // Mostrar máximo 5 páginas alrededor
-    let inicio = Math.max(1, paginaActual - 2);
-    let fin = Math.min(totalPaginas, paginaActual + 2);
-
-    if (inicio > 1) {
-        html += `<button class="page-btn" onclick="buscarContenido(1)">1</button>`;
-        if (inicio > 2) html += `<span class="dots">...</span>`;
-    }
-
-    for (let i = inicio; i <= fin; i++) {
-        html += `
-            <button class="page-btn ${i === paginaActual ? 'active' : ''}"
-                onclick="buscarContenido(${i})">
-                ${i}
-            </button>
-        `;
-    }
-
-    if (fin < totalPaginas) {
-        if (fin < totalPaginas - 1) html += `<span class="dots">...</span>`;
-        html += `<button class="page-btn" onclick="buscarContenido(${totalPaginas})">${totalPaginas}</button>`;
-    }
-
-    // Botón siguiente
-    html += `
-        <button class="page-btn"
-            ${paginaActual === totalPaginas ? "disabled" : ""}
-            onclick="buscarContenido(${paginaActual + 1})">
-            ▶
-        </button>
-    `;
-
-    html += `</div>`;
-
-    paginacion.innerHTML = html;
+async function cargarGeneros(){
+    // Ahora usa el helper compartido
+    cargarGenerosEnContenedor('contenidoGeneros');
 }
+
+// ============ CARGAR GÉNEROS EN CONTENEDOR ESPECÍFICO ============
+// Reutilizable tanto para inicio como para explorar/buscar
+async function cargarGenerosEnContenedor(containerId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ busqueda: "", tipo: "todo", limit: 300, offset: 0 })
+        });
+        const result = await res.json();
+        const data = result.data;
+        if (!data) return;
+
+        const grupos = {
+            misterioTerror: ["misterio", "terror"],
+            comedia: ["comedia"],
+            romanceDrama: ["romance", "drama"],
+            accionWestern: ["accion", "western"],
+            animacionFamilia: ["animacion", "familia"]
+        };
+        const titulos = {
+            misterioTerror: "Misterio y Terror",
+            comedia: "Comedia",
+            romanceDrama: "Romance y Drama",
+            accionWestern: "Acción y Western",
+            animacionFamilia: "Animación y Familia"
+        };
+
+        const contenedor = document.getElementById(containerId);
+        if (!contenedor) return;
+
+        let html = "";
+        Object.keys(grupos).forEach(key => {
+            const peliculas = data.filter(item =>
+                grupos[key].includes((item.genero || "").toLowerCase())
+            );
+            if (peliculas.length === 0) return;
+            html += `
+                <section class="genero-section genero-${key}">
+                    <h2 class="genero-titulo">${titulos[key]}</h2>
+                    <div class="genero-scroll">
+                        ${peliculas.slice(0, 20).map(item => `
+                            <div class="genero-card" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
+                                <img src="${item.imagen_url}" alt="${item.titulo}">
+                            </div>
+                        `).join("")}
+                    </div>
+                </section>
+            `;
+        });
+        contenedor.innerHTML = html;
+    } catch (e) {
+        console.error("Error cargando géneros:", e);
+    }
+}
+
+// ============ BUSCADOR INTELIGENTE (buscar + explorar) ============
+let buscarDebounce = null;
+window.onBuscarInput = function() {
+    clearTimeout(buscarDebounce);
+    buscarDebounce = setTimeout(() => {
+        const query = document.getElementById('buscarInput')?.value?.trim() || '';
+        const generosEl = document.getElementById('generosExplorar') || document.getElementById('categoriasBuscar');
+        const resultadosEl = document.getElementById('resultados');
+
+        if (!query) {
+            if (generosEl) generosEl.style.display = '';
+            if (resultadosEl) { resultadosEl.style.display = 'none'; resultadosEl.innerHTML = ''; }
+            return;
+        }
+        if (generosEl) generosEl.style.display = 'none';
+        if (resultadosEl) { resultadosEl.style.display = ''; resultadosEl.innerHTML = ''; }
+        // Reset para nueva búsqueda
+        paginaActual = 1; totalPaginas = 1; cargando = false;
+        buscarContenido(1);
+    }, 350);
+};
+
+// Mostrar resultados filtrados por tipo en explorar
+async function mostrarResultadosExplorar() {
+    const generosEl = document.getElementById('generosExplorar');
+    const resultadosEl = document.getElementById('resultados');
+    if (generosEl) generosEl.style.display = 'none';
+    if (resultadosEl) resultadosEl.style.display = '';
+    await buscarContenido(1);
+}
+
+// ============ FILTRAR POR CATEGORÍA EN BUSCAR ============
+// Mapa de qué columna y qué valor usar para cada categoría
+const FILTROS_BUSCAR = {
+    // Filtra por columna 'descarga' no nula — son los disponibles para descargar
+    'disponible':      { col: 'descarga',  valor: null },      // especial: != null
+
+    // Filtra por columna 'tipo'
+    'serie':           { col: 'tipo',      valor: 'serie' },
+    'anime':           { col: 'tipo',      valor: 'anime' },
+
+    // Filtra por columna 'genero' (coincidencia parcial)
+    'accion':          { col: 'genero',    valor: 'accion' },
+    'ciencia ficcion': { col: 'genero',    valor: 'ciencia' },
+    'comedia':         { col: 'genero',    valor: 'comedia' },
+    'drama':           { col: 'genero',    valor: 'drama' },
+    'terror':          { col: 'genero',    valor: 'terror' },
+    'familia':         { col: 'genero',    valor: 'familia' },
+};
+
+window.filtrarPorTipo = async function(categoria) {
+    const generosEl   = document.getElementById('categoriasBuscar');
+    const resultadosEl = document.getElementById('resultados');
+
+    if (generosEl) generosEl.style.display = 'none';
+    if (resultadosEl) {
+        resultadosEl.style.display = '';
+        resultadosEl.innerHTML = '<div class="text-center p-20 text-gris">⏳ Cargando...</div>';
+    }
+
+    try {
+        // Traer todos (hasta 500) para filtrar en frontend
+        // (el backend no soporta filtros por genero/descarga directamente aún)
+        const res = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ busqueda: "", tipo: "todo", limit: 500, offset: 0 })
+        });
+        const result = await res.json();
+        const todos = result.data || [];
+
+        let filtrados = [];
+
+        if (categoria === 'disponible') {
+            // Mostrar solo los que tienen la columna 'descarga' con valor no nulo/vacío
+            filtrados = todos.filter(item =>
+                item.descarga && item.descarga.trim() !== ''
+            );
+        } else {
+            const cfg = FILTROS_BUSCAR[categoria];
+            if (!cfg) return;
+
+            if (cfg.col === 'tipo') {
+                filtrados = todos.filter(item =>
+                    (item.tipo || '').toLowerCase() === cfg.valor
+                );
+            } else if (cfg.col === 'genero') {
+                filtrados = todos.filter(item =>
+                    (item.genero || '').toLowerCase().includes(cfg.valor)
+                );
+            }
+        }
+
+        if (!filtrados.length) {
+            resultadosEl.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
+            return;
+        }
+
+        // Para "disponible" abrimos el modal normal (igual que cualquier otra tarjeta)
+        // El botón Descargar aparecerá en el modal porque item.descarga tiene valor
+        resultadosEl.innerHTML = filtrados.map(item => tarjetaHTML(item)).join('');
+
+    } catch (e) {
+        console.error('Error filtrarPorTipo:', e);
+        if (resultadosEl) resultadosEl.innerHTML = '<div class="text-center p-20 text-gris">❌ Error cargando</div>';
+    }
+};
+
+// ============ MENÚ MÁS (overlay) ============
+function abrirMenuMas() {
+    document.getElementById('overlayMas')?.classList.add('active');
+}
+window.cerrarMenuMas = function() {
+    document.getElementById('overlayMas')?.classList.remove('active');
+};
+
+// Cambiar a explorar con tipo preseleccionado
+window.cambiarVistaConFiltro = function(tipo) {
+    tipoActual = tipo;
+    cerrarMenuMas();
+    cambiarVista('explorar');
+};
+
+
+
+// ============ BUSCADOR tipo actual ============
+let tipoActual = 'todo';
+
+// ============ SCROLL INFINITO ============
+function activarScrollInfinito() {
+    window.removeEventListener('scroll', _scrollHandler);
+    window.addEventListener('scroll', _scrollHandler);
+}
+
+function _scrollHandler() {
+    if (cargando) return;
+    const grid = document.getElementById('resultados');
+    if (!grid || grid.style.display === 'none') return;
+    if (paginaActual >= totalPaginas) return;
+
+    const scrollBottom = window.innerHeight + window.scrollY;
+    const docHeight = document.documentElement.scrollHeight;
+    if (scrollBottom >= docHeight - 350) {
+        cargarMasContenido();
+    }
+}
+
+async function cargarMasContenido() {
+    if (cargando || paginaActual >= totalPaginas) return;
+    cargando = true;
+
+    const loader = document.getElementById('scroll-loader');
+    if (loader) loader.style.display = 'flex';
+
+    paginaActual++;
+    const offset = (paginaActual - 1) * LIMITE_SCROLL;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ busqueda: busquedaActual, tipo: tipoActual, limit: LIMITE_SCROLL, offset })
+        });
+        const result = await response.json();
+        const data = result.data;
+        const grid = document.getElementById('resultados');
+        if (grid && data?.length) {
+            data.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
+        }
+    } catch (e) { console.error('Scroll error:', e); }
+
+    if (loader) loader.style.display = 'none';
+    cargando = false;
+}
+
+// renderPaginacion ya no se usa en explorar (scroll infinito)
+function renderPaginacion() {}
+
 function mostrarModal(titulo, mensaje, callback) {
     const modal = document.getElementById("modal");
     const title = document.getElementById("modal-title");
@@ -918,54 +1352,95 @@ function mostrarModal(titulo, mensaje, callback) {
     };
 }
 
-// ============ FUNCIONES DEL MODAL DE CONTENIDO ============
+// ============ MODAL DETALLE CONTENIDO (nuevo diseño) ============
 let contenidoSeleccionado = null;
 
 function abrirModalContenido(item) {
     contenidoSeleccionado = item;
-    
-    document.getElementById('modalTitulo').innerText = item.titulo || 'Sin título';
-    document.getElementById('modalImagen').src = item.imagen_url || '';
-    document.getElementById('modalSinopsis').innerText = item.sinopsis || 'Sin sinopsis disponible.';
-    
-    document.getElementById('modalContenido').style.display = 'flex';
+
+    // Fondo blureado
+    const bgEl = document.getElementById('detalleHeroBg');
+    if (bgEl) bgEl.style.backgroundImage = `url('${item.imagen_url || ''}')`;
+
+    // Poster
+    const imgEl = document.getElementById('detalleImagen');
+    if (imgEl) { imgEl.src = item.imagen_url || ''; imgEl.onerror = () => { imgEl.style.display='none'; }; }
+
+    // Año y tipo
+    const anioTipoEl = document.getElementById('detalleAnioTipo');
+    if (anioTipoEl) {
+        const partes = [item.año, item.tipo].filter(Boolean);
+        anioTipoEl.textContent = partes.join(' | ');
+    }
+
+    // Título
+    const tituloEl = document.getElementById('detalleTitulo');
+    if (tituloEl) tituloEl.textContent = item.titulo || 'Sin título';
+
+    // Sinopsis
+    const sinEl = document.getElementById('detalleSinopsis');
+    if (sinEl) sinEl.textContent = item.sinopsis || 'Sin sinopsis disponible.';
+
+    // Meta
+    const metaEl = document.getElementById('detalleMeta');
+    if (metaEl) {
+        let metaHtml = '';
+        if (item.protagonistas) metaHtml += `<div><strong>Protagonizada por:</strong> ${item.protagonistas}</div>`;
+        if (item.creadores)     metaHtml += `<div><strong>Creada por:</strong> ${item.creadores}</div>`;
+        if (item.genero)        metaHtml += `<div><strong>Género:</strong> ${item.genero}</div>`;
+        metaEl.innerHTML = metaHtml;
+    }
+
+    // Botón descargar
+    const btnDesc = document.getElementById('btnDescargar');
+    if (btnDesc) {
+        const linkDescarga = item.descarga || null;
+        if (linkDescarga && linkDescarga.trim() !== '') {
+            btnDesc.style.display = 'flex';
+            btnDesc.onclick = () => {
+                try {
+                    if (linkDescarga.includes('t.me')) tg.openTelegramLink(linkDescarga);
+                    else tg.openLink(linkDescarga);
+                } catch (e) { window.open(linkDescarga, '_blank'); }
+            };
+        } else {
+            btnDesc.style.display = 'none';
+        }
+    }
+
+    // Mostrar modal
+    const modal = document.getElementById('modalDetalle');
+    if (modal) { modal.classList.add('active'); modal.scrollTop = 0; }
 }
 
-function cerrarModalContenido() {
-    document.getElementById('modalContenido').style.display = 'none';
+window.cerrarModalDetalle = function() {
+    document.getElementById('modalDetalle')?.classList.remove('active');
     contenidoSeleccionado = null;
-}
+};
 
-// Configurar el botón "Ver ahora"
+// mantener compatibilidad
+function cerrarModalContenido() { cerrarModalDetalle(); }
+
+// Configurar el botón "Ver ahora" del nuevo modal
 document.addEventListener('DOMContentLoaded', function() {
     const btnVer = document.getElementById('btnVerAhora');
     if (btnVer) {
         btnVer.addEventListener('click', function() {
             const item = contenidoSeleccionado;
             if (!item) return;
-            
-            cerrarModalContenido();
-            
-            // Si no tiene membresía, mostrar modal VIP
+            cerrarModalDetalle();
+
             if (!membresiaActiva) {
                 document.getElementById("modal-vip-bloqueo").classList.add("active");
                 return;
             }
-            
-            // ===== CASO 1: CONTENIDO DE CANAL =====
             if ((!item.fuente || item.fuente === 'canal') && item.enlace_canal) {
-                if (item.enlace_canal.includes('t.me')) {
-                    window.Telegram.WebApp.openTelegramLink(item.enlace_canal);
-                } else {
-                    window.Telegram.WebApp.openLink(item.enlace_canal);
-                }
+                if (item.enlace_canal.includes('t.me')) tg.openTelegramLink(item.enlace_canal);
+                else tg.openLink(item.enlace_canal);
                 return;
-            } 
-            
-            // ===== CASO 2: CONTENIDO DE VIMEUS =====
-            else if (item.fuente === 'vimeus' && item.tmdb_id) {
+            }
+            if (item.fuente === 'vimeus' && item.tmdb_id) {
                 abrirReproductorVimeus(item);
-                return;
             }
         });
     }
@@ -991,10 +1466,10 @@ async function abrirReproductorVimeus(item) {
     if (platform === 'ios' || platform === 'android') {
         tg.showPopup({
             title: '📱 Modo móvil',
-            message: '🎬 Reproductor Vimeus\n\n' +
-                     '⚠️ Este video puede contener publicidad.\n' +
+            message: '🎬 Reproductor Externo\n\n' +
+                     '⚠️ Este video puede contener publicidad, nosotros no la controlamos.\n' +
                      '❌ En móvil no hay pantalla completa.\n\n' +
-                     '💻 Usa Desktop para mejor experiencia.\n\n' +
+                     '💻 Usa Telegram web o Desktop para mejor experiencia y sin publcidad.\n\n' +
                      '¿Continuar?',
             buttons: [
                 { id: 'continuar', type: 'default', text: '▶ Continuar' },
@@ -1014,7 +1489,6 @@ async function abrirReproductorVimeus(item) {
 }
 
 // Función que abre el reproductor (con fullscreen)
-// Variable global para cachear la view_key
 let vimeusViewKey = null;
 
 // Función para obtener la view_key (con caché)
@@ -1175,16 +1649,10 @@ document.addEventListener('keydown', function(event) {
 
 // ============ FUNCIONES PARA EL CONTADOR DE OFERTA ============
 function iniciarContadorOferta() {
-    // Definimos la hora de finalización de la oferta
-    // Ejemplo: que termine a las 11:59 PM de hoy
     const ahora = new Date();
     const finOferta = new Date(ahora);
-    finOferta.setHours(23, 59, 59, 0); // Termina a las 23:59:59 de hoy
-    
-    // ----- OPCIÓN 2: Duración de 24 horas desde el primer click ----
-    // Si prefieres que dure 24 horas desde que alguien entra:
-    // const finOferta = new Date(ahora.getTime() + (24 * 60 * 60 * 1000));
-    
+    finOferta.setHours(23, 59, 59, 0);
+ 
     // Función para actualizar el contador
     function actualizarContador() {
         const ahoraActual = new Date();
@@ -1202,8 +1670,7 @@ function iniciarContadorOferta() {
             contenedorHoras.innerText = '00';
             contenedorMinutos.innerText = '00';
             contenedorSegundos.innerText = '00';
-            // Opcional: Ocultar el banner o mostrar un mensaje de "Oferta terminada"
-            // document.getElementById('ofert-counter').style.display = 'none';
+
             return;
         }
         

@@ -1,1106 +1,248 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CineApp Perú</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        
-        #contenido {
-            padding-bottom: 15px; /* igual o un poco más que el footer */
-}
-        body {
-            background: #0a0a0f;
-            color: white;
-            padding: 16px;
-            padding-bottom: 80px;
-        }
-        
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: auto;
-            width: 100%;
-            max-width: 1200px;
-            margin-bottom: 20px;
-        }
-        
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            color: #ffd966;
-        }
-        
-        .badge {
-            background: #0000ff;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        
-        /* Buscador */
-        .buscador {
-            background: #1e1e2a;
-            padding: 12px 16px;
-            border-radius: 12px;
-            display: flex;
-            gap: 10px;
-            margin: auto;
-            width: 100%;
-            max-width: 600px;
-            margin-top: 20px;
-            margin-bottom: 20px;
-            box-sizing: border-box;
-        }
-        
-        .buscador input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: white;
-            font-size: 16px;
-            outline: none;
-        }
-        
-        .buscador input::placeholder {
-            color: #666;
-        }
-        
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            scrollbar-width: none;
-            margin: auto;
-            width: 100%;
-            max-width: 600px;
-            margin-bottom: 30px;
-        }
-        
-        .tab {
-            background: #1e1e2a;
-            padding: 8px 20px;
-            border-radius: 10px;
-            white-space: nowrap;
-            cursor: pointer;
-        }
-        
-        .tab.activo {
-            background: #0004ff;
-            color: rgb(255, 255, 255);
-        }
-        
-        /* Grid de películas */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 14px;
-            width: 100%;
-            max-width: 1200px;
-            margin: auto;
-        }
-        
-        @media (min-width: 400px) and (max-width: 600px) {
-        .grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-        }
-        .tarjeta {  
-            background: #1e1e2a;
-            border-radius: 12px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .tarjeta:hover {
-            transform: scale(1.03);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-        }
-        
-        .tarjeta-imagen {
-            height: auto;
-            background: #2a2a35;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-        }
-        
-        .tarjeta-info {
-            padding: 12px;
-        }
-        
-        .tarjeta-titulo {
-            font-weight: bold;
-            margin-bottom: 4px;
-            font-size: 11px;
-        }
-        
-        .tarjeta-detalle {
-            font-size: 8px;
-            color: #94a3b8;
-        }
-        
-        .genero {
-            color: #f97316;
-        }
-        /* Membresías */
-        .planes {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin: auto;
-            width: 100%;
-            max-width: 600px;
-            margin-top: 30px;
-        }
-        
-        .plan {
-            background: #1e1e2a;
-            padding: 22px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: auto;
-            width: 100%;
-            max-width: 600px;
-            text-align: center;
-            box-sizing: border-box;
-        }
-        
-        .plan-info {
-            flex: 1;
-            padding-right: 10px;
-            margin: auto;
-            width: 100%;
-            max-width: 250px;
-        }
-        
-        .plan-nombre {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-        
-        .plan-duracion {
-            font-size: 12px;
-            color: #aaa;
-            margin-bottom: 8px;
-        }
-        
-        .plan-precio {
-            font-size: 20px;
-            color: #f97316;
-            font-weight: bold;
-        }
-        
-        .btn-comprar {
-            background: #f97316;
-            color: rgb(255, 255, 255);
-            padding: 10px 20px;
-            border-radius: 20px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        /* Pedidos */
-        .pedidos-form {
-            background: #1e1e2a;
-            padding: 20px;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 600px;
-            margin: auto;
-            margin-bottom: 20px;
-            margin-top: 20px;
-        }
-        
-        .pedidos-form input,
-        .pedidos-form select {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            background: #2a2a35;
-            border: none;
-            border-radius: 8px;
-            color: white;
-        }
-        
-        .btn-pedir {
-            background: #f97316;
-            color: black;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            width: 100%;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
 
-.paginacion-contenedor {
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-    margin: 20px 0;
-    flex-wrap: wrap;
-}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineApp Perú</title>
 
-.page-btn {
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: none;
-    background: #1f2937;
-    color: #fff;
-    cursor: pointer;
-    transition: 0.2s;
-    font-size: 14px;
-}
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-.page-btn:hover {
-    background: #374151;
-}
-
-.page-btn.active {
-    background: #f97316;
-    font-weight: bold;
-}
-
-.page-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.dots {
-    align-self: center;
-    padding: 0 5px;
-    color: #999;
-}
-        
-        /* Perfil */
-        .perfil-card {
-            background: #1e1e2a;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin: auto;
-            width: 100%;
-            max-width: 600px;
-            box-sizing: border-box;
-        }
-        
-        .perfil-item {
-            padding: 18px;
-            background: #2a2a35;
-            border-radius: 8px;
-            width: 100%;
-            max-width: 600px;
-            margin: auto;
-            margin-top: 15px;
-        }
-        
-        /* Footer */
-.footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 70px;
-    display: flex;
-    justify-content: space-evenly;
-    align-items: center;
-    background: #0f172a;
-    border-top: 1px solid #1e293b;
-    z-index: 1000;
-}
-
-.footer-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 12px;
-    color: #64748b;
-    cursor: pointer;
-    transition: 0.2s;
-}
-
-.footer-item .icon {
-    width: 22px;
-    height: 22px;
-    fill: currentColor;
-    margin-bottom: 4px;
-}
-
-.footer-item.activo {
-    color: #f97316;
-}
-
-.footer-item:hover {
-    color: #ffffff;
-}
-        
-        .tarjeta-imagen img {
-             width: 100%;
-             aspect-ratio: 2 / 3;
-             object-fit: cover;
-             border-radius: 10px;
-         }
-
-        /* Utilidades */
-        .text-center { text-align: center; }
-        .p-20 { padding: 20px; }
-        .mt-20 { margin-top: 20px; }
-        .text-gris { color: #666; }
-    </style>
-
-    <style>
-    /* tus estilos actuales */
-
-    /* ===== NUEVOS ESTILOS MEMBRESÍAS ===== */
-
-    .plan-precio {
-        font-size: 22px;
-        font-weight: bold;
-        color: #f97316;
-        margin-top: 6px;
-    }
-
-    .precio-pen {
-        font-size: 12px;
-        color: #aaa;
-        margin-left: 8px;
-    }
-
-    .botones-plan {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 12px;
-        width: 100%;
-        max-width: 350px;
-    }
-
-    .btn-comprar {
-        background: #f97316;
-    color: #ffffff;
-    padding: 14px 18px;
-    border-radius: 14px;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-    text-align: center;
-    width: 100%;
-    font-size: 15px;
-    transition: all 0.3s ease;
-    margin-top: 8px;
-}
-
-    .btn-comprar.tarjeta {
-        background: #000000;
-    }
-
-    .btn-sub {
-        font-size: 11px;
-        font-weight: normal;
-        margin-top: 4px;
-        opacity: 0.8;
-    }
-
-    .info-compra {
-    font-size: 11px;
-    color: #aaa;
-    margin-top: 6px;
-    text-align: center;
-}
-
-.btn-verificar {
-    background: #1eff00;
-    color: rgb(0, 0, 0);
-    padding: 12px;
-    border-radius: 12px;
-    border: none;
-    margin: auto;
-    width: 100%;
-    max-width: 600px;
-    margin-top: 20px;
-    display: block;
-}
-
-.logo img {
-    height: 38px;
-    width: auto;
-    display: block;
-}
-
-.estado-pendiente {
-    color: #f59e0b;
-    background: rgba(245, 158, 11, 0.1);
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-}
-
-.estado-entregado {
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-}
-
-.pedido-item {
-    margin-bottom: 10px;
-    transition: all 0.3s;
-}
-
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.65);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-}
-
-.modal.hidden {
-    display: none;
-}
-
-.modal-content {
-    background: #1e293b;
-    padding: 20px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 350px;
-    text-align: center;
-    color: white;
-    animation: fadeIn 0.2s ease-in-out;
-}
-
-.modal-buttons {
-    margin-top: 15px;
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-}
-
-.btn-primary {
-    flex: 1;
-    background: #f97316;
-    border: none;
-    padding: 10px;
-    border-radius: 8px;
-    color: white;
-    cursor: pointer;
-}
-
-.btn-pedir.disabled {
-    background: #334155;
-    color: #94a3b8;
-    cursor: not-allowed;
-}
-
-.btn-secondary {
-    flex: 1;
-    background: #334155;
-    border: none;
-    padding: 10px;
-    border-radius: 8px;
-    color: white;
-    cursor: pointer;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.pedido-item:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.admin-tabs {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    padding: 10px;
-    background: var(--bg-secondary);
-    border-radius: 10px;
-}
-
-.admin-tabs .tab {
-    flex: 1;
-    text-align: center;
-    padding: 10px;
-    cursor: pointer;
-    border-radius: 8px;
-    transition: all 0.3s;
-}
-
-.admin-tabs .tab.activo {
-    background: var(--accent-color);
-    color: white;
-}
-
-.lista-pedidos-admin {
-    max-height: 70vh;
-    overflow-y: auto;
-    padding-right: 5px;
-}
-
-.lista-pedidos-admin .perfil-item {
-    background: var(--bg-secondary);
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 10px;
-    transition: all 0.3s;
-}
-
-.lista-pedidos-admin .perfil-item:hover {
-    transform: translateX(5px);
-    background: var(--bg-hover);
-}
-
-/* Scrollbar personalizado */
-.lista-pedidos-admin::-webkit-scrollbar {
-    width: 5px;
-}
-
-.lista-pedidos-admin::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-}
-
-.lista-pedidos-admin::-webkit-scrollbar-thumb {
-    background: var(--accent-color);
-    border-radius: 5px;
-}
-
-
-@media (max-width: 600px) {
-    .plan {
-        flex-direction: column;
-    }
-
-    .plan-info {
-        margin-bottom: 14px;
-    }
-}
-
-@media (max-width: 600px) {
-    .btn-comprar {
-        padding: 10px;
-        font-size: 14px;
-    }
-}
-
-.modal-vip {
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.75);
-    justify-content:center;
-    align-items:center;
-    z-index:99999;
-}
-
-.modal-vip.active {
-    display:flex;
-}
-
-.modal-vip-content {
-    background:#1e293b;
-    padding:25px;
-    border-radius:16px;
-    width:90%;
-    max-width:380px;
-    text-align:center;
-    color:white;
-}
-
-.modal-icon {
-    font-size:28px;
-    margin-bottom:10px;
-}
-
-.modal-title {
-    margin-top:0;
-    margin-bottom:10px;
-}
-
-.btn-vip {
-    margin-top:15px;
-    width:100%;
-    background:#f97316;
-    border:none;
-    padding:12px;
-    border-radius:10px;
-    color:white;
-    font-weight:600;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    gap:6px;
-    cursor:pointer;
-}
-
-.btn-vip:hover {
-    background:#ea580c;
-}
-
-.btn-cancelar {
-    margin-top:10px;
-    background:transparent;
-    border:none;
-    color:#94a3b8;
-    cursor:pointer;
-}
-.modal-vip-content {
-    animation:scaleIn 0.2s ease;
-}
-
-.tendencias-container {
-    display: flex;
-    overflow-x: auto;
-    gap: 12px;
-    padding-bottom: 10px;
-    max-width: 1200px;
-    width: 100%;
-    margin: auto;
-}
-
-.tendencia-item {
-    position: relative;
-    min-width: 140px;
-    cursor: pointer;
-}
-
-.tendencia-item img {
-    width: 100%;
-    border-radius: 10px;
-}
-
-.numero {
-    position: absolute;
-    left: -10px;
-    bottom: -15px;
-    font-size: 80px;
-    font-weight: bold;
-    color: rgba(255,255,255,0.15);
-    z-index: 1;
-    -webkit-text-stroke: 2px coral;
-}
-
-/* ===== MODAL DE CONTENIDO ===== */
-.modal-contenido {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-}
-
-.modal-contenido .modal-card {
-    background: #0f172a;
-    border-radius: 14px;
-    max-width: 300px;
-    width: 100%;
-    padding: 30px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-    text-align: justify;
-}
-
-.modal-contenido .modal-card img {
-    width: 100%;
-    max-width: 150px;
-    margin: auto;
-    display: flex;
-    border-radius: 10px;
-    margin-bottom: 10px;
-}
-
-.modal-contenido .modal-card h2 {
-    font-size: 17px;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-.modal-contenido .modal-card p {
-    font-size: 13px;
-    color: #cbd5e1;
-    margin-bottom: 15px;
-    line-height: 1.4;
-}
-
-.modal-contenido .modal-card button {
-    background: #f97316;
-    border: none;
-    padding: 12px;
-    border-radius: 8px;
-    color: white;
-    width: 100%;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-.modal-contenido .modal-card .cerrar {
-    background: transparent;
-    color: #94a3b8;
-    margin-top: 8px;
-}
-
-h2.titulo-seccion {
-    padding-bottom: 15px;
-    max-width: 1200px;
-    width: 100%;
-    margin: auto;
-}
-
-/* ===== REPRODUCTOR MODAL MEJORADO ===== */
-.modal-reproductor {
-    position: fixed;
-    inset: 0;
-    background: black;
-    z-index: 100000;
-    display: none;
-    flex-direction: column;
-}
-
-.reproductor-contenedor {
-    flex: 1;
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-#iframeReproductor {
-    width: 100%;
-    height: calc(100% - 44px); /* Mismo alto que el botón */
-    border: none;
-    background: #000;
-    display: block;
-}
-
-/* Botón cerrar: esquina superior derecha, pequeño y semitransparente */
-.reproductor-cerrar-bottom {
-    position: relative;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100002;
-    height: 44px;
-    background: rgba(15, 15, 15, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    padding: 0 20px;
-    transition: background 0.2s;
-}
-
-.reproductor-cerrar-bottom:hover,
-.reproductor-cerrar-bottom:active {
-    background: rgba(180, 0, 0, 0.85);
-}
-
-.reproductor-cerrar-bottom svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-}
-
-.reproductor-cerrar-bottom svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-}
-
-.reproductor-cerrar-bottom:hover {
-    background: rgba(200, 0, 0, 0.7);
-}
-
-/* Auto-ocultar el botón después de 3s de inactividad */
-.reproductor-cerrar-bottom.oculto {
-    opacity: 0.15;
-}
-
-@keyframes scaleIn {
-    from { transform:scale(0.9); opacity:0; }
-    to { transform:scale(1); opacity:1; }
-}
-
-/* ===== AVISO PARA DESKTOP ===== */
-.aviso-desktop {
-    position: fixed;
-    bottom: 90px;
-    left: 20px;
-    right: 20px;
-    background: #1e293b;
-    color: white;
-    padding: 12px 16px;
-    border-radius: 12px;
-    text-align: center;
-    font-size: 14px;
-    z-index: 100001;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: fadeOut 4s forwards;
-    pointer-events: none;
-}
-
-@keyframes fadeOut {
-    0% { opacity: 1; transform: translateY(0); }
-    70% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(10px); }
-}
-
-/* ===== ESTILOS PARA PRECIOS CON DESCUENTO ===== */
-.precio-original {
-    text-decoration: line-through;
-    color: #94a3b8;
-    font-size: 14px;
-    margin-right: 8px;
-}
-
-.precio-descuento {
-    color: #f97316;
-    font-weight: bold;
-    font-size: 24px;
-}
-
-/* ===== BANNER DE OFERTA ===== */
-.oferta-banner {
-    background: linear-gradient(145deg, #f97316, #c2410c);
-    color: white;
-    border-radius: 16px;
-    padding: 20px;
-    margin: 20px auto;
-    max-width: 600px;
-    text-align: center;
-    box-shadow: 0 10px 25px rgba(249, 115, 22, 0.3);
-    border: 1px solid rgba(255,255,255,0.2);
-}
-
-.oferta-titulo {
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    margin-bottom: 10px;
-    text-transform: uppercase;
-}
-
-.oferta-tiempo {
-    font-size: 16px;
-}
-
-.contador {
-    display: inline-block;
-    background: rgba(0,0,0,0.3);
-    padding: 10px 15px;
-    border-radius: 50px;
-    font-size: 24px;
-    font-weight: 700;
-    margin-top: 8px;
-}
-
-.contador span {
-    background: #1e293b;
-    padding: 8px 12px;
-    border-radius: 12px;
-    margin: 0 3px;
-    display: inline-block;
-    min-width: 50px;
-}
-
-/* ===== BANNER DE CUPÓN ===== */
-.cupon-banner {
-    background: linear-gradient(145deg, #3b82f6, #1e3a8a);
-    color: white;
-    border-radius: 16px;
-    padding: 20px;
-    margin: 20px auto;
-    max-width: 600px;
-    text-align: center;
-    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
-    border: 1px solid rgba(255,255,255,0.2);
-}
-
-.cupon-titulo {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 10px;
-    opacity: 0.9;
-}
-
-.cupon-codigo {
-    background: #1e293b;
-    padding: 15px 20px;
-    border-radius: 12px;
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: 4px;
-    margin: 10px auto;
-    display: inline-block;
-    border: 2px dashed #f97316;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.cupon-codigo:hover {
-    transform: scale(1.05);
-    background: #2d3748;
-}
-
-.cupon-instruccion {
-    font-size: 14px;
-    opacity: 0.8;
-    margin-top: 8px;
-}
-
-</style>
+<link rel="stylesheet" href="/static/styles.css">
 
 </head>
+
 <body>
-    <div class="header">
-        <div class="logo">
-    <img src="static/logo-que-hay-live.webp" alt="Que Hay Live">
-</div>  
-      <div class="badge" id="badge">Cargando...</div>
-    </div>
-    <div id="contenido"></div>
 
-    <div class="footer">
+<div class="header">
 
-    <div class="footer-item activo" data-vista="inicio">
-        <svg class="icon" viewBox="0 0 24 24">
-            <path d="M3 10L12 3L21 10V21H14V14H10V21H3V10Z"/>
-        </svg>
-        <span>Inicio</span>
-    </div>
+<div class="logo">
+<img src="static/logo-que-hay-live.png">
+</div>
 
-    <div class="footer-item" data-vista="membresias">
-        <svg class="icon" viewBox="0 0 24 24">
-            <path d="M12 1L15 8H22L17 12L19 19L12 15L5 19L7 12L2 8H9L12 1Z"/>
-        </svg>
-        <span>Membresías</span>
-    </div>
+<div class="user-info">
 
-    <div class="footer-item" data-vista="pedidos">
-        <svg class="icon" viewBox="0 0 24 24">
-            <path d="M6 2H18L21 7V22H3V7L6 2Z"/>
-        </svg>
-        <span>Pedidos</span>
-    </div>
+<img id="avatarUsuario" class="avatar">
 
-    <div class="footer-item" data-vista="perfil">
-        <svg class="icon" viewBox="0 0 24 24">
-            <path d="M12 12C15 12 18 14 18 17V19H6V17C6 14 9 12 12 12ZM12 2C14 2 16 4 16 6C16 8 14 10 12 10C10 10 8 8 8 6C8 4 10 2 12 2Z"/>
-        </svg>
-        <span>Perfil</span>
-    </div>
+<div class="user-text">
+<div id="nombreUsuario">Usuario</div>
+<div id="badge">Sin membresía</div>
+</div>
 
 </div>
 
-    <script src="/static/app.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</div>
+
+
+<div id="contenido"></div>
+
+
+<div class="footer">
+
+<div class="footer-item activo" data-vista="inicio">
+<svg class="icon" viewBox="0 0 24 24">
+<path d="M3 10L12 3L21 10V21H14V14H10V21H3V10Z"/>
+</svg>
+<span>Inicio</span>
+</div>
+
+<div class="footer-item" data-vista="membresias">
+<svg class="icon" viewBox="0 0 24 24">
+<path d="M12 1L15 8H22L17 12L19 19L12 15L5 19L7 12L2 8H9L12 1Z"/>
+</svg>
+<span>Membresías</span>
+</div>
+
+<div class="footer-item" data-vista="pedidos">
+<svg class="icon" viewBox="0 0 24 24">
+<path d="M6 2H18L21 7V22H3V7L6 2Z"/>
+</svg>
+<span>Pedidos</span>
+</div>
+
+<div class="footer-item" data-vista="buscar">
+<svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2"/></svg>
+</svg>
+<span>Buscar</span>
+</div>
+
+<div class="footer-item" data-vista="mas">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="4" height="14" rx="1"/><rect x="10" y="5" width="4" height="14" rx="1"/><rect x="17" y="5" width="4" height="14" rx="1"/></svg>
+</svg>
+<span>Más</span>
+</div>
+
+</div>
+
+
+<script src="/static/app.js"></script>
+
 <script>
-  window.Telegram.WebApp.ready();
-  // Opcional: personalizar el botón de cierre, colores, etc.
+window.Telegram.WebApp.ready();
 </script>
 
-<!-- MODAL DE CONTENIDO (PELÍCULAS/SERIES) -->
-<div id="modalContenido" class="modal-contenido" style="display: none;">
-    <div class="modal-card">
-        <img id="modalImagen" src="" alt="Poster" style="width:100%; border-radius:10px;">
-        <h2 id="modalTitulo" style="margin:10px 0;"></h2>
-        <p id="modalSinopsis" style="color:#ccc; font-size:14px;"></p>
-        <button id="btnVerAhora" class="btn-comprar" style="width:100%;">▶ Ver ahora</button>
-        <button onclick="cerrarModalContenido()" class="btn-cancelar" style="margin-top:10px;">Cerrar</button>
+
+<!-- OVERLAY MENÚ MÁS -->
+<div class="overlay-mas" id="overlayMas">
+    <span class="mas-close" onclick="cerrarMenuMas()">✕</span>
+    <div class="mas-menu">
+        <div class="mas-item" onclick="cerrarMenuMas(); cambiarVista('perfil')">Mi Perfil</div>
+        <div class="mas-item" onclick="cambiarVistaConFiltro('pelicula')">Películas</div>
+        <div class="mas-item" onclick="cambiarVistaConFiltro('serie')">Series</div>
+        <div class="mas-item" onclick="cambiarVistaConFiltro('biblico')">Bíblico</div>
+        <div class="mas-item" onclick="cambiarVistaConFiltro('anime')">Anime</div>
     </div>
 </div>
 
-<div id="modal" class="modal hidden">
-    <div class="modal-content">
-        <h3 id="modal-title"></h3>
-        <p id="modal-message"></p>
-        <div class="modal-buttons">
-            <button id="modal-cancel" class="btn-secondary">Cancelar</button>
-            <button id="modal-ok" class="btn-primary">Ver planes</button>
+<!-- MODAL DETALLE CONTENIDO -->
+<div id="modalDetalle" class="modal-detalle">
+    <button class="detalle-back" onclick="cerrarModalDetalle()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+    </button>
+    <div class="detalle-hero" id="detalleHero">
+        <div class="detalle-hero-bg" id="detalleHeroBg"></div>
+        <div class="detalle-hero-overlay"></div>
+        <div class="detalle-hero-contenido">
+            <img id="detalleImagen" class="detalle-poster" src="" alt="">
+            <div class="detalle-info-hero">
+                <div class="detalle-anio-tipo" id="detalleAnioTipo"></div>
+                <div class="detalle-titulo" id="detalleTitulo"></div>
+            </div>
         </div>
     </div>
+    <div class="detalle-cuerpo">
+        <button id="btnVerAhora" class="detalle-btn-reproducir">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            Reproducir
+        </button>
+        <button id="btnDescargar" class="detalle-btn-descargar" style="display:none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Descargar
+        </button>
+        <div class="detalle-sinopsis" id="detalleSinopsis"></div>
+        <div class="detalle-meta" id="detalleMeta"></div>
+    </div>
 </div>
+
+<!-- MODAL CONTENIDO  -->
+<div id="modalContenido" class="modal-contenido" style="display:none;">
+<div class="modal-card">
+<img id="modalImagen" src="">
+<h2 id="modalTitulo"></h2>
+<p id="modalSinopsis"></p>
+</div>
+</div>
+
+<!-- MODAL PAGO-->
+<div id="modalPago" class="modal-pago">
+    <div class="modal-pago-card">
+        <span class="modal-pago-close" onclick="cerrarModalPago()">✕</span>
+        <div class="modal-pago-titulo">PAGAR CON YAPE O PLIN</div>
+        <div class="modal-pago-sub">Escanea el codigo QR<br>o copia el número</div>
+        <button class="btn-copiar-num" onclick="copiarNumero('930202820')">
+            <small>copiar número</small>
+            930202820
+        </button>
+        <div class="modal-qr">
+            <img src="static/qr-yape.png" alt="QR" onerror="this.parentElement.innerHTML='<div style=\'padding:20px;color:#000;text-align:center;font-size:12px;\'>QR Yape/Plin</div>'">
+        </div>
+        <div class="modal-qr-nombre">Richard Quiroz</div>
+        <div class="modal-pago-instruccion">
+            Abre tu Plin o Yape y escanea el QR y paga, luego envía una captura del pago al bot y tu membresía se activará después de verificar el pago por el admin. Luego de pagar presiona el botón de abajo.
+        </div>
+        <button class="btn-ya-pague" onclick="irAlBot()">Ya Pagué ir al bot</button>
+    </div>
+</div>
+
+
+
+
+<div id="modal" class="modal hidden">
+
+<div class="modal-content">
+
+<h3 id="modal-title"></h3>
+<p id="modal-message"></p>
+
+<div class="modal-buttons">
+
+<button id="modal-cancel" class="btn-secondary">
+Cancelar
+</button>
+
+<button id="modal-ok" class="btn-primary">
+Ver planes
+</button>
+
+</div>
+
+</div>
+
+</div>
+
 
 <div id="modal-vip-bloqueo" class="modal-vip">
-  <div class="modal-vip-content">
-    
-    <div class="modal-icon">
-      ✋
-    </div>
 
-    <h3 class="modal-title">Contenido VIP</h3>
+<div class="modal-vip-content">
 
-    <p>
-      Esta película está disponible solo para miembros VIP.
-      Activa tu membresía y accede ahora.
-    </p>
-
-    <button onclick="irAMembresias()" class="btn-vip">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-        <path d="M2 7l5 5 5-9 5 9 5-5-2 13H4L2 7z"/>
-      </svg>
-      Hazte VIP
-    </button>
-
-    <button onclick="cerrarModalVIP()" class="btn-cancelar">
-      Cancelar
-    </button>
-
-  </div>
+<div class="modal-icon">
+✋
 </div>
-<!-- REPRODUCTOR MODAL MEJORADO -->
-<div id="modalReproductor" class="modal-reproductor" style="display: none;">
-    <div class="reproductor-contenedor">
-        <iframe id="iframeReproductor" 
-                src="" 
-                frameborder="0" 
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                allowfullscreen
-                referrerpolicy="origin">
-        </iframe>
-        
-        <!-- Botón de cerrar en la parte inferior -->
-        <button onclick="cerrarReproductor()" class="reproductor-cerrar-bottom">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-            Cerrar reproductor
-        </button>
-    </div>
+
+<h3 class="modal-title">
+Contenido VIP
+</h3>
+
+<p>
+Esta película está disponible solo para miembros VIP.
+</p>
+
+<button onclick="irAMembresias()" class="btn-vip">
+
+<svg viewBox="0 0 24 24" width="18" height="18">
+<path d="M2 7l5 5 5-9 5 9 5-5-2 13H4L2 7z"/>
+</svg>
+
+Hazte VIP
+
+</button>
+
+<button onclick="cerrarModalVIP()" class="btn-cancelar">
+Cancelar
+</button>
+
 </div>
+
+</div>
+
+
+<div id="modalReproductor" class="modal-reproductor">
+
+<div class="reproductor-contenedor">
+
+<iframe id="iframeReproductor"></iframe>
+
+<button onclick="cerrarReproductor()" class="reproductor-cerrar-bottom">
+
+<svg width="20" height="20" viewBox="0 0 24 24">
+<path d="M18 6L6 18M6 6l12 12"/>
+</svg>
+
+Cerrar reproductor
+
+</button>
+
+</div>
+
+</div>
+
+
 </body>
 </html>
