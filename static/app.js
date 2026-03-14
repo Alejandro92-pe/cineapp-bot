@@ -857,40 +857,9 @@ function irAMembresias(){
 // ============ PAGOS ============
 let planPagoActual = null;
 
-window.pagarPeru = async function(plan, precio) {
-
+window.pagarPeru = function(plan, precio) {
     planPagoActual = { plan, precio };
-
-    // abrir modal QR
     document.getElementById('modalPago').classList.add('active');
-
-    try {
-
-        const response = await fetch(`${API_BASE_URL}/crear_pago_yape`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                telegram_id: userId,
-                plan: plan.toLowerCase(),
-                monto: precio
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error("Error registrando pago:", data);
-            return;
-        }
-
-        console.log("Pago registrado:", data);
-
-    } catch (error) {
-
-        console.error("Error conexión:", error);
-
-    }
-
 };
 
 window.cerrarModalPago = function() {
@@ -898,11 +867,19 @@ window.cerrarModalPago = function() {
 };
 
 window.irAlBot = function() {
+
+    if (!planPagoActual) return;
+
+    const { plan, precio } = planPagoActual;
+
     cerrarModalPago();
+
+    const url = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=pago_${plan}_${precio}`;
+
     try {
-        tg.openTelegramLink(`https://t.me/${TELEGRAM_BOT_USERNAME}`);
+        tg.openTelegramLink(url);
     } catch (e) {
-        tg.openLink(`https://t.me/${TELEGRAM_BOT_USERNAME}`);
+        tg.openLink(url);
     }
 };
 

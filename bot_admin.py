@@ -533,7 +533,7 @@ KEYWORD_REPLIES = {
 "beneficios": (
     "✨ *BENEFICIOS VIP* ✨\n\n"
     "🔐 Acceso privado\n"
-    "📥 Ingreso al panel de descargas\n"
+    "📥 Descargas directas en Drive desde la Mini App\n"
     "🚫 Sin publicidad en Telegram web y Desktop\n"
     "🎞 Contenido exclusivo\n"
     "📦 Pedidos según plan\n"
@@ -558,11 +558,11 @@ KEYWORD_REPLIES = {
 
 "planes": (
     "💎 *PLANES DISPONIBLES — 50% OFF POR TIEMPO LIMITADO* 💎\n\n"
-    "🥉 COPPER — ~~S/22~~ S/11 | ~~$6.00~~ $3.00\n"
-    "🥈 SILVER — ~~S/33~~ S/16.50 | ~~$9.00~~ $4.50\n"
-    "🥇 GOLD — ~~S/85~~ S/42.50 | ~~$22.99~~ $11.50\n"
-    "🏆 PLATINUM — ~~S/163~~ S/81.50 | ~~$43.99~~ $22.00\n"
-    "💠 DIAMOND — ~~S/348~~ S/174 | ~~$93.99~~ $47.00\n\n"
+    "🥉 COPPER : Antes: S/22 - $6 | Ahora: S/11 - $3\n"
+    "🥈 SILVER : Antes: S/33 - $9 | Ahora: S/17 - $4.50\n"
+    "🥇 GOLD   : Antes: S/85 - $22.99 | Ahora: S/43 - $11.49\n"
+    "🏆 PLATINUM : Antes: S/163 - $43.99 | Ahora: S/82 - $22\n"
+    "💠 DIAMOND : Antes: S/348 - $93.99 | Ahora: S/174 - $46.99\n\n"
     "⏳ Oferta especial por tiempo limitado.\n"
     "¿Te gustaría pagar en soles o en dólares?"
 ),
