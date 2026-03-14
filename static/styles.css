@@ -992,7 +992,7 @@ z-index:2;
 }
 
 .hero h1{
-font-size:42px;
+font-size:35px;
 font-weight:800;
 letter-spacing:1px;
 margin-bottom:10px;
@@ -1983,3 +1983,4 @@ h2.titulo-seccion {
 #buscarInput:focus + svg{
 stroke:#00ffff;
 }
+

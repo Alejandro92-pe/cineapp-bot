@@ -1113,8 +1113,8 @@ async function cargarGenerosEnContenedor(containerId) {
             misterioTerror: ["misterio", "terror"],
             comedia: ["comedia"],
             romanceDrama: ["romance", "drama"],
-            accionWestern: ["accion", "western"],
-            animacionFamilia: ["animacion", "familia"]
+            accionWestern: ["acción", "western"],
+            animacionFamilia: ["animación", "familia"]
         };
         const titulos = {
             misterioTerror: "Misterio y Terror",
@@ -1194,7 +1194,7 @@ const FILTROS_BUSCAR = {
     'anime':           { col: 'tipo',      valor: 'anime' },
 
     // Filtra por columna 'genero' (coincidencia parcial)
-    'accion':          { col: 'genero',    valor: 'accion' },
+    'accion':          { col: 'genero',    valor: 'acción' },
     'ciencia ficcion': { col: 'genero',    valor: 'ciencia' },
     'comedia':         { col: 'genero',    valor: 'comedia' },
     'drama':           { col: 'genero',    valor: 'drama' },
@@ -1393,20 +1393,47 @@ function abrirModalContenido(item) {
 
     // Botón descargar
     const btnDesc = document.getElementById('btnDescargar');
-    if (btnDesc) {
-        const linkDescarga = item.descarga || null;
-        if (linkDescarga && linkDescarga.trim() !== '') {
-            btnDesc.style.display = 'flex';
-            btnDesc.onclick = () => {
-                try {
-                    if (linkDescarga.includes('t.me')) tg.openTelegramLink(linkDescarga);
-                    else tg.openLink(linkDescarga);
-                } catch (e) { window.open(linkDescarga, '_blank'); }
-            };
-        } else {
-            btnDesc.style.display = 'none';
-        }
+
+if (btnDesc) {
+
+    const linkDescarga = item.descarga || null;
+
+    if (linkDescarga && linkDescarga.trim() !== '') {
+
+        btnDesc.style.display = 'flex';
+
+        btnDesc.onclick = (e) => {
+
+            e.stopPropagation();
+
+            // misma validación que usar "Ver ahora"
+            if (!membresiaActiva) {
+                document.getElementById("modal-vip-bloqueo").classList.add("active");
+                return;
+            }
+
+             // usuario con membresía → aviso TG
+            if (typeof tg !== "undefined") {
+                tg.showAlert("🗃 Para descomprimir los archivos ZIP usa la clave:\n\nquehay.live");
+            }
+
+            try {
+                if (linkDescarga.includes('t.me')) {
+                    tg.openTelegramLink(linkDescarga);
+                } else {
+                    tg.openLink(linkDescarga);
+                }
+            } catch (e) {
+                window.open(linkDescarga, '_blank');
+            }
+
+        };
+
+    } else {
+        btnDesc.style.display = 'none';
     }
+
+}
 
     // Mostrar modal
     const modal = document.getElementById('modalDetalle');

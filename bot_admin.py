@@ -131,7 +131,6 @@ def beneficios(message):
 
 @bot.message_handler(func=lambda m: m.text == "📱 Mini App Vip")
 def miniapp_info(message):
-
     texto = (
         "📱 *¿QUÉ ES LA MINI APP VIP?*\n\n"
         "Es una aplicación dentro de Telegram donde puedes:\n\n"
@@ -141,22 +140,16 @@ def miniapp_info(message):
         "👤 Ver tu membresía y fecha de vencimiento\n"
         "💳 Comprar tu plan de forma segura\n\n"
         "🚀 Todo sin salir de Telegram.\n\n"
-        "👇 Para entrar escribe:\n"
-        "*abrir app*"
+        "👇 Presiona el botón para abrir la app:"
     )
-
-    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
-
-@bot.message_handler(func=lambda m: m.text and "abrir app" in m.text.lower())
-def abrir_app(message):
-
-    bot.send_message(
-        message.chat.id,
-        "📱 *Accede a la Mini App aquí:*\n\n"
-        "👉 https://cineapp-bot.onrender.com\n\n"
-        "⚡ Recomendado usar desde Telegram.",
-        parse_mode="Markdown"
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton(
+            text="🎬 Abrir Mini App",
+            web_app=telebot.types.WebAppInfo(url="https://cineapp-bot.onrender.com")
+        )
     )
+    bot.send_message(message.chat.id, texto, parse_mode="Markdown", reply_markup=markup)
 
 @bot.message_handler(func=lambda m: m.text == "🎞 Pedir Película")
 def pedir_pelicula_info(message):
