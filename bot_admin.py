@@ -19,7 +19,7 @@ supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 GRUPO_SOPORTE_ID = -1003805629374  
 MINIAPP_URL = "cineapp-bot.onrender.com"
 
-BMC_URL = "https://buymeacoffee.com/quehay/membership"
+BMC_URL = "https://buymeacoffee.com/quehay/extras"
 
 BMC_LINKS = {
     "copper": "https://buymeacoffee.com/quehay/e/517243",
@@ -34,6 +34,7 @@ user_states = {}
 # ============ CANALES PRIVADOS ============
 CANAL_PELICULAS_ID = -1003890553566
 CANAL_SERIES_ID = -1003879512007
+GRUPO_CONTENIDO_ID = -1002991571573
 
 # Inicializar
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -684,14 +685,23 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                     member_limit=1,
                     expire_date=int(time.time()) + 604800
                 )
+                invite_link_grupo = bot.create_chat_invite_link(
+                    chat_id=GRUPO_CONTENIDO_ID,
+                    name=f"Usuario_{user_id}_grupo",
+                    member_limit=1,
+                    expire_date=int(time.time()) + 604800
+                )
                 bot.send_message(
                     user_id,
                     f"🔐 *ACCESO A TUS CANALES*\n\n"
                     f"🎬 *CANAL DE PELÍCULAS:*\n{invite_link_pelis.invite_link}\n\n"
                     f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
-                    f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días",
+                    f"👥 *GRUPO PRIVADO BÍBLICO:*\n{invite_link_grupo.invite_link}\n\n"
+                    f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
+                    f"📍 Únete a los 3, selencialos y solo maneja la MiniApp y Bot",
+                    parse_mode="Markdown"
                 )
-                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y enlaces enviados")
+                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y 3 enlaces enviados")
             except Exception as e:
                 bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
                 bot.send_message(user_id, f"🎉 Membresía activada. En breve recibirás los enlaces.")
@@ -855,22 +865,27 @@ def generar_enlaces(message):
             member_limit=1,
             expire_date=int(time.time()) + 604800
         )
-        
         invite_link_series = bot.create_chat_invite_link(
             chat_id=CANAL_SERIES_ID,
             name=f"Usuario_{user_id}_series",
             member_limit=1,
             expire_date=int(time.time()) + 604800
         )
-        
-        # Enviar al usuario (SIN MARKDOWN)
+        invite_link_grupo = bot.create_chat_invite_link(
+            chat_id=GRUPO_CONTENIDO_ID,
+            name=f"Usuario_{user_id}_grupo",
+            member_limit=1,
+            expire_date=int(time.time()) + 604800
+        )
+
         bot.send_message(
             user_id,
             f"🔐 ACCESO A TUS CANALES\n\n"
             f"🎬 CANAL DE PELÍCULAS:\n{invite_link_pelis.invite_link}\n\n"
             f"📺 CANAL DE SERIES:\n{invite_link_series.invite_link}\n\n"
+            f"👥 GRUPO PRIVADO BÍBLICO:\n{invite_link_grupo.invite_link}\n\n"
             f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
-            # 👈 SIN parse_mode
+            f"📍 Únete a los 3, selencialos y solo maneja la MiniApp y Bot"
         )
         
         bot.reply_to(message, f"✅ Enlaces enviados a {user_id}")

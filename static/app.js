@@ -1227,9 +1227,13 @@ window.filtrarPorTipo = async function(categoria) {
             return;
         }
 
-        // Para "disponible" abrimos el modal normal (igual que cualquier otra tarjeta)
-        // El botón Descargar aparecerá en el modal porque item.descarga tiene valor
-        resultadosEl.innerHTML = filtrados.map(item => tarjetaHTML(item)).join('');
+        // Mostrar primeros 20 
+        window._filtradosCache = filtrados;
+        totalPaginas = Math.ceil(filtrados.length / LIMITE);
+        paginaActual = 1;
+        cargando = false;
+        resultadosEl.innerHTML = filtrados.slice(0, LIMITE).map(item => tarjetaHTML(item)).join('');
+        activarScrollInfinitoCache();
 
     } catch (e) {
         console.error('Error filtrarPorTipo:', e);
@@ -1237,6 +1241,37 @@ window.filtrarPorTipo = async function(categoria) {
     }
 };
 
+function activarScrollInfinitoCache() {
+    window.removeEventListener('scroll', _scrollHandlerCache);
+    window.addEventListener('scroll', _scrollHandlerCache);
+}
+
+function _scrollHandlerCache() {
+    if (cargando) return;
+    const grid = document.getElementById('resultados');
+    if (!grid || grid.style.display === 'none') return;
+
+    const cache = window._filtradosCache;
+    if (!cache) return;
+
+    const yaHay = grid.querySelectorAll('.tarjeta').length;
+    if (yaHay >= cache.length) return;
+
+    const scrollBottom = window.innerHeight + window.scrollY;
+    const docHeight = document.documentElement.scrollHeight;
+    if (scrollBottom < docHeight - 350) return;
+
+    cargando = true;
+    const loader = document.getElementById('scroll-loader');
+    if (loader) loader.style.display = 'flex';
+
+    setTimeout(() => {
+        const siguientes = cache.slice(yaHay, yaHay + LIMITE_SCROLL);
+        siguientes.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
+        if (loader) loader.style.display = 'none';
+        cargando = false;
+    }, 200);
+}
 // ============ MENÚ MÁS (overlay) ============
 function abrirMenuMas() {
     document.getElementById('overlayMas')?.classList.add('active');
