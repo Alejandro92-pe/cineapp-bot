@@ -779,6 +779,9 @@ async function cargarUsuariosAdmin(contenedor) {
 }
 
 // ============ BUSCADOR — carga inicial 20 + scroll de 5 ============
+let totalItemsBackend = 0;
+let totalItemsFiltro  = 0;
+
 window.buscarContenido = async function(pagina = 1) {
     paginaActual = pagina;
     busquedaActual = document.getElementById('buscarInput')?.value || '';
@@ -790,10 +793,10 @@ window.buscarContenido = async function(pagina = 1) {
         body: JSON.stringify({ busqueda: busquedaActual, tipo: tipoActual, limit: LIMITE, offset })
     });
 
-    const result = await response.json();
-    const data = result.data;
-    const totalRegistros = result.total;
-    totalPaginas = Math.ceil(totalRegistros / LIMITE);
+    const result        = await response.json();
+    const data          = result.data;
+    totalItemsBackend   = result.total || 0; 
+    totalPaginas        = Math.ceil(totalItemsBackend / LIMITE);
 
     const grid = document.getElementById('resultados');
     if (!grid) return;
@@ -826,6 +829,7 @@ window.cambiarTipo = function(tipo, e) {
     tipoActual = tipo;
     paginaActual = 1;
     totalPaginas = 1;
+    totalItemsBackend = 0;
     cargando = false;
     busquedaActual = '';
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('activo'));
@@ -1148,7 +1152,7 @@ window.onBuscarInput = function() {
         if (generosEl) generosEl.style.display = 'none';
         if (resultadosEl) { resultadosEl.style.display = ''; resultadosEl.innerHTML = ''; }
         // Reset para nueva búsqueda
-        paginaActual = 1; totalPaginas = 1; cargando = false;
+        paginaActual = 1; totalPaginas = 1; totalItemsBackend = 0; cargando = false;
         buscarContenido(1);
     }, 350);
 };
@@ -1169,7 +1173,7 @@ const FILTROS_BUSCAR = {
     'serie':            { param: 'tipo',      valor: 'serie'     },
     'anime':            { param: 'tipo',      valor: 'anime'     },
     'peliculas anime':  { param: 'tipo',      valor: 'peliculas anime' }, // nuevo tipo
-    'accion':           { param: 'genero',    valor: 'accion'    },
+    'accion':           { param: 'genero',    valor: 'acción'    },
     'ciencia ficcion':  { param: 'genero',    valor: 'ciencia'   },
     'comedia':          { param: 'genero',    valor: 'comedia'   },
     'drama':            { param: 'genero',    valor: 'drama'     },
@@ -1242,49 +1246,6 @@ window.filtrarPorTipo = async function(categoria) {
     }
 };
 
-// ============ SCROLL INFINITO PARA FILTROS RÁPIDOS (llama al backend) ============
-function activarScrollInfinitoFiltro() {
-    window.removeEventListener('scroll', _scrollHandlerFiltro);
-    window.addEventListener('scroll', _scrollHandlerFiltro);
-}
-
-async function _scrollHandlerFiltro() {
-    if (cargandoFiltro) return;
-    if (paginaFiltro >= totalPaginasFiltro) return;
-    if (!filtroRapidoActivo) return;
-
-    const scrollBottom = window.innerHeight + window.scrollY;
-    const docHeight    = document.documentElement.scrollHeight;
-    if (scrollBottom < docHeight - 350) return;
-
-    cargandoFiltro = true;
-    const loader = document.getElementById('scroll-loader');
-    if (loader) loader.style.display = 'flex';
-
-    paginaFiltro++;
-    const offset = (paginaFiltro - 1) * LIMITE;
-    const body   = buildFiltroBody(filtroRapidoActivo, offset);
-
-    try {
-        const res    = await fetch(`${API_BASE_URL}/api/contenido`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        const result = await res.json();
-        const data   = result.data || [];
-        const grid   = document.getElementById('resultados');
-
-        if (grid && data.length) {
-            data.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
-        }
-    } catch (e) {
-        console.error('Scroll filtro error:', e);
-    }
-
-    if (loader) loader.style.display = 'none';
-    cargandoFiltro = false;
-}
 // ============ MENÚ MÁS (overlay) ============
 function abrirMenuMas() {
     document.getElementById('overlayMas')?.classList.add('active');
@@ -1305,54 +1266,94 @@ window.cambiarVistaConFiltro = function(tipo) {
 // ============ BUSCADOR tipo actual ============
 let tipoActual = 'todo';
 
-// ============ SCROLL INFINITO ============
+// ============ SCROLL INFINITO UNIFICADO  (llama al backend) ============
+let scrollActivo = false;
+
 function activarScrollInfinito() {
-    window.removeEventListener('scroll', _scrollHandler);
-    window.addEventListener('scroll', _scrollHandler);
+    // Limpiar filtro rápido al entrar a explorar
+    filtroRapidoActivo = null;
+    _registrarScrollHandler();
 }
 
-function _scrollHandler() {
-    if (cargando) return;
-    const grid = document.getElementById('resultados');
-    if (!grid || grid.style.display === 'none') return;
-    if (paginaActual >= totalPaginas) return;
+function activarScrollInfinitoFiltro() {
+    // filtroRapidoActivo ya está seteado antes de llamar esto
+    _registrarScrollHandler();
+}
+
+function _registrarScrollHandler() {
+    window.removeEventListener('scroll', _scrollUnificado);
+    window.addEventListener('scroll', _scrollUnificado);
+}
+
+async function _scrollUnificado() {
+    // Evitar disparos simultáneos con cualquier flag
+    if (cargando || cargandoFiltro) return;
 
     const scrollBottom = window.innerHeight + window.scrollY;
-    const docHeight = document.documentElement.scrollHeight;
-    if (scrollBottom >= docHeight - 350) {
-        cargarMasContenido();
+    const docHeight    = document.documentElement.scrollHeight;
+    if (scrollBottom < docHeight - 350) return;
+
+    const grid = document.getElementById('resultados');
+    if (!grid || grid.style.display === 'none') return;
+
+    if (filtroRapidoActivo) {
+        // ── MODO FILTRO RÁPIDO ──
+        // Comparar items reales en pantalla vs total real del backend
+        const yaHay = grid.querySelectorAll('.tarjeta').length;
+        if (yaHay >= totalItemsFiltro) return;  // ya tenemos todo, no pedir más
+
+        cargandoFiltro = true;
+        const loader = document.getElementById('scroll-loader');
+        if (loader) loader.style.display = 'flex';
+
+        const body = buildFiltroBody(filtroRapidoActivo, yaHay); // offset = yaHay
+
+        try {
+            const res    = await fetch(`${API_BASE_URL}/api/contenido`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const result = await res.json();
+            const data   = result.data || [];
+            data.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
+        } catch (e) { console.error('Scroll filtro:', e); }
+
+        if (loader) loader.style.display = 'none';
+        cargandoFiltro = false;
+
+    } else {
+        // ── MODO EXPLORAR ──
+        // Comparar items reales en pantalla vs total real del backend
+        const yaHay = grid.querySelectorAll('.tarjeta').length;
+        if (yaHay >= totalItemsBackend) return;  // ya tenemos todo, no pedir más
+
+        cargando = true;
+        const loader = document.getElementById('scroll-loader');
+        if (loader) loader.style.display = 'flex';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/contenido`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ busqueda: busquedaActual, tipo: tipoActual, limit: LIMITE_SCROLL, offset: yaHay })
+            });
+            const result = await response.json();
+            const data   = result.data;
+            if (data?.length) {
+                data.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
+            }
+        } catch (e) { console.error('Scroll explorar:', e); }
+
+        if (loader) loader.style.display = 'none';
+        cargando = false;
     }
 }
 
-async function cargarMasContenido() {
-    if (cargando || paginaActual >= totalPaginas) return;
-    cargando = true;
+// cargarMasContenido ya no se usa directamente — el handler unificado lo reemplaza
+async function cargarMasContenido() {}
 
-    const loader = document.getElementById('scroll-loader');
-    if (loader) loader.style.display = 'flex';
-
-    paginaActual++;
-    const offset = (paginaActual - 1) * LIMITE_SCROLL;
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/contenido`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ busqueda: busquedaActual, tipo: tipoActual, limit: LIMITE_SCROLL, offset })
-        });
-        const result = await response.json();
-        const data = result.data;
-        const grid = document.getElementById('resultados');
-        if (grid && data?.length) {
-            data.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
-        }
-    } catch (e) { console.error('Scroll error:', e); }
-
-    if (loader) loader.style.display = 'none';
-    cargando = false;
-}
-
-// renderPaginacion ya no se usa en explorar (scroll infinito)
+// renderPaginacion no se usa (scroll infinito)
 function renderPaginacion() {}
 
 function mostrarModal(titulo, mensaje, callback) {
