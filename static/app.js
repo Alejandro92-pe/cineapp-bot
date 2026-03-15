@@ -235,8 +235,9 @@ window.cambiarVista = async function(vista) {
                 <div class="tab ${tipoInicial==='todo'?'activo':''}"     onclick="cambiarTipo('todo', event)">Todo</div>
                 <div class="tab ${tipoInicial==='pelicula'?'activo':''}" onclick="cambiarTipo('pelicula', event)">Películas</div>
                 <div class="tab ${tipoInicial==='serie'?'activo':''}"    onclick="cambiarTipo('serie', event)">Series</div>
-                <div class="tab ${tipoInicial==='anime'?'activo':''}"    onclick="cambiarTipo('anime', event)">Anime</div>
                 <div class="tab ${tipoInicial==='biblico'?'activo':''}"  onclick="cambiarTipo('biblico', event)">Bíblico</div>
+                <div class="tab ${tipoInicial==='anime'?'activo':''}"    onclick="cambiarTipo('anime', event)">Anime</div>
+                <div class="tab ${tipoInicial==='Peliculas anime'?'activo':''}"    onclick="cambiarTipo('Peliculas anime', event)">Peliculas anime</div>
             </div>
 
             <div id="generosExplorar"></div>
@@ -521,6 +522,7 @@ window.cambiarVista = async function(vista) {
             <div class="buscar-cat-item" onclick="filtrarPorTipo('serie')">Series Tv</div>
             <div class="buscar-cat-item" onclick="filtrarPorTipo('accion')">Acción</div>
             <div class="buscar-cat-item" onclick="filtrarPorTipo('anime')">Anime</div>
+            <div class="buscar-cat-item" onclick="filtrarPorTipo('peliculas anime')">Películas Anime</div>
             <div class="buscar-cat-item" onclick="filtrarPorTipo('ciencia ficcion')">Ciencia Ficción</div>
             <div class="buscar-cat-item" onclick="filtrarPorTipo('comedia')">Comedias</div>
             <div class="buscar-cat-item" onclick="filtrarPorTipo('drama')">Dramas</div>
@@ -1161,27 +1163,41 @@ async function mostrarResultadosExplorar() {
 }
 
 // ============ FILTRAR POR CATEGORÍA EN BUSCAR ============
-// Mapa de qué columna y qué valor usar para cada categoría
+// Mapa de qué columna y qué valor usar para cada categoría para backend
 const FILTROS_BUSCAR = {
-    // Filtra por columna 'descarga' no nula — son los disponibles para descargar
-    'disponible':      { col: 'descarga',  valor: null },      // especial: != null
-
-    // Filtra por columna 'tipo'
-    'serie':           { col: 'tipo',      valor: 'serie' },
-    'anime':           { col: 'tipo',      valor: 'anime' },
-
-    // Filtra por columna 'genero' (coincidencia parcial)
-    'accion':          { col: 'genero',    valor: 'acción' },
-    'ciencia ficcion': { col: 'genero',    valor: 'ciencia' },
-    'comedia':         { col: 'genero',    valor: 'comedia' },
-    'drama':           { col: 'genero',    valor: 'drama' },
-    'terror':          { col: 'genero',    valor: 'terror' },
-    'familia':         { col: 'genero',    valor: 'familia' },
+    'disponible':       { param: 'descarga',  valor: true        },  // descarga != null
+    'serie':            { param: 'tipo',      valor: 'serie'     },
+    'anime':            { param: 'tipo',      valor: 'anime'     },
+    'peliculas anime':  { param: 'tipo',      valor: 'peliculas anime' }, // nuevo tipo
+    'accion':           { param: 'genero',    valor: 'accion'    },
+    'ciencia ficcion':  { param: 'genero',    valor: 'ciencia'   },
+    'comedia':          { param: 'genero',    valor: 'comedia'   },
+    'drama':            { param: 'genero',    valor: 'drama'     },
+    'terror':           { param: 'genero',    valor: 'terror'    },
+    'familia':          { param: 'genero',    valor: 'familia'   },
 };
 
+// Estado del filtro rápido activo (para scroll infinito)
+let filtroRapidoActivo = null;
+let paginaFiltro = 1;
+let totalPaginasFiltro = 1;
+let cargandoFiltro = false;
+
+// Construye el body del fetch según el filtro
+function buildFiltroBody(categoria, offset = 0) {
+    const cfg = FILTROS_BUSCAR[categoria];
+    if (!cfg) return null;
+    const body = { busqueda: '', tipo: 'todo', limit: LIMITE, offset };
+    if (cfg.param === 'tipo')     body.tipo     = cfg.valor;
+    if (cfg.param === 'genero')   body.genero   = cfg.valor;
+    if (cfg.param === 'descarga') body.descarga = true;
+    return body;
+}
+
 window.filtrarPorTipo = async function(categoria) {
-    const generosEl   = document.getElementById('categoriasBuscar');
+    const generosEl    = document.getElementById('categoriasBuscar');
     const resultadosEl = document.getElementById('resultados');
+    const loader       = document.getElementById('scroll-loader');
 
     if (generosEl) generosEl.style.display = 'none';
     if (resultadosEl) {
@@ -1189,51 +1205,36 @@ window.filtrarPorTipo = async function(categoria) {
         resultadosEl.innerHTML = '<div class="text-center p-20 text-gris">⏳ Cargando...</div>';
     }
 
+    // Resetear estado de scroll
+    filtroRapidoActivo  = categoria;
+    paginaFiltro        = 1;
+    totalPaginasFiltro  = 1;
+    cargandoFiltro      = false;
+
+    const body = buildFiltroBody(categoria, 0);
+    if (!body) return;
+
     try {
-        // Traer todos (hasta 500) para filtrar en frontend
-        // (el backend no soporta filtros por genero/descarga directamente aún)
-        const res = await fetch(`${API_BASE_URL}/api/contenido`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ busqueda: "", tipo: "todo", limit: 500, offset: 0 })
+        const res    = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
         });
         const result = await res.json();
-        const todos = result.data || [];
+        const data   = result.data || [];
+        const total  = result.total || data.length;
 
-        let filtrados = [];
+        totalPaginasFiltro = Math.ceil(total / LIMITE);
 
-        if (categoria === 'disponible') {
-            // Mostrar solo los que tienen la columna 'descarga' con valor no nulo/vacío
-            filtrados = todos.filter(item =>
-                item.descarga && item.descarga.trim() !== ''
-            );
-        } else {
-            const cfg = FILTROS_BUSCAR[categoria];
-            if (!cfg) return;
-
-            if (cfg.col === 'tipo') {
-                filtrados = todos.filter(item =>
-                    (item.tipo || '').toLowerCase() === cfg.valor
-                );
-            } else if (cfg.col === 'genero') {
-                filtrados = todos.filter(item =>
-                    (item.genero || '').toLowerCase().includes(cfg.valor)
-                );
-            }
-        }
-
-        if (!filtrados.length) {
+        if (!data.length) {
             resultadosEl.innerHTML = '<div class="text-center p-20 text-gris">😢 No se encontraron resultados</div>';
             return;
         }
 
-        // Mostrar primeros 20 
-        window._filtradosCache = filtrados;
-        totalPaginas = Math.ceil(filtrados.length / LIMITE);
-        paginaActual = 1;
-        cargando = false;
-        resultadosEl.innerHTML = filtrados.slice(0, LIMITE).map(item => tarjetaHTML(item)).join('');
-        activarScrollInfinitoCache();
+        resultadosEl.innerHTML = data.map(item => tarjetaHTML(item)).join('');
+
+        // Activar scroll infinito para este filtro
+        activarScrollInfinitoFiltro();
 
     } catch (e) {
         console.error('Error filtrarPorTipo:', e);
@@ -1241,36 +1242,48 @@ window.filtrarPorTipo = async function(categoria) {
     }
 };
 
-function activarScrollInfinitoCache() {
-    window.removeEventListener('scroll', _scrollHandlerCache);
-    window.addEventListener('scroll', _scrollHandlerCache);
+// ============ SCROLL INFINITO PARA FILTROS RÁPIDOS (llama al backend) ============
+function activarScrollInfinitoFiltro() {
+    window.removeEventListener('scroll', _scrollHandlerFiltro);
+    window.addEventListener('scroll', _scrollHandlerFiltro);
 }
 
-function _scrollHandlerCache() {
-    if (cargando) return;
-    const grid = document.getElementById('resultados');
-    if (!grid || grid.style.display === 'none') return;
-
-    const cache = window._filtradosCache;
-    if (!cache) return;
-
-    const yaHay = grid.querySelectorAll('.tarjeta').length;
-    if (yaHay >= cache.length) return;
+async function _scrollHandlerFiltro() {
+    if (cargandoFiltro) return;
+    if (paginaFiltro >= totalPaginasFiltro) return;
+    if (!filtroRapidoActivo) return;
 
     const scrollBottom = window.innerHeight + window.scrollY;
-    const docHeight = document.documentElement.scrollHeight;
+    const docHeight    = document.documentElement.scrollHeight;
     if (scrollBottom < docHeight - 350) return;
 
-    cargando = true;
+    cargandoFiltro = true;
     const loader = document.getElementById('scroll-loader');
     if (loader) loader.style.display = 'flex';
 
-    setTimeout(() => {
-        const siguientes = cache.slice(yaHay, yaHay + LIMITE_SCROLL);
-        siguientes.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
-        if (loader) loader.style.display = 'none';
-        cargando = false;
-    }, 200);
+    paginaFiltro++;
+    const offset = (paginaFiltro - 1) * LIMITE;
+    const body   = buildFiltroBody(filtroRapidoActivo, offset);
+
+    try {
+        const res    = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const result = await res.json();
+        const data   = result.data || [];
+        const grid   = document.getElementById('resultados');
+
+        if (grid && data.length) {
+            data.forEach(item => grid.insertAdjacentHTML('beforeend', tarjetaHTML(item)));
+        }
+    } catch (e) {
+        console.error('Scroll filtro error:', e);
+    }
+
+    if (loader) loader.style.display = 'none';
+    cargandoFiltro = false;
 }
 // ============ MENÚ MÁS (overlay) ============
 function abrirMenuMas() {

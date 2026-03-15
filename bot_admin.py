@@ -305,7 +305,7 @@ def recibir_foto(message):
 
         bot.send_message(
             chat_id,
-            f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado, si es correcto se te enviaran 2 enlaces a los canales privados y se te activara tu Membresía",
+            f"✅ ¡Voucher recibido! Tu pago de *{plan.upper()}* será revisado, si es correcto se te enviaran 3 enlaces a los canales privados y se te activara tu Membresía",
             parse_mode="Markdown"
         )
 
@@ -698,7 +698,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                     f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
                     f"👥 *GRUPO PRIVADO BÍBLICO:*\n{invite_link_grupo.invite_link}\n\n"
                     f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
-                    f"📍 Únete a los 3, selencialos y solo maneja la MiniApp y Bot",
+                    f"📍 Únete a los 3, silencialos y solo maneja la MiniApp y Bot",
                     parse_mode="Markdown"
                 )
                 bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y 3 enlaces enviados")
@@ -885,7 +885,7 @@ def generar_enlaces(message):
             f"📺 CANAL DE SERIES:\n{invite_link_series.invite_link}\n\n"
             f"👥 GRUPO PRIVADO BÍBLICO:\n{invite_link_grupo.invite_link}\n\n"
             f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
-            f"📍 Únete a los 3, selencialos y solo maneja la MiniApp y Bot"
+            f"📍 Únete a los 3, silencialos y solo maneja la MiniApp y Bot"
         )
         
         bot.reply_to(message, f"✅ Enlaces enviados a {user_id}")
@@ -1609,6 +1609,14 @@ def api_contenido():
 
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
+
+    genero = data.get("genero", None)
+    if genero:
+        query = query.ilike("genero", f"%{genero}%")
+
+    solo_descarga = data.get("descarga", False)
+    if solo_descarga:
+        query = query.not_.is_("descarga", "null").neq("descarga", "")
 
     resultados = (
         query
