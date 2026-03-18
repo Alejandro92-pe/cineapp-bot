@@ -325,6 +325,8 @@ def recibir_foto(message):
 
 @bot.message_handler(content_types=['video', 'document', 'audio', 'voice'])
 def soporte_archivos(message):
+    if message.chat.type != 'private':
+        return
     user_id = message.from_user.id
     chat_id = message.chat.id
 
