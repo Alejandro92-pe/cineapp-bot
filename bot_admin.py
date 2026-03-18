@@ -297,6 +297,8 @@ def handle_callbacks(call):
 
 @bot.message_handler(content_types=['photo'])
 def recibir_foto(message):
+    if message.chat.type != 'private':
+        return
     user_id = message.from_user.id
     chat_id = message.chat.id
 
