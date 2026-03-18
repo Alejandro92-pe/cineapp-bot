@@ -1989,7 +1989,8 @@ stroke:#00ffff;
     color: #94a3b8;
     text-align: center;
     padding: 8px 0 4px;
-    line-height: 1.6;
+    line-height: 0.7;
+    padding-bottom: 4%;
 }
 .info-descarga strong {
     color: #ccc;
