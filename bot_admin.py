@@ -388,7 +388,7 @@ def responder_desde_grupo(message):
 def manejar_texto(message):
 
     # 🚫 Ignorar mensajes del grupo soporte
-    if message.chat.id == GRUPO_SOPORTE_ID:
+    if message.chat.type != 'private':
         return
 
     user_id = message.from_user.id
@@ -1435,6 +1435,7 @@ def verificar_vencimientos():
         try:
             bot.ban_chat_member(chat_id=CANAL_PELICULAS_ID, user_id=u["telegram_id"])
             bot.ban_chat_member(chat_id=CANAL_SERIES_ID, user_id=u["telegram_id"])
+            bot.ban_chat_member(chat_id=GRUPO_CONTENIDO_ID, user_id=u["telegram_id"])
             print(f"Usuario {u['telegram_id']} expulsado de canales por vencimiento")
         except Exception as e:
             print(f"Error expulsando a {u['telegram_id']}: {e}")

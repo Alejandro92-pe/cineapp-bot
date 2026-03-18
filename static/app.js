@@ -1425,8 +1425,10 @@ if (btnDesc) {
     const linkDescarga = item.descarga || null;
 
     if (linkDescarga && linkDescarga.trim() !== '') {
-
-        btnDesc.style.display = 'flex';
+            btnDesc.style.display = 'flex';
+            // Mostrar info de contraseñas solo si tiene membresía activa
+            const infoDesc = document.getElementById('infoDescarga');
+            if (infoDesc) infoDesc.style.display = membresiaActiva ? 'block' : 'none';
 
         btnDesc.onclick = (e) => {
 
@@ -1436,11 +1438,6 @@ if (btnDesc) {
             if (!membresiaActiva) {
                 document.getElementById("modal-vip-bloqueo").classList.add("active");
                 return;
-            }
-
-             // usuario con membresía → aviso TG
-            if (typeof tg !== "undefined") {
-                tg.showAlert("🗃 Para descomprimir los archivos ZIP usa la clave:\n\nquehay.live");
             }
 
             try {
@@ -1456,8 +1453,10 @@ if (btnDesc) {
         };
 
     } else {
-        btnDesc.style.display = 'none';
-    }
+            btnDesc.style.display = 'none';
+            const infoDesc = document.getElementById('infoDescarga');
+            if (infoDesc) infoDesc.style.display = 'none';
+        }
 
 }
 
@@ -1588,7 +1587,7 @@ async function abrirReproductorDirecto(item) {
         embedUrl = `https://vimeus.com/e/anime?tmdb=${item.tmdb_id}&view_key=${viewKey}`;
     }
     
-    embedUrl += '&title=quehay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v2&playUI=v3&epanel=v1&splash=v2';
+    embedUrl += '&title=quehay&theme=blue&loader=v2&font=v3&overlay=v4&selector=v1&playUI=v3&epanel=v1&splash=v2';
     
     console.log("🔗 URL generada:", embedUrl);
     
