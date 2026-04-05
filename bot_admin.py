@@ -695,15 +695,29 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                     member_limit=1,
                     expire_date=int(time.time()) + 604800
                 )
+
+                from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+                markup = InlineKeyboardMarkup(row_width=1)
+
+                markup.add(
+                InlineKeyboardButton("🎬 Canal de Películas", url=invite_link_pelis.invite_link),
+                InlineKeyboardButton("📺 Canal de Series", url=invite_link_series.invite_link),
+                InlineKeyboardButton("👥 Grupo Privado", url=invite_link_grupo.invite_link)
+                )
+
                 bot.send_message(
-                    user_id,
-                    f"🔐 *ACCESO A TUS CANALES*\n\n"
-                    f"🎬 *CANAL DE PELÍCULAS:*\n{invite_link_pelis.invite_link}\n\n"
-                    f"📺 *CANAL DE SERIES:*\n{invite_link_series.invite_link}\n\n"
-                    f"👥 *GRUPO PRIVADO BÍBLICO:*\n{invite_link_grupo.invite_link}\n\n"
-                    f"⚠️ Enlaces de USO ÚNICO - Expiran en 7 días"
-                    f"📍 Únete a los 3, silencialos y solo maneja la MiniApp y Bot",
-                    parse_mode="Markdown"
+                user_id,
+                "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
+                "👇 Toca los botones para unirte\n\n"
+                "⚠️ Enlaces de uso único - expiran en 7 días",
+                parse_mode="HTML",
+                reply_markup=markup
+                )
+
+                bot.send_message(
+                user_id,
+                "📍 Únete a los 3 canales silencialos y luego usa la MiniApp para ver el contenido"
                 )
                 bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y 3 enlaces enviados")
             except Exception as e:

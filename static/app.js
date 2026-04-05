@@ -899,12 +899,17 @@ window.copiarNumero = function(num) {
     } catch (e) { alert('Copiado: ' + num); }
 };
 
-window.pagarInternacional = async function(plan) {
+window.pagarInternacional = function(plan) {
+    window.planSeleccionado = plan;
+    document.getElementById("modal-email").style.display = "flex";
+};
 
-    const email = prompt("Escribe el correo que usarás en BuyMeACoffee.\nEs obligatorio para activar tu membresía automáticamente.");
+async function confirmarPago() {
+
+    const email = document.getElementById("email-input").value;
 
     if (!email) {
-        alert("Debes ingresar un correo válido.");
+        alert("Ingresa un correo");
         return;
     }
 
@@ -914,7 +919,7 @@ window.pagarInternacional = async function(plan) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 telegram_id: userId,
-                plan: plan.toLowerCase(),
+                plan: window.planSeleccionado.toLowerCase(),
                 email: email
             })
         });
@@ -922,17 +927,22 @@ window.pagarInternacional = async function(plan) {
         const data = await response.json();
 
         if (!response.ok) {
-            alert(data.error || "Error creando el pago.");
+            alert("Error");
             return;
         }
 
         tg.openLink(data.url);
 
-    } catch (error) {
-        console.error(error);
-        alert("Error de conexión.");
+    } catch (e) {
+        alert("Error conexión");
     }
-};
+}
+
+function cerrarModal() {
+    document.getElementById("modal-email").style.display = "none";
+    document.getElementById("email-input").value = "";
+}
+
 
 
 // ============ PEDIDOS (usuario) ============
