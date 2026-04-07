@@ -2063,7 +2063,7 @@ stroke:#00ffff;
 }
 
 
-@keyframes fadeIn {z
+@keyframes fadeIn {
   from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
 }
@@ -2140,4 +2140,59 @@ stroke:#00ffff;
   font-weight: bold;
   cursor: pointer;
   width: 100%;
+}
+
+
+/* ============ RATING BADGE ============ */
+
+/* Badge flotante sobre las tarjetas del grid */
+.tarjeta-imagen {
+    position: relative;
+}
+
+.rating-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 3px 7px 3px 5px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--rating-color, #f1c40f);
+    line-height: 1;
+    pointer-events: none;
+    z-index: 2;
+    letter-spacing: 0.2px;
+}
+
+.rating-badge svg {
+    flex-shrink: 0;
+}
+
+/* Badge en tendencia-item */
+.tendencia-item {
+    position: relative;
+}
+
+/* Badge en genero-card */
+.genero-card {
+    position: relative;
+}
+
+/* Rating en línea dentro del modal detalle (al lado de año y tipo) */
+.detalle-rating-inline {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    vertical-align: middle;
+    gap: 2px;
+    letter-spacing: 0.3px;
 }

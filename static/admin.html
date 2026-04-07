@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — CineApp</title>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #17171a;
+    --surface2: #1e1e22;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f2;
+    --muted: #888;
+    --accent: #e8b04b;
+    --accent-dim: rgba(232,176,75,0.12);
+    --danger: #e2504a;
+    --success: #4caf7d;
+    --info: #5b9cf6;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  .login-box {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 16px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 380px;
+  }
+  .login-logo {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .login-logo .icon {
+    width: 56px;
+    height: 56px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(232,176,75,0.3);
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    margin-bottom: 0.75rem;
+  }
+  .login-logo h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+  }
+  .login-logo p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .login-field {
+    margin-bottom: 1rem;
+  }
+  .login-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .login-field input {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.85rem;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .login-field input:focus {
+    border-color: var(--accent);
+  }
+  .login-field input::placeholder { color: var(--muted); }
+  .btn-login {
+    width: 100%;
+    background: var(--accent);
+    color: #1a1200;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.7rem;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    margin-top: 0.5rem;
+  }
+  .btn-login:hover { opacity: 0.88; }
+  .login-error {
+    margin-top: 0.75rem;
+    background: rgba(226,80,74,0.12);
+    border: 0.5px solid rgba(226,80,74,0.3);
+    color: #f08080;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    font-size: 13px;
+    display: none;
+  }
+
+  /* ── LAYOUT ── */
+  #admin-app { display: none; }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 50;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
+  .topbar-left span { font-size: 16px; font-weight: 600; }
+  .topbar-badge {
+    font-size: 11px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 0.5px solid rgba(232,176,75,0.3);
+    border-radius: 20px;
+    padding: 2px 8px;
+  }
+  .btn-logout {
+    background: none;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 12px;
+    padding: 0.35rem 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ── PANELS ── */
+  .panel { display: none; padding: 1.25rem; }
+  .panel.active { display: block; }
+
+  /* ── TMDB IMPORTER ── */
+  .importer-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .importer-card h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+  .importer-card .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+  .import-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .import-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .import-field label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .import-field input[type="number"],
+  .import-field input[type="text"] {
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.75rem;
+    color: var(--text);
+    font-size: 14px;
+    width: 140px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .import-field input:focus { border-color: var(--accent); }
+  .tipo-selector {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .tipo-btn {
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 12px;
+    padding: 0.55rem 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tipo-btn.selected {
+    background: var(--accent-dim);
+    border-color: rgba(232,176,75,0.4);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .btn-import {
+    background: var(--accent);
+    color: #1a1200;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 1.1rem;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .btn-import:hover { opacity: 0.88; }
+  .btn-import:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Preview card */
+  .preview-card {
+    display: none;
+    margin-top: 1rem;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1rem;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  .preview-card.visible { display: flex; }
+  .preview-poster {
+    width: 70px;
+    min-width: 70px;
+    height: 105px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+  .preview-info { flex: 1; min-width: 0; }
+  .preview-titulo { font-size: 15px; font-weight: 600; margin-bottom: 0.3rem; }
+  .preview-meta { font-size: 12px; color: var(--muted); margin-bottom: 0.5rem; }
+  .preview-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 12px;
+    background: rgba(232,176,75,0.12);
+    color: var(--accent);
+    border-radius: 20px;
+    padding: 2px 8px;
+    margin-bottom: 0.5rem;
+  }
+  .preview-generos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .genero-tag {
+    font-size: 11px;
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 20px;
+    padding: 2px 8px;
+    color: var(--muted);
+  }
+  .import-status {
+    margin-top: 0.75rem;
+    font-size: 13px;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    display: none;
+  }
+  .import-status.success {
+    display: block;
+    background: rgba(76,175,125,0.12);
+    border: 0.5px solid rgba(76,175,125,0.3);
+    color: #7dd7a5;
+  }
+  .import-status.error {
+    display: block;
+    background: rgba(226,80,74,0.12);
+    border: 0.5px solid rgba(226,80,74,0.3);
+    color: #f08080;
+  }
+  .import-status.loading {
+    display: block;
+    background: rgba(91,156,246,0.1);
+    border: 0.5px solid rgba(91,156,246,0.25);
+    color: #90b8f8;
+  }
+
+  /* Quick add batch */
+  .batch-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .batch-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    font-size: 13px;
+  }
+  .batch-item .b-titulo { flex: 1; font-weight: 500; }
+  .batch-item .b-tipo {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 55px;
+  }
+  .batch-item .b-status {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    min-width: 60px;
+    text-align: center;
+  }
+  .b-status.ok { background: rgba(76,175,125,0.15); color: #7dd7a5; }
+  .b-status.err { background: rgba(226,80,74,0.12); color: #f08080; }
+  .b-status.pending { background: rgba(91,156,246,0.1); color: #90b8f8; }
+  .b-status.dup { background: rgba(136,136,136,0.12); color: var(--muted); }
+
+  /* ── CONTENT LIST ── */
+  .filtros-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filtro-btn {
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: 20px;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 0.3rem 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filtro-btn.active {
+    background: var(--accent-dim);
+    border-color: rgba(232,176,75,0.4);
+    color: var(--accent);
+  }
+  .content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.75rem;
+  }
+  .content-item {
+    position: relative;
+    cursor: default;
+  }
+  .content-item img {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    display: block;
+    background: var(--surface2);
+  }
+  .content-item .item-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    padding: 1.5rem 0.4rem 0.4rem;
+  }
+  .content-item .item-titulo {
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .content-item .item-tipo {
+    font-size: 10px;
+    color: rgba(255,255,255,0.55);
+  }
+  .item-badge {
+    position: absolute;
+    top: 4px; right: 4px;
+    font-size: 9px;
+    background: rgba(0,0,0,0.6);
+    color: var(--accent);
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+
+  /* ── PAGOS ── */
+  .pago-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .pago-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .pago-info { flex: 1; min-width: 0; }
+  .pago-user { font-size: 13px; font-weight: 500; }
+  .pago-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .btn-aprobar {
+    background: rgba(76,175,125,0.15);
+    border: 0.5px solid rgba(76,175,125,0.35);
+    color: #7dd7a5;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .btn-aprobar:hover { opacity: 0.8; }
+
+  /* ── USUARIOS ── */
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .user-row:last-child { border-bottom: none; }
+  .user-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-nombre { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-id { font-size: 11px; color: var(--muted); }
+  .mem-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .mem-badge.activa { background: rgba(76,175,125,0.12); color: #7dd7a5; }
+  .mem-badge.inactiva { background: var(--surface2); color: var(--muted); }
+
+  /* ── STATS ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.3rem; }
+  .stat-value { font-size: 24px; font-weight: 600; }
+
+  /* ── MISC ── */
+  .empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-more {
+    width: 100%;
+    margin-top: 1rem;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0.6rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .load-more:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Batch textarea */
+  .batch-textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    font-family: monospace;
+    padding: 0.65rem 0.85rem;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .batch-textarea:focus { border-color: var(--accent); }
+  .batch-textarea::placeholder { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🎬</div>
+      <h1>Panel Admin</h1>
+      <p>CineApp · Acceso restringido</p>
+    </div>
+    <div class="login-field">
+      <label>Tu ID de Telegram</label>
+      <input type="number" id="inp-admin-id" placeholder="ej: 7824549071">
+    </div>
+    <div class="login-field">
+      <label>Contraseña de admin</label>
+      <input type="password" id="inp-admin-pass" placeholder="••••••••">
+    </div>
+    <button class="btn-login" onclick="intentarLogin()">Entrar al panel</button>
+    <div class="login-error" id="login-error">ID o contraseña incorrectos.</div>
+  </div>
+</div>
+
+<!-- ADMIN APP -->
+<div id="admin-app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span>🎬 Admin</span>
+      <span class="topbar-badge" id="topbar-id-badge">—</span>
+    </div>
+    <button class="btn-logout" onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('importar')">📥 Importar TMDB</div>
+    <div class="tab" onclick="switchTab('catalogo')">🎞 Catálogo</div>
+    <div class="tab" onclick="switchTab('pagos')">💰 Pagos</div>
+    <div class="tab" onclick="switchTab('pedidos')">📦 Pedidos</div>
+    <div class="tab" onclick="switchTab('usuarios')">👥 Usuarios</div>
+  </div>
+
+  <!-- IMPORTAR TMDB -->
+  <div class="panel active" id="panel-importar">
+    <div class="importer-card">
+      <h2>Importar desde TMDB</h2>
+      <p class="sub">Ingresa el ID de TMDB de la película, serie o anime que quieres agregar al catálogo.</p>
+      <div class="import-row">
+        <div class="import-field">
+          <label>ID de TMDB</label>
+          <input type="number" id="tmdb-id-input" placeholder="ej: 550" onkeydown="if(event.key==='Enter') importarTMDB()">
+        </div>
+        <div class="import-field">
+          <label>Tipo de contenido</label>
+          <div class="tipo-selector" id="tipo-selector">
+            <button class="tipo-btn selected" data-tipo="pelicula" onclick="seleccionarTipo(this)">🎬 Película</button>
+            <button class="tipo-btn" data-tipo="serie" onclick="seleccionarTipo(this)">📺 Serie</button>
+            <button class="tipo-btn" data-tipo="anime" onclick="seleccionarTipo(this)">⛩️ Anime</button>
+          </div>
+        </div>
+        <button class="btn-import" id="btn-importar" onclick="importarTMDB()">
+          Importar
+        </button>
+      </div>
+
+      <div class="import-status" id="import-status"></div>
+
+      <div class="preview-card" id="preview-card">
+        <img class="preview-poster" id="prev-poster" src="" alt="">
+        <div class="preview-info">
+          <div class="preview-titulo" id="prev-titulo"></div>
+          <div class="preview-meta" id="prev-meta"></div>
+          <div class="preview-rating" id="prev-rating"></div>
+          <div class="preview-generos" id="prev-generos"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Importación en batch -->
+    <div class="importer-card">
+      <h2>Importar varios IDs (batch)</h2>
+      <p class="sub">Pega varios IDs de TMDB separados por coma, uno por línea, o así: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;">550,pelicula | 1396,serie | 21,anime</code></p>
+      <textarea class="batch-textarea" id="batch-input" placeholder="Formato: tmdb_id,tipo&#10;550,pelicula&#10;1396,serie&#10;21,anime"></textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:0.65rem;">
+        <button class="btn-import" id="btn-batch" onclick="importarBatch()" style="background:var(--surface2);border:0.5px solid var(--border2);color:var(--text);">
+          Importar batch
+        </button>
+      </div>
+      <div class="batch-row" id="batch-results"></div>
+    </div>
+  </div>
+
+  <!-- CATÁLOGO -->
+  <div class="panel" id="panel-catalogo">
+    <div class="filtros-bar">
+      <button class="filtro-btn active" onclick="filtrarCatalogo('todo', this)">Todos</button>
+      <button class="filtro-btn" onclick="filtrarCatalogo('pelicula', this)">Películas</button>
+      <button class="filtro-btn" onclick="filtrarCatalogo('serie', this)">Series</button>
+      <button class="filtro-btn" onclick="filtrarCatalogo('anime', this)">Anime</button>
+    </div>
+    <div class="content-grid" id="catalogo-grid"></div>
+    <button class="load-more" id="btn-mas-catalogo" onclick="cargarMasCatalogo()" style="display:none">Cargar más</button>
+  </div>
+
+  <!-- PAGOS -->
+  <div class="panel" id="panel-pagos">
+    <div id="pagos-list"></div>
+  </div>
+
+  <!-- PEDIDOS -->
+  <div class="panel" id="panel-pedidos">
+    <div class="stats-grid" id="pedidos-stats" style="display:none">
+      <div class="stat-card"><div class="stat-label">Total pedidos</div><div class="stat-value" id="stat-total-ped">—</div></div>
+      <div class="stat-card"><div class="stat-label">Pendientes</div><div class="stat-value" id="stat-pend-ped">—</div></div>
+    </div>
+    <div id="pedidos-list"></div>
+  </div>
+
+  <!-- USUARIOS -->
+  <div class="panel" id="panel-usuarios">
+    <div class="stats-grid" id="usuarios-stats" style="display:none">
+      <div class="stat-card"><div class="stat-label">Total usuarios</div><div class="stat-value" id="stat-total-usr">—</div></div>
+      <div class="stat-card"><div class="stat-label">Con membresía</div><div class="stat-value" id="stat-activos-usr">—</div></div>
+    </div>
+    <div id="usuarios-list"></div>
+  </div>
+</div>
+
+<script>
+const API = '';  // mismo origen, vacío = relativo
+const ADMIN_PASS = 'quehay2024admin';  // ← Cambia esto a tu contraseña real
+let adminId = null;
+let catalogoOffset = 0;
+let catalogoTipo = 'todo';
+let tipoSeleccionado = 'pelicula';
+
+// ── LOGIN ──
+
+function intentarLogin() {
+  const id = parseInt(document.getElementById('inp-admin-id').value);
+  const pass = document.getElementById('inp-admin-pass').value;
+  const errEl = document.getElementById('login-error');
+
+  if (!id || pass !== ADMIN_PASS) {
+    errEl.style.display = 'block';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  adminId = id;
+  sessionStorage.setItem('admin_id', id);
+  mostrarApp();
+}
+
+function cerrarSesion() {
+  sessionStorage.removeItem('admin_id');
+  adminId = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-app').style.display = 'none';
+}
+
+function mostrarApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-app').style.display = 'block';
+  document.getElementById('topbar-id-badge').textContent = `ID ${adminId}`;
+  cargarCatalogo();
+}
+
+document.getElementById('inp-admin-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') intentarLogin();
+});
+
+// Autorestaurar sesión
+const savedId = sessionStorage.getItem('admin_id');
+if (savedId) {
+  adminId = parseInt(savedId);
+  mostrarApp();
+}
+
+// ── TABS ──
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const tabs = ['importar','catalogo','pagos','pedidos','usuarios'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+
+  if (tab === 'pagos') cargarPagos();
+  else if (tab === 'pedidos') cargarPedidos();
+  else if (tab === 'usuarios') cargarUsuarios();
+  else if (tab === 'catalogo') { catalogoOffset = 0; cargarCatalogo(); }
+}
+
+// ── IMPORTADOR TMDB ──
+
+function seleccionarTipo(btn) {
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  tipoSeleccionado = btn.dataset.tipo;
+}
+
+async function importarTMDB() {
+  const tmdbId = parseInt(document.getElementById('tmdb-id-input').value);
+  if (!tmdbId) { mostrarEstado('Ingresa un ID de TMDB válido', 'error'); return; }
+
+  const btn = document.getElementById('btn-importar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Importando...';
+  document.getElementById('preview-card').classList.remove('visible');
+  mostrarEstado('Consultando TMDB y guardando...', 'loading');
+
+  try {
+    const resp = await fetch(`${API}/api/admin/importar_tmdb`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_id: adminId, tmdb_id: tmdbId, tipo: tipoSeleccionado })
+    });
+    const data = await resp.json();
+
+    if (resp.ok && data.success) {
+      mostrarEstado(`✓ Importado: "${data.titulo}" (ID interno: ${data.id})`, 'success');
+      mostrarPreview(data);
+      document.getElementById('tmdb-id-input').value = '';
+    } else if (resp.status === 409) {
+      mostrarEstado(`Ya existe en el catálogo: "${data.error}" (ID: ${data.id})`, 'error');
+    } else {
+      mostrarEstado(`Error: ${data.error || 'desconocido'}`, 'error');
+    }
+  } catch(e) {
+    mostrarEstado('Error de red: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Importar';
+  }
+}
+
+function mostrarEstado(msg, tipo) {
+  const el = document.getElementById('import-status');
+  el.className = 'import-status ' + tipo;
+  el.textContent = msg;
+}
+
+function mostrarPreview(data) {
+  const card = document.getElementById('preview-card');
+  document.getElementById('prev-poster').src = data.imagen_url || '';
+  document.getElementById('prev-titulo').textContent = data.titulo;
+  document.getElementById('prev-meta').textContent = `${data.tipo} · ${data.ano || '—'}`;
+  document.getElementById('prev-rating').textContent = `★ ${data.rating || '0'}/10`;
+  const gen = document.getElementById('prev-generos');
+  gen.innerHTML = '';
+  (data.genero || '').split(',').forEach(g => {
+    if (g.trim()) gen.innerHTML += `<span class="genero-tag">${g.trim()}</span>`;
+  });
+  card.classList.add('visible');
+}
+
+// ── BATCH ──
+
+async function importarBatch() {
+  const raw = document.getElementById('batch-input').value.trim();
+  if (!raw) return;
+
+  const lines = raw.split(/[\n,]+/).map(l => l.trim()).filter(Boolean);
+  const items = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(/[|,\s]+/).map(p => p.trim()).filter(Boolean);
+    const id = parseInt(parts[0]);
+    const tipo = parts[1] || 'pelicula';
+    if (!isNaN(id)) items.push({ id, tipo });
+  }
+
+  if (!items.length) return;
+
+  const resultsEl = document.getElementById('batch-results');
+  resultsEl.innerHTML = '';
+  const btn = document.getElementById('btn-batch');
+  btn.disabled = true;
+
+  for (const item of items) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'batch-item';
+    rowEl.innerHTML = `
+      <span class="b-titulo">ID ${item.id}</span>
+      <span class="b-tipo">${item.tipo}</span>
+      <span class="b-status pending">Importando…</span>
+    `;
+    resultsEl.appendChild(rowEl);
+    const statusEl = rowEl.querySelector('.b-status');
+
+    try {
+      const resp = await fetch(`${API}/api/admin/importar_tmdb`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_id: adminId, tmdb_id: item.id, tipo: item.tipo })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        rowEl.querySelector('.b-titulo').textContent = data.titulo;
+        statusEl.className = 'b-status ok';
+        statusEl.textContent = '✓ OK';
+      } else if (resp.status === 409) {
+        rowEl.querySelector('.b-titulo').textContent = `ID ${item.id}`;
+        statusEl.className = 'b-status dup';
+        statusEl.textContent = 'Duplicado';
+      } else {
+        statusEl.className = 'b-status err';
+        statusEl.textContent = 'Error';
+      }
+    } catch {
+      statusEl.className = 'b-status err';
+      statusEl.textContent = 'Error red';
+    }
+
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  btn.disabled = false;
+}
+
+// ── CATÁLOGO ──
+
+async function cargarCatalogo(append = false) {
+  if (!append) {
+    catalogoOffset = 0;
+    document.getElementById('catalogo-grid').innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  }
+
+  const resp = await fetch(`${API}/api/admin/contenido`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ admin_id: adminId, tipo: catalogoTipo, limit: 24, offset: catalogoOffset })
+  });
+  const data = await resp.json();
+  const grid = document.getElementById('catalogo-grid');
+  if (!append) grid.innerHTML = '';
+
+  if (!data.data || !data.data.length) {
+    grid.innerHTML = '<div class="empty-state">Sin contenido</div>';
+    document.getElementById('btn-mas-catalogo').style.display = 'none';
+    return;
+  }
+
+  data.data.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'content-item';
+    div.innerHTML = `
+      <img src="${item.imagen_url || ''}" alt="${item.titulo}" onerror="this.style.background='var(--surface)'">
+      <div class="item-overlay">
+        <div class="item-titulo">${item.titulo}</div>
+        <div class="item-tipo">${item.tipo} · ${item.ano || '—'}</div>
+      </div>
+      ${item.tmdb_id ? '<span class="item-badge">TMDB</span>' : ''}
+    `;
+    grid.appendChild(div);
+  });
+
+  catalogoOffset += data.data.length;
+  const btnMas = document.getElementById('btn-mas-catalogo');
+  btnMas.style.display = catalogoOffset < data.total ? 'block' : 'none';
+}
+
+function cargarMasCatalogo() { cargarCatalogo(true); }
+
+function filtrarCatalogo(tipo, btn) {
+  catalogoTipo = tipo;
+  document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  cargarCatalogo();
+}
+
+// ── PAGOS ──
+
+async function cargarPagos() {
+  const container = document.getElementById('pagos-list');
+  container.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const resp = await fetch(`${API}/api/admin/pagos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ admin_id: adminId })
+  });
+  const data = await resp.json();
+  container.innerHTML = '';
+  if (!data.length) { container.innerHTML = '<div class="empty-state">Sin pagos pendientes ✓</div>'; return; }
+  data.forEach(p => {
+    const ini = p.nombre ? p.nombre[0].toUpperCase() : '?';
+    const div = document.createElement('div');
+    div.className = 'pago-card';
+    div.innerHTML = `
+      <div class="pago-avatar">${ini}</div>
+      <div class="pago-info">
+        <div class="pago-user">ID: ${p.usuario_id} · ${p.membresia_comprada?.toUpperCase() || '—'}</div>
+        <div class="pago-meta">S/${p.monto || '?'} · ${p.metodo || '?'} · ${(p.fecha_pago||'').slice(0,10)}</div>
+      </div>
+      <button class="btn-aprobar" onclick="aprobarPago(${p.id}, this)">Aprobar</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function aprobarPago(pagoId, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  const resp = await fetch(`${API}/aprobar_pago`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pagoId })
+  });
+  const data = await resp.json();
+  if (data.success) { btn.closest('.pago-card').remove(); }
+  else { btn.disabled = false; btn.textContent = 'Error'; }
+}
+
+// ── PEDIDOS ──
+
+async function cargarPedidos() {
+  const container = document.getElementById('pedidos-list');
+  container.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const resp = await fetch(`${API}/admin_pedidos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ admin_id: adminId })
+  });
+  const data = await resp.json();
+  container.innerHTML = '';
+
+  const statsEl = document.getElementById('pedidos-stats');
+  statsEl.style.display = 'grid';
+  document.getElementById('stat-total-ped').textContent = data.total || 0;
+  document.getElementById('stat-pend-ped').textContent = data.pendientes || 0;
+
+  if (!data.pedidos || !data.pedidos.length) {
+    container.innerHTML = '<div class="empty-state">Sin pedidos</div>'; return;
+  }
+  data.pedidos.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'pago-card';
+    div.innerHTML = `
+      <div class="pago-avatar" style="background:var(--surface2);color:var(--muted)">${(p.usuario?.nombre||'?')[0].toUpperCase()}</div>
+      <div class="pago-info">
+        <div class="pago-user">${p.titulo}</div>
+        <div class="pago-meta">${p.usuario?.nombre || '?'} · ${p.tipo} · ${p.fecha}</div>
+      </div>
+      ${p.estado === 'pendiente' ? `<button class="btn-aprobar" onclick="marcarEntregado(${p.id}, this)">Entregar</button>` : '<span style="font-size:11px;color:var(--muted)">Entregado</span>'}
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function marcarEntregado(pedidoId, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  const resp = await fetch(`${API}/marcar_entregado`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ admin_id: adminId, pedido_id: pedidoId })
+  });
+  const data = await resp.json();
+  if (data.success) { btn.textContent = 'Entregado'; btn.style.opacity = '0.5'; }
+  else { btn.disabled = false; btn.textContent = 'Error'; }
+}
+
+// ── USUARIOS ──
+
+async function cargarUsuarios() {
+  const container = document.getElementById('usuarios-list');
+  container.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const resp = await fetch(`${API}/api/admin/usuarios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ admin_id: adminId })
+  });
+  const data = await resp.json();
+  container.innerHTML = '';
+
+  const statsEl = document.getElementById('usuarios-stats');
+  statsEl.style.display = 'grid';
+  document.getElementById('stat-total-usr').textContent = data.length;
+  document.getElementById('stat-activos-usr').textContent = data.filter(u => u.membresia_activa).length;
+
+  if (!data.length) { container.innerHTML = '<div class="empty-state">Sin usuarios</div>'; return; }
+  data.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-row';
+    const ini = (u.nombre || '?')[0].toUpperCase();
+    div.innerHTML = `
+      <div class="user-avatar">${ini}</div>
+      <div class="user-info">
+        <div class="user-nombre">${u.nombre || 'Sin nombre'}</div>
+        <div class="user-id">${u.telegram_id}</div>
+      </div>
+      <span class="mem-badge ${u.membresia_activa ? 'activa' : 'inactiva'}">${u.membresia_tipo || 'Ninguno'}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+</script>
+</body>
+</html>

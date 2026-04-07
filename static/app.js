@@ -823,15 +823,30 @@ window.buscarContenido = async function(pagina = 1) {
 };
 
 
+function ratingBadgeHTML(rating) {
+    if (!rating || rating === 0) return '';
+    const score = parseFloat(rating).toFixed(1);
+    // Color según puntuación
+    const color = score >= 7 ? '#2ecc71' : score >= 5 ? '#f1c40f' : '#b60000';
+    return `
+        <div class="rating-badge" style="--rating-color:${color}">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="${color}">
+                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+            </svg>
+            <span>${score}</span>
+        </div>`;
+}
+
 function tarjetaHTML(item) {
     return `
         <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" loading="lazy">
+                ${ratingBadgeHTML(item.rating)}
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">${item.tipo}${item.año ? ' • ' + item.año : ''}${item.genero ? ' • ' + item.genero : ''}</div>
+                <div class="tarjeta-detalle">${item.tipo}${item.ano ? ' • ' + item.ano : ''}${item.genero ? ' • ' + item.genero : ''}</div>
             </div>
         </div>
     `;
@@ -1091,6 +1106,7 @@ async function cargarTendencias() {
         <div class="tendencia-item" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <span class="numero">${index + 1}</span>
             <img src="${item.imagen_url}" alt="${item.titulo}">
+            ${ratingBadgeHTML(item.rating)}
         </div>
     `).join('');
 }
@@ -1198,6 +1214,7 @@ async function cargarGenerosEnContenedor(containerId) {
                         ${peliculas.slice(0, 20).map(item => `
                             <div class="genero-card" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
                                 <img src="${item.imagen_url}" alt="${item.titulo}">
+                                ${ratingBadgeHTML(item.rating)}
                             </div>
                         `).join("")}
                     </div>
@@ -1467,11 +1484,19 @@ function abrirModalContenido(item) {
     const imgEl = document.getElementById('detalleImagen');
     if (imgEl) { imgEl.src = item.imagen_url || ''; imgEl.onerror = () => { imgEl.style.display='none'; }; }
 
-    // Año y tipo
+    // Año, tipo y rating (en la misma línea del hero)
     const anioTipoEl = document.getElementById('detalleAnioTipo');
     if (anioTipoEl) {
         const partes = [item.año, item.tipo].filter(Boolean);
-        anioTipoEl.textContent = partes.join(' | ');
+        const ratingVal = item.rating ? parseFloat(item.rating).toFixed(1) : null;
+        const ratingColor = ratingVal >= 7 ? '#2ecc71' : ratingVal >= 5 ? '#f1c40f' : '#da0000';
+        const ratingHtml = ratingVal ? `
+            <span class="detalle-rating-inline" style="color:${ratingColor}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="${ratingColor}" style="vertical-align:middle;margin-right:2px">
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                </svg>${ratingVal}
+            </span>` : '';
+        anioTipoEl.innerHTML = partes.join(' | ') + (ratingHtml ? ' &nbsp;' + ratingHtml : '');
     }
 
     // Título
