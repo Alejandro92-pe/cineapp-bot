@@ -287,9 +287,20 @@ window.cambiarVista = async function(vista) {
             <div class="mem-oferta-instruccion">Usa este código al pagar con tarjeta</div>
         </div>
 
-        <div class="planes-nueva">
-    `;
+        
+     <div class="tutorial-pago">
+    <h3>🎥 Tutorial de cómo pagar con:</h3>
+    <div class="tutorial-botones">
+        <button onclick="verTutorialYape()">📱 Yape / Plin</button>
+        <button onclick="verTutorialTarjeta()">💳 Tarjeta</button>
+    </div>
+     </div>
+    
 
+        <div class="planes-nueva">
+        
+    `;
+    
     planesMembresias.forEach(p => {
         const precioSolesOriginal    = p.precio_soles;
         const precioDolaresOriginal  = p.precio_dolares;
@@ -811,6 +822,7 @@ window.buscarContenido = async function(pagina = 1) {
     // No renderizar paginación numérica — usa scroll infinito en explorar
 };
 
+
 function tarjetaHTML(item) {
     return `
         <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
@@ -880,14 +892,67 @@ window.irAlBot = function() {
 
     cerrarModalPago();
 
-    const url = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=pago_${plan}_${precio}`;
+    // guardar URL para usar luego
+    window.urlBotPago = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=pago_${plan}_${precio}`;
+
+    mostrarConfirmacionPago();
+};
+
+function mostrarConfirmacionPago() {
+    const div = document.createElement("div");
+
+    div.innerHTML = `
+    <div style="
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.9);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:99999;
+        color:white;
+        text-align:center;
+    ">
+        <div>
+            <h2>✅ Pago enviado por confirmar</h2>
+            <p>Ahora regresa al bot y envia el vucher ⬆</p>
+
+            <button onclick="abrirBotManual()" class="btn-ir-bot">
+           🤖 Ir al bot
+            </button>
+        </div>
+    </div>
+    `;
+
+    document.body.appendChild(div);
+}
+
+function abrirBotManual() {
+
+    if (!window.urlBotPago) return;
+
+    const url = window.urlBotPago;
 
     try {
-        tg.openTelegramLink(url);
+        if (window.Telegram?.WebApp) {
+
+            Telegram.WebApp.openTelegramLink(url);
+
+            setTimeout(() => {
+                Telegram.WebApp.close();
+            }, 300);
+
+        } else {
+            window.open(url, "_blank");
+        }
+
     } catch (e) {
-        tg.openLink(url);
+        window.location.href = url;
     }
-};
+}
 
 window.copiarNumero = function(num) {
     try { navigator.clipboard.writeText(num); } catch(e) {}
@@ -1777,6 +1842,24 @@ function copiarCodigo(codigo) {
     } else {
         alert('Código copiado: QH50OFF');
     }
+}
+
+function verTutorialYape() {
+    abrirVideoTutorial("https://player.vimeo.com/video/1180635702?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479");
+}
+
+function verTutorialTarjeta() {
+    abrirVideoTutorial("https://player.vimeo.com/video/1180635496?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479");
+}
+
+function abrirVideoTutorial(url) {
+    document.getElementById("modal-video").style.display = "flex";
+    document.getElementById("video-frame").src = url + "?autoplay=1";
+}
+
+function cerrarVideo() {
+    document.getElementById("modal-video").style.display = "none";
+    document.getElementById("video-frame").src = "";
 }
 // iniciarContadorOferta();
 // ============ INICIAR ============

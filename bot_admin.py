@@ -48,7 +48,7 @@ def menu_principal(chat_id, user_name=""):
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("💎 Ver Planes", "🎬 Beneficios VIP")
-    markup.row("⭐ Testimonios", "🎞 Pedir Película")
+    markup.row("⭐ Testimonios", "💰 Cómo pagar")
     markup.row("📱 Mini App Vip", "🆘 Ayuda")
 
     bot.send_message(chat_id, texto, reply_markup=markup, parse_mode="Markdown")
@@ -152,26 +152,25 @@ def miniapp_info(message):
     )
     bot.send_message(message.chat.id, texto, parse_mode="Markdown", reply_markup=markup)
 
-@bot.message_handler(func=lambda m: m.text == "🎞 Pedir Película")
-def pedir_pelicula_info(message):
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+@bot.message_handler(func=lambda m: m.text == "💰 Cómo pagar")
+def como_pagar(message):
 
-    texto = (
-        "🎞 *PIDE TU PELÍCULA o SERIE FAVORITA*\n\n"
-        "¿No encuentras una película o serie?\n"
-        "💎 Como miembro VIP puedes solicitarla.\n\n"
-        "📦 Según tu plan puedes tener pedidos mensuales.\n"
-        "⚡ Nuestro equipo la buscará y la añadirá al canal.\n\n"
-        "🎬 Puedes pedir:\n"
-        "• Películas clásicas\n"
-        "• Estrenos\n"
-        "• Series\n"
-        "• Contenido difícil de encontrar\n\n"
-        "👇 Para hacer tu pedido escribe:\n"
-        "*quiero pedir*\n\n"
-        "💡 (Disponible solo para miembros activos)"
+    markup = InlineKeyboardMarkup(row_width=1)
+
+    markup.add(
+        InlineKeyboardButton("📱 Ver cómo pagar con Yape / Plin", url="https://player.vimeo.com/video/1180635702?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"),
+        InlineKeyboardButton("💳 Ver cómo pagar con Tarjeta", url="https://player.vimeo.com/video/1180635496?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479")
     )
 
-    bot.send_message(message.chat.id, texto, parse_mode="Markdown")
+    bot.send_message(
+        message.chat.id,
+        "💰 <b>¿Cómo pagar tu membresía?</b>\n\n"
+        "🎥 Mira estos tutoriales rápidos:\n\n"
+        "👇 Elige tu método de pago",
+        parse_mode="HTML",
+        reply_markup=markup
+    )
 
 @bot.message_handler(func=lambda m: m.text and "quiero pedir" in m.text.lower())
 def redirigir_miniapp_pedidos(message):
