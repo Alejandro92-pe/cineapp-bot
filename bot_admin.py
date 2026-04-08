@@ -330,6 +330,39 @@ def start(message):
                 reply_markup=markup
             )
             return
+     # ✅ Manejar miniapp (explorar contenido)
+    if len(args) > 1 and args[1] == "miniapp":
+        texto = (
+            "📱 *MINI APP VIP*\n\n"
+            "Explora todo nuestro contenido:\n"
+            "🎬 Películas • 📺 Series • ⛩️ Anime\n\n"
+            "👇 Presiona el botón para abrir la Mini App:"
+        )
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(
+            "🎬 Abrir Mini App",
+            web_app=telebot.types.WebAppInfo(url=MINIAPP_URL)
+        ))
+        bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=markup)
+        return
+    
+    # ✅ Manejar planes (ver membresías)
+    if len(args) > 1 and args[1] == "planes":
+        texto = (
+            "💎 *PLANES CON 50% OFF* 💎\n\n"
+            "🥉 Copper • 🥈 Silver • 🥇 Gold • 🏆 Platinum • 💠 Diamond\n\n"
+            "👇 Presiona el botón para ver los planes y comprar desde la Mini App:"
+        )
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton(
+            "💎 Ver Membresías",
+            web_app=telebot.types.WebAppInfo(url=f"{MINIAPP_URL}?seccion=membresias")  # Misma URL, diferente texto
+        ))
+        bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=markup)
+        return
+
+    # Si no hay comando especial, mostrar menú principal
+    menu_principal(chat_id, user_name)
 
     menu_principal(chat_id, user_name)
 
