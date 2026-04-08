@@ -36,8 +36,9 @@ GRUPO_SOPORTE_ID    = -1003805629374
 CANAL_PELICULAS_ID  = -1003890553566
 CANAL_SERIES_ID     = -1003879512007
 GRUPO_CONTENIDO_ID  = -1002991571573
-CANAL_PUBLICO_9000  =  "@mejoresanimesenlatino"
-CANAL_GRATIS_PRIVADO   = -1002503337168
+CANAL_PUBLICO_ID    = "@mejoresanimesenlatino"   # canal público
+CANAL_PRIVADO_ID    = -1002503337168              # canal privado
+
 
 MINIAPP_URL = "https://cineapp-bot.onrender.com"
 BMC_URL     = "https://buymeacoffee.com/quehay/extras"
@@ -67,7 +68,7 @@ def tmdb_get(path, params=None):
     """Petición GET autenticada a TMDB."""
     params = params or {}
     params["api_key"] = TMDB_API_KEY
-    params["language"] = "es-MX"
+    params["language"] = "es-ES"
     r = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=10)
     r.raise_for_status()
     return r.json()
@@ -86,7 +87,7 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
 
     # Año
     fecha_raw = data.get("release_date") or data.get("first_air_date") or ""
-    año = int(fecha_raw[:4]) if fecha_raw and len(fecha_raw) >= 4 else None
+    ano = int(fecha_raw[:4]) if fecha_raw and len(fecha_raw) >= 4 else None
 
     # Géneros — guardamos como string separado por comas para compatibilidad
     generos_raw = data.get("genres", [])
@@ -107,7 +108,7 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
         "titulo":    titulo,
         "tipo":      tipo,
         "genero":    genero,
-        "año":       año,
+        "ano":       ano,
         "imagen_url": imagen_url,
         "sinopsis":  sinopsis,
         "rating":    rating,
@@ -136,7 +137,7 @@ def construir_caption(item: dict) -> str:
     rating_str = f"{rating:.1f}/10" if rating else "N/D"
 
     generos = item.get("genero") or "Sin género"
-    año     = item.get("año") or "—"
+    ano     = item.get("ano") or "—"
     titulo  = item.get("titulo") or "Sin título"
     sinopsis = item.get("sinopsis") or ""
     # Recortar sinopsis a 200 caracteres
@@ -147,7 +148,7 @@ def construir_caption(item: dict) -> str:
         f"{tipo_emoji} *{titulo}*\n"
         f"━━━━━━━━━━━━━━━\n"
         f"🏷 *Tipo:* {tipo_label}\n"
-        f"📅 *Año:* {año}\n"
+        f"📅 *Año:* {ano}\n"
         f"🎭 *Género:* {generos}\n"
         f"⭐ *Rating:* {estrellas} `{rating_str}`\n"
         f"━━━━━━━━━━━━━━━\n"
@@ -174,41 +175,44 @@ def construir_botones_canal(item: dict) -> InlineKeyboardMarkup:
     markup.add(btn_miniapp, btn_membresia)
     return markup
 
-def enviar_contenido_al_canal(item: dict):
+def _enviar_a_un_canal(canal_id, caption, markup, imagen):
+    """Envía a un canal específico. Retorna True/False."""
+    try:
+        if imagen:
+            bot.send_photo(
+                chat_id=canal_id,
+                photo=imagen,
+                caption=caption,
+                parse_mode="Markdown",
+                reply_markup=markup
+            )
+        else:
+            bot.send_message(
+                chat_id=canal_id,
+                text=caption,
+                parse_mode="Markdown",
+                reply_markup=markup
+            )
+        print(f"✅ Enviado a {canal_id}")
+        return True
+    except Exception as e:
+        print(f"❌ Error enviando a {canal_id}: {e}")
+        return False
 
-    caption  = construir_caption(item)
-    markup   = construir_botones_canal(item)
+
+def enviar_contenido_al_canal(item: dict):
+    """
+    Envía el contenido a AMBOS canales (público y privado) sin distinción de tipo.
+    Retorna True si al menos un canal recibió el mensaje correctamente.
+    """
+    caption = construir_caption(item)
+    markup  = construir_botones_canal(item)
     imagen  = item.get("imagen_url", "")
 
-    canales = [
-        CANAL_PUBLICO_9000,   # @canal_publico
-        CANAL_GRATIS_PRIVADO  # -100xxxx
-    ]
+    ok_publico  = _enviar_a_un_canal(CANAL_PUBLICO_ID,  caption, markup, imagen)
+    ok_privado  = _enviar_a_un_canal(CANAL_PRIVADO_ID,  caption, markup, imagen)
 
-    try:
-        for canal_id in canales:
-
-            if imagen:
-                bot.send_photo(
-                    chat_id=canal_id,
-                    photo=imagen,
-                    caption=caption,
-                    parse_mode=None,
-                    reply_markup=markup
-                )
-            else:
-                bot.send_message(
-                    chat_id=canal_id,
-                    text=caption,
-                    parse_mode=None,
-                    reply_markup=markup
-                )
-
-        return True
-
-    except Exception as e:
-        print(f"❌ Error enviando: {e}")
-        return False
+    return ok_publico or ok_privado
 
 # ============ PROGRAMADOR AUTOMÁTICO 3x DÍA ============
 # Se llama desde el endpoint /cron/publicar_contenido
@@ -244,7 +248,7 @@ def obtener_siguiente_contenido_a_publicar():
         query = query.neq("id", excluido_id)
 
     # Priorizar más recientes (año DESC) y más nuevos en BD (id DESC)
-    resultado = query.order("año", desc=True).order("id", desc=True).limit(1).execute()
+    resultado = query.order("ano", desc=True).order("id", desc=True).limit(1).execute()
 
     return resultado.data[0] if resultado.data else None
 
@@ -775,7 +779,7 @@ def generar_enlaces(message):
         markup.add(
             InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
             InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
-            InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
+            InlineKeyboardButton("👥 Grupo Bíblico",      url=inv_grupo.invite_link),
         )
         bot.send_message(uid,
             "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
@@ -1059,7 +1063,7 @@ def api_importar_tmdb():
             "id": nuevo_id,
             "titulo": contenido["titulo"],
             "tipo": contenido["tipo"],
-            "año": contenido["año"],
+            "ano": contenido["ano"],
             "genero": contenido["genero"],
             "rating": contenido["rating"],
             "imagen_url": contenido["imagen_url"],
@@ -1106,7 +1110,8 @@ def cron_publicar_contenido():
             print(f"✅ Publicado automáticamente: {item['titulo']}")
             return jsonify({"success": True, "titulo": item["titulo"]}), 200
         else:
-            return jsonify({"error": "Error al enviar al canal"}), 500
+            print(f"❌ No se pudo enviar a ningún canal: {item['titulo']}")
+            return jsonify({"error": "No se pudo enviar a ningún canal. Verifica que el bot sea admin en ambos canales."}), 500
 
     except Exception as e:
         print(f"❌ Error en cron publicar: {e}")
