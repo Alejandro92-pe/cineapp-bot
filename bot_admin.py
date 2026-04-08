@@ -31,14 +31,19 @@ def check_admin(data):
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# Username del bot (cacheado para no llamar get_me() en cada mensaje)
+# Se puede hardcodear directamente para evitar la llamada a la API
+BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")  # ← pon tu username aquí
+
 # ============ IDs DE CANALES ============
 GRUPO_SOPORTE_ID    = -1003805629374
+# Canales VIP (donde van los miembros con membresía activa)
 CANAL_PELICULAS_ID  = -1003890553566
 CANAL_SERIES_ID     = -1003879512007
 GRUPO_CONTENIDO_ID  = -1002991571573
-CANAL_PUBLICO_ID    = "@mejoresanimesenlatino"   # canal público
-CANAL_PRIVADO_ID    = -1002503337168              # canal privado
-
+# Canales públicos de difusión (cron publica aquí para atraer miembros)
+CANAL_PUBLICO_ID    = "@mejoresanimesenlatino"   # canal público de la comunidad
+CANAL_PRIVADO_ID    = -1002503337168              # canal privado adicional de difusión
 
 MINIAPP_URL = "https://cineapp-bot.onrender.com"
 BMC_URL     = "https://buymeacoffee.com/quehay/extras"
@@ -157,19 +162,23 @@ def construir_caption(item: dict) -> str:
     return texto
 
 def construir_botones_canal(item: dict) -> InlineKeyboardMarkup:
-    """Botones inline para mensajes de canal que maximizan la compra de membresías."""
+    """
+    Botones inline para mensajes de canal.
+    IMPORTANTE: En canales NO se puede usar web_app=, solo url=
+    Por eso el botón de Mini App usa una URL directa al bot con parámetro start.
+    """
     markup = InlineKeyboardMarkup(row_width=2)
 
-    # Botón 1: Mini App — directo al catálogo
+    # Botón 1: Abrir Mini App via deep-link al bot (url= funciona en canales)
     btn_miniapp = InlineKeyboardButton(
-        "🎬 Explorar Mini App",
-        web_app=telebot.types.WebAppInfo(url=MINIAPP_URL)
+        "🎬 Ver en Mini App",
+        url=f"https://t.me/{BOT_USERNAME}?start=miniapp"
     )
 
-    # Botón 2: Comprar membresía — deep-link al bot
+    # Botón 2: Comprar membresía — deep-link al bot (usa username cacheado, no get_me())
     btn_membresia = InlineKeyboardButton(
         "💎 Obtener Membresía VIP",
-        url=f"https://t.me/{bot.get_me().username}?start=planes"
+        url=f"https://t.me/{BOT_USERNAME}?start=planes"
     )
 
     markup.add(btn_miniapp, btn_membresia)
@@ -661,7 +670,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                 markup.add(
                     InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
                     InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
-                    InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
+                    InlineKeyboardButton("👥 Grupo Bíblico",      url=inv_grupo.invite_link),
                 )
                 bot.send_message(user_id,
                     "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
@@ -779,7 +788,7 @@ def generar_enlaces(message):
         markup.add(
             InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
             InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
-            InlineKeyboardButton("👥 Grupo Bíblico",      url=inv_grupo.invite_link),
+            InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
         )
         bot.send_message(uid,
             "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
@@ -1114,8 +1123,11 @@ def cron_publicar_contenido():
             return jsonify({"error": "No se pudo enviar a ningún canal. Verifica que el bot sea admin en ambos canales."}), 500
 
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
         print(f"❌ Error en cron publicar: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"Traceback completo:\n{tb}")
+        return jsonify({"error": str(e), "traceback": tb}), 500
 
 @app.route("/cron/verificar_vencimientos", methods=["GET"])
 def cron_verificar_vencimientos():
