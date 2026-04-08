@@ -36,6 +36,8 @@ GRUPO_SOPORTE_ID    = -1003805629374
 CANAL_PELICULAS_ID  = -1003890553566
 CANAL_SERIES_ID     = -1003879512007
 GRUPO_CONTENIDO_ID  = -1002991571573
+CANAL_PELIS_ID      = -1002503337168
+CANAL_QHC_ID        = -1002596822676
 
 MINIAPP_URL = "https://cineapp-bot.onrender.com"
 BMC_URL     = "https://buymeacoffee.com/quehay/extras"
@@ -178,7 +180,7 @@ def enviar_contenido_al_canal(item: dict):
     Retorna True si se envió correctamente.
     """
     tipo = item.get("tipo", "pelicula")
-    canal_id = CANAL_PELICULAS_ID if tipo == "pelicula" else CANAL_SERIES_ID
+    canal_id = CANAL_QHC_ID if tipo == "pelicula" else CANAL_PELIS_ID
 
     caption  = construir_caption(item)
     markup   = construir_botones_canal(item)
