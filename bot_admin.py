@@ -84,7 +84,7 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
 
     # Año
     fecha_raw = data.get("release_date") or data.get("first_air_date") or ""
-    ano = int(fecha_raw[:4]) if fecha_raw and len(fecha_raw) >= 4 else None
+    año = int(fecha_raw[:4]) if fecha_raw and len(fecha_raw) >= 4 else None
 
     # Géneros — guardamos como string separado por comas para compatibilidad
     generos_raw = data.get("genres", [])
@@ -105,7 +105,7 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
         "titulo":    titulo,
         "tipo":      tipo,
         "genero":    genero,
-        "ano":       ano,
+        "año":       año,
         "imagen_url": imagen_url,
         "sinopsis":  sinopsis,
         "rating":    rating,
@@ -134,7 +134,7 @@ def construir_caption(item: dict) -> str:
     rating_str = f"{rating:.1f}/10" if rating else "N/D"
 
     generos = item.get("genero") or "Sin género"
-    ano     = item.get("ano") or "—"
+    año     = item.get("año") or "—"
     titulo  = item.get("titulo") or "Sin título"
     sinopsis = item.get("sinopsis") or ""
     # Recortar sinopsis a 200 caracteres
@@ -145,7 +145,7 @@ def construir_caption(item: dict) -> str:
         f"{tipo_emoji} *{titulo}*\n"
         f"━━━━━━━━━━━━━━━\n"
         f"🏷 *Tipo:* {tipo_label}\n"
-        f"📅 *Año:* {ano}\n"
+        f"📅 *Año:* {año}\n"
         f"🎭 *Género:* {generos}\n"
         f"⭐ *Rating:* {estrellas} `{rating_str}`\n"
         f"━━━━━━━━━━━━━━━\n"
@@ -239,7 +239,7 @@ def obtener_siguiente_contenido_a_publicar():
         query = query.neq("id", excluido_id)
 
     # Priorizar más recientes (año DESC) y más nuevos en BD (id DESC)
-    resultado = query.order("ano", desc=True).order("id", desc=True).limit(1).execute()
+    resultado = query.order("año", desc=True).order("id", desc=True).limit(1).execute()
 
     return resultado.data[0] if resultado.data else None
 
@@ -1054,7 +1054,7 @@ def api_importar_tmdb():
             "id": nuevo_id,
             "titulo": contenido["titulo"],
             "tipo": contenido["tipo"],
-            "ano": contenido["ano"],
+            "año": contenido["año"],
             "genero": contenido["genero"],
             "rating": contenido["rating"],
             "imagen_url": contenido["imagen_url"],

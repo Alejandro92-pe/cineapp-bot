@@ -846,7 +846,7 @@ function tarjetaHTML(item) {
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
-                <div class="tarjeta-detalle">${item.tipo}${item.ano ? ' • ' + item.ano : ''}${item.genero ? ' • ' + item.genero : ''}</div>
+                <div class="tarjeta-detalle">${item.tipo}${item.año ? ' • ' + item.año : ''}${item.genero ? ' • ' + item.genero : ''}</div>
             </div>
         </div>
     `;

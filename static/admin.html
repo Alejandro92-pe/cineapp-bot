@@ -842,7 +842,7 @@ function mostrarPreview(data) {
   const card = document.getElementById('preview-card');
   document.getElementById('prev-poster').src = data.imagen_url || '';
   document.getElementById('prev-titulo').textContent = data.titulo;
-  document.getElementById('prev-meta').textContent = `${data.tipo} · ${data.ano || '—'}`;
+  document.getElementById('prev-meta').textContent = `${data.tipo} · ${data.año || '—'}`;
   document.getElementById('prev-rating').textContent = `★ ${data.rating || '0'}/10`;
   const gen = document.getElementById('prev-generos');
   gen.innerHTML = '';
@@ -951,7 +951,7 @@ async function cargarCatalogo(append = false) {
       <img src="${item.imagen_url || ''}" alt="${item.titulo}" onerror="this.style.background='var(--surface)'">
       <div class="item-overlay">
         <div class="item-titulo">${item.titulo}</div>
-        <div class="item-tipo">${item.tipo} · ${item.ano || '—'}</div>
+        <div class="item-tipo">${item.tipo} · ${item.año || '—'}</div>
       </div>
       ${item.tmdb_id ? '<span class="item-badge">TMDB</span>' : ''}
     `;
