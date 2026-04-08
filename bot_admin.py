@@ -36,8 +36,8 @@ GRUPO_SOPORTE_ID    = -1003805629374
 CANAL_PELICULAS_ID  = -1003890553566
 CANAL_SERIES_ID     = -1003879512007
 GRUPO_CONTENIDO_ID  = -1002991571573
-CANAL_PELIS_ID      = -1002503337168
-CANAL_QHC_ID        = -1002596822676
+CANAL_PUBLICO_9000  =  "@mejoresanimesenlatino"
+CANAL_GRATIS_PRIVADO   = -1002503337168
 
 MINIAPP_URL = "https://cineapp-bot.onrender.com"
 BMC_URL     = "https://buymeacoffee.com/quehay/extras"
@@ -175,36 +175,39 @@ def construir_botones_canal(item: dict) -> InlineKeyboardMarkup:
     return markup
 
 def enviar_contenido_al_canal(item: dict):
-    """
-    Envía un ítem de contenido al canal correspondiente con poster, info y botones.
-    Retorna True si se envió correctamente.
-    """
-    tipo = item.get("tipo", "pelicula")
-    canal_id = CANAL_QHC_ID if tipo == "pelicula" else CANAL_PELIS_ID
 
     caption  = construir_caption(item)
     markup   = construir_botones_canal(item)
-    imagen   = item.get("imagen_url", "")
+    imagen  = item.get("imagen_url", "")
+
+    canales = [
+        CANAL_PUBLICO_9000,   # @canal_publico
+        CANAL_GRATIS_PRIVADO  # -100xxxx
+    ]
 
     try:
-        if imagen:
-            bot.send_photo(
-                chat_id=canal_id,
-                photo=imagen,
-                caption=caption,
-                parse_mode="Markdown",
-                reply_markup=markup
-            )
-        else:
-            bot.send_message(
-                chat_id=canal_id,
-                text=caption,
-                parse_mode="Markdown",
-                reply_markup=markup
-            )
+        for canal_id in canales:
+
+            if imagen:
+                bot.send_photo(
+                    chat_id=canal_id,
+                    photo=imagen,
+                    caption=caption,
+                    parse_mode=None,
+                    reply_markup=markup
+                )
+            else:
+                bot.send_message(
+                    chat_id=canal_id,
+                    text=caption,
+                    parse_mode=None,
+                    reply_markup=markup
+                )
+
         return True
+
     except Exception as e:
-        print(f"❌ Error enviando al canal: {e}")
+        print(f"❌ Error enviando: {e}")
         return False
 
 # ============ PROGRAMADOR AUTOMÁTICO 3x DÍA ============
