@@ -21,6 +21,13 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")  # ← TMDB va en el backend, NUNCA en el frontend
 
 supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+def check_admin(data):
+    """Verifica admin_id tolerando int y string."""
+    try:
+        return int(data.get("admin_id", 0)) == ADMIN_ID
+    except (ValueError, TypeError):
+        return False
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -934,7 +941,7 @@ def admin_pedidos():
         r.headers.update({"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
         return r, 200
     data = request.get_json()
-    if data.get("admin_id") != ADMIN_ID:
+    if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
     pedidos_res = supabase_service.table("pedidos").select("*, usuarios!inner(*)").order("fecha_pedido", desc=True).execute()
     pedidos = [{
@@ -958,7 +965,7 @@ def marcar_entregado():
         r.headers.update({"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST"})
         return r, 200
     data = request.get_json()
-    if data.get("admin_id") != ADMIN_ID:
+    if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
     pedido_id = data.get("pedido_id")
     pedido_res = supabase_service.table("pedidos").select("*, usuarios!inner(*)").eq("id", pedido_id).execute()
@@ -1004,17 +1011,30 @@ def api_importar_tmdb():
     Body JSON: { "admin_id": 123, "tmdb_id": 550, "tipo": "pelicula" | "serie" | "anime" }
     """
     try:
-        data     = request.get_json()
-        admin_id = data.get("admin_id")
-        tmdb_id  = data.get("tmdb_id")
-        tipo     = data.get("tipo", "pelicula").lower()
+        data     = request.get_json(force=True, silent=True) or {}
+        print(f"DEBUG importar_tmdb recibido: {data}")
+
+        # Tolerar admin_id como int o string
+        try:
+            admin_id = int(data.get("admin_id", 0))
+        except (ValueError, TypeError):
+            admin_id = 0
+
+        try:
+            tmdb_id = int(data.get("tmdb_id", 0))
+        except (ValueError, TypeError):
+            tmdb_id = 0
+
+        tipo = str(data.get("tipo", "pelicula")).lower().strip()
+
+        print(f"DEBUG parsed: admin_id={admin_id} ({type(admin_id)}), ADMIN_ID={ADMIN_ID} ({type(ADMIN_ID)}), tmdb_id={tmdb_id}, tipo={tipo}")
 
         if admin_id != ADMIN_ID:
-            return jsonify({"error": "No autorizado"}), 403
+            return jsonify({"error": f"No autorizado (got {admin_id}, expected {ADMIN_ID})"}), 403
         if not tmdb_id:
-            return jsonify({"error": "tmdb_id requerido"}), 400
+            return jsonify({"error": "tmdb_id requerido o invalido"}), 400
         if tipo not in ("pelicula", "serie", "anime"):
-            return jsonify({"error": "tipo debe ser: pelicula, serie o anime"}), 400
+            return jsonify({"error": f"tipo invalido: '{tipo}'. Debe ser: pelicula, serie o anime"}), 400
 
         if not TMDB_API_KEY:
             return jsonify({"error": "TMDB_API_KEY no configurada en el servidor"}), 500
@@ -1050,7 +1070,7 @@ def api_importar_tmdb():
 def api_admin_contenido():
     """Lista el contenido del admin con paginación."""
     data = request.get_json()
-    if data.get("admin_id") != ADMIN_ID:
+    if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
     limit  = int(data.get("limit", 20))
     offset = int(data.get("offset", 0))
@@ -1191,7 +1211,7 @@ def api_contenido():
 @app.route("/api/admin/pagos", methods=["POST"])
 def api_admin_pagos():
     data = request.get_json()
-    if data.get("admin_id") != ADMIN_ID:
+    if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
     pagos = supabase_service.table("pagos_manuales").select("*") \
         .eq("estado","pendiente").order("created_at", desc=True).execute()
@@ -1200,7 +1220,7 @@ def api_admin_pagos():
 @app.route("/api/admin/usuarios", methods=["POST"])
 def api_admin_usuarios():
     data = request.get_json()
-    if data.get("admin_id") != ADMIN_ID:
+    if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
     usuarios = supabase_service.table("usuarios").select("*").order("id", desc=True).execute()
     return jsonify(usuarios.data)

@@ -594,7 +594,7 @@
     </div>
     <div class="login-field">
       <label>Tu ID de Telegram</label>
-      <input type="number" id="inp-admin-id" placeholder="ej: 7824549071">
+      <input type="number" id="inp-admin-id" placeholder="ej: 5824989040">
     </div>
     <div class="login-field">
       <label>Contraseña de admin</label>
@@ -720,18 +720,20 @@ let tipoSeleccionado = 'pelicula';
 // ── LOGIN ──
 
 function intentarLogin() {
-  const id = parseInt(document.getElementById('inp-admin-id').value);
+  const rawId = document.getElementById('inp-admin-id').value.trim();
+  const id = parseInt(rawId, 10);
   const pass = document.getElementById('inp-admin-pass').value;
   const errEl = document.getElementById('login-error');
 
-  if (!id || pass !== ADMIN_PASS) {
+  if (!id || isNaN(id) || pass !== ADMIN_PASS) {
     errEl.style.display = 'block';
     return;
   }
 
   errEl.style.display = 'none';
-  adminId = id;
-  sessionStorage.setItem('admin_id', id);
+  adminId = id;  // siempre number
+  sessionStorage.setItem('admin_id', String(id));
+  console.log('Login ok, adminId =', adminId, typeof adminId);
   mostrarApp();
 }
 
@@ -756,8 +758,12 @@ document.getElementById('inp-admin-pass').addEventListener('keydown', e => {
 // Autorestaurar sesión
 const savedId = sessionStorage.getItem('admin_id');
 if (savedId) {
-  adminId = parseInt(savedId);
-  mostrarApp();
+  const parsedId = parseInt(savedId, 10);
+  if (!isNaN(parsedId) && parsedId > 0) {
+    adminId = parsedId;
+    console.log('Sesion restaurada, adminId =', adminId, typeof adminId);
+    mostrarApp();
+  }
 }
 
 // ── TABS ──
@@ -785,8 +791,15 @@ function seleccionarTipo(btn) {
 }
 
 async function importarTMDB() {
-  const tmdbId = parseInt(document.getElementById('tmdb-id-input').value);
-  if (!tmdbId) { mostrarEstado('Ingresa un ID de TMDB válido', 'error'); return; }
+  const tmdbId = parseInt(document.getElementById('tmdb-id-input').value.trim(), 10);
+  if (!tmdbId || isNaN(tmdbId)) { mostrarEstado('Ingresa un ID de TMDB válido', 'error'); return; }
+
+  const payload = {
+    admin_id: Number(adminId),   // forzar number
+    tmdb_id:  Number(tmdbId),    // forzar number
+    tipo:     String(tipoSeleccionado).toLowerCase()
+  };
+  console.log('Payload importar:', JSON.stringify(payload));
 
   const btn = document.getElementById('btn-importar');
   btn.disabled = true;
@@ -798,7 +811,7 @@ async function importarTMDB() {
     const resp = await fetch(`${API}/api/admin/importar_tmdb`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_id: adminId, tmdb_id: tmdbId, tipo: tipoSeleccionado })
+      body: JSON.stringify(payload)
     });
     const data = await resp.json();
 
@@ -874,10 +887,15 @@ async function importarBatch() {
     const statusEl = rowEl.querySelector('.b-status');
 
     try {
+      const batchPayload = {
+        admin_id: Number(adminId),
+        tmdb_id:  Number(item.id),
+        tipo:     String(item.tipo).toLowerCase()
+      };
       const resp = await fetch(`${API}/api/admin/importar_tmdb`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin_id: adminId, tmdb_id: item.id, tipo: item.tipo })
+        body: JSON.stringify(batchPayload)
       });
       const data = await resp.json();
       if (resp.ok && data.success) {
