@@ -65,7 +65,7 @@ def tmdb_get(path, params=None):
     """Petición GET autenticada a TMDB."""
     params = params or {}
     params["api_key"] = TMDB_API_KEY
-    params["language"] = "es-ES"
+    params["language"] = "es-MX"
     r = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=10)
     r.raise_for_status()
     return r.json()

@@ -1203,9 +1203,16 @@ async function cargarGenerosEnContenedor(containerId) {
 
         let html = "";
         Object.keys(grupos).forEach(key => {
-            const peliculas = data.filter(item =>
-                grupos[key].includes((item.genero || "").toLowerCase())
-            );
+            const peliculas = data.filter(item => {
+
+        const generosItem = (item.genero || "")
+        .toLowerCase()
+        .split(",")
+        .map(g => g.trim());
+
+        return grupos[key].some(g => generosItem.includes(g));
+
+        });
             if (peliculas.length === 0) return;
             html += `
                 <section class="genero-section genero-${key}">
