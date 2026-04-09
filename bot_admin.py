@@ -194,35 +194,51 @@ def obtener_siguiente_contenido_a_publicar():
     """
     Devuelve el próximo ítem disponible a publicar.
     
-    FIX TIMEZONE: Supabase guarda timestamptz en UTC.
-    Usamos hora de Lima (UTC-5) para definir "hoy" y la convertimos a UTC
-    antes de enviarla a Supabase, evitando que publicaciones nocturnas
-    (p.ej. 20:00 Lima = 01:00 UTC del día siguiente) se repitan.
+    Lógica anti-repetición TOTAL:
+    - Nunca repite un contenido que ya fue publicado alguna vez.
+    - Cuando se agotan todos (se publicó todo el catálogo), reinicia
+      el ciclo borrando el historial y empieza desde el más reciente.
+    - Dentro del mismo día Lima (UTC-5) nunca publica el mismo contenido
+      dos veces (protección extra para el cron 3x día).
     """
-    # "Hoy" en Lima → medianoche Lima → convertir a UTC para la query
     ahora_lima = datetime.now(LIMA_TZ)
-    hoy_lima_medianoche = ahora_lima.replace(hour=0, minute=0, second=0, microsecond=0)
-    # Supabase acepta ISO 8601 con offset
-    hoy_inicio_iso = hoy_lima_medianoche.isoformat()
-    print(f"DEBUG cron: ahora Lima={ahora_lima}, hoy_inicio={hoy_inicio_iso}")
+    print(f"DEBUG cron: ahora Lima={ahora_lima.strftime('%Y-%m-%d %H:%M')}")
 
-    # IDs ya publicados HOY (en hora Lima)
-    ya_publicados = supabase_service.table("publicaciones_canal") \
+    # 1. Todos los IDs ya publicados en la historia completa
+    todos_publicados = supabase_service.table("publicaciones_canal") \
         .select("contenido_id") \
-        .gte("publicado_en", hoy_inicio_iso) \
         .execute()
+    ids_historicos = list({p["contenido_id"] for p in todos_publicados.data})
+    print(f"DEBUG cron: publicados históricos: {len(ids_historicos)} ítems")
 
-    ids_excluidos = [p["contenido_id"] for p in ya_publicados.data]
-    print(f"DEBUG cron: ya publicados hoy: {ids_excluidos}")
+    # 2. Cuántos contenidos hay en total disponibles
+    total_res = supabase_service.table("contenido") \
+        .select("id", count="exact") \
+        .eq("disponible", True) \
+        .execute()
+    total_disponibles = total_res.count or 0
 
+    # 3. Si ya se publicó todo el catálogo → reiniciar historial
+    if len(ids_historicos) >= total_disponibles and total_disponibles > 0:
+        print(f"🔄 Catálogo completo publicado ({total_disponibles} ítems). Reiniciando ciclo...")
+        supabase_service.table("publicaciones_canal").delete().neq("id", 0).execute()
+        ids_historicos = []
+
+    # 4. Buscar el siguiente no publicado aún
     query = supabase_service.table("contenido") \
         .select("*") \
         .eq("disponible", True)
 
-    for excluido_id in ids_excluidos:
+    for excluido_id in ids_historicos:
         query = query.neq("id", excluido_id)
 
     resultado = query.order("año", desc=True).order("id", desc=True).limit(1).execute()
+    
+    if resultado.data:
+        print(f"DEBUG cron: siguiente a publicar: {resultado.data[0]['titulo']} (id={resultado.data[0]['id']})")
+    else:
+        print("DEBUG cron: sin contenido disponible")
+    
     return resultado.data[0] if resultado.data else None
 
 def registrar_publicacion(contenido_id: int):
@@ -820,26 +836,29 @@ def publicar_manual(message):
         bot.reply_to(message, "❌ Usa: /publicar ID_CONTENIDO"); return
     try:
         cid = int(partes[1])
+        print(f"🔧 /publicar solicitado para contenido_id={cid}")
         res = supabase_service.table("contenido").select("*").eq("id", cid).execute()
         if not res.data:
             bot.reply_to(message, f"❌ Contenido {cid} no encontrado"); return
         item = res.data[0]
+        print(f"🔧 Publicando: {item['titulo']} | imagen: {item.get('imagen_url','(sin imagen)')[:60]}")
         bot.reply_to(message, f"⏳ Publicando '{item['titulo']}' en los canales...")
         ok = enviar_contenido_al_canal(item)
         if ok:
             registrar_publicacion(cid)
-            bot.reply_to(message, f"✅ Publicado: {item['titulo']}")
+            bot.reply_to(message, f"✅ Publicado correctamente: {item['titulo']}")
         else:
             bot.reply_to(message,
-                "❌ Error al publicar en ambos canales.\n"
-                "Verifica que el bot sea administrador en:\n"
+                f"❌ Error al publicar.\n"
+                f"Verifica que el bot @{BOT_USERNAME} sea admin en:\n"
                 f"• {CANAL_PUBLICO_ID}\n"
                 f"• {CANAL_PRIVADO_ID}"
             )
     except ValueError:
-        bot.reply_to(message, "❌ El ID debe ser un número entero")
+        bot.reply_to(message, "❌ El ID debe ser un número. Ej: /publicar 428")
     except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
+        print(f"❌ Excepción en /publicar: {e}")
+        bot.reply_to(message, f"❌ Error inesperado: {e}")
 
 # ============ FLASK APP ============
 from flask import Flask, request
@@ -1077,6 +1096,34 @@ def api_admin_contenido():
         query = query.eq("tipo", tipo)
     resultado = query.order("id", desc=True).range(offset, offset + limit - 1).execute()
     return jsonify({"data": resultado.data, "total": resultado.count}), 200
+
+@app.route("/api/admin/publicar", methods=["POST"])
+def api_admin_publicar():
+    """
+    Publica manualmente un contenido desde el panel web admin.
+    Body: { "admin_id": 123, "contenido_id": 428 }
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not check_admin(data):
+            return jsonify({"error": "No autorizado"}), 403
+        contenido_id = int(data.get("contenido_id", 0))
+        if not contenido_id:
+            return jsonify({"error": "contenido_id requerido"}), 400
+        res = supabase_service.table("contenido").select("*").eq("id", contenido_id).execute()
+        if not res.data:
+            return jsonify({"error": f"Contenido {contenido_id} no encontrado"}), 404
+        item = res.data[0]
+        print(f"🔧 Publicación manual via API: {item['titulo']} (id={contenido_id})")
+        ok = enviar_contenido_al_canal(item)
+        if ok:
+            registrar_publicacion(contenido_id)
+            return jsonify({"success": True, "titulo": item["titulo"]}), 200
+        else:
+            return jsonify({"error": "No se pudo enviar a ningún canal. Verifica que el bot sea admin."}), 500
+    except Exception as e:
+        print(f"❌ Error api_admin_publicar: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/cron/publicar_contenido", methods=["GET"])
 def cron_publicar_contenido():
