@@ -4,7 +4,7 @@ import os
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import hmac
 import hashlib
@@ -18,7 +18,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")  # ← TMDB va en el backend, NUNCA en el frontend
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -28,22 +28,25 @@ def check_admin(data):
         return int(data.get("admin_id", 0)) == ADMIN_ID
     except (ValueError, TypeError):
         return False
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Username del bot (cacheado para no llamar get_me() en cada mensaje)
-# Se puede hardcodear directamente para evitar la llamada a la API
-BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")  # ← pon tu username aquí
+# Username cacheado para no llamar get_me() cada vez
+BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")
+
+# Zona horaria de Lima (UTC-5) — usada para calcular "hoy" correctamente
+LIMA_TZ = timezone(timedelta(hours=-5))
 
 # ============ IDs DE CANALES ============
-GRUPO_SOPORTE_ID    = -1003805629374
-# Canales VIP (donde van los miembros con membresía activa)
-CANAL_PELICULAS_ID  = -1003890553566
-CANAL_SERIES_ID     = -1003879512007
-GRUPO_CONTENIDO_ID  = -1002991571573
-# Canales públicos de difusión (cron publica aquí para atraer miembros)
-CANAL_PUBLICO_ID    = "@mejoresanimesenlatino"   # canal público de la comunidad
-CANAL_PRIVADO_ID    = -1002503337168              # canal privado adicional de difusión
+GRUPO_SOPORTE_ID   = -1003805629374
+# Canales VIP (membresías)
+CANAL_PELICULAS_ID = -1003890553566
+CANAL_SERIES_ID    = -1003879512007
+GRUPO_CONTENIDO_ID = -1002991571573
+# Canales de difusión pública (cron publica aquí para atraer miembros)
+CANAL_PUBLICO_ID   = "@mejoresanimesenlatino"
+CANAL_PRIVADO_ID   = -1002503337168
 
 MINIAPP_URL = "https://cineapp-bot.onrender.com"
 BMC_URL     = "https://buymeacoffee.com/quehay/extras"
@@ -58,19 +61,16 @@ BMC_LINKS   = {
 user_states = {}
 
 # ============ TMDB HELPERS ============
-
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_IMG  = "https://image.tmdb.org/t/p/w500"
 
-# Mapeo tipo usuario → tipo TMDB endpoint
 TIPO_TMDB = {
     "pelicula": "movie",
     "serie":    "tv",
-    "anime":    "tv",   # TMDB no distingue anime, lo marcamos como anime en nuestra BD
+    "anime":    "tv",
 }
 
 def tmdb_get(path, params=None):
-    """Petición GET autenticada a TMDB."""
     params = params or {}
     params["api_key"] = TMDB_API_KEY
     params["language"] = "es-ES"
@@ -79,41 +79,25 @@ def tmdb_get(path, params=None):
     return r.json()
 
 def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
-    """
-    Descarga los datos de TMDB y devuelve un dict listo para insertar
-    en la tabla `contenido` de Supabase.
-    tipo: 'pelicula' | 'serie' | 'anime'
-    """
     endpoint_tipo = TIPO_TMDB.get(tipo, "movie")
     data = tmdb_get(f"/{endpoint_tipo}/{tmdb_id}")
 
-    # Título
     titulo = data.get("title") or data.get("name") or "Sin título"
-
-    # Año
     fecha_raw = data.get("release_date") or data.get("first_air_date") or ""
+    # ← SIEMPRE "año" con ñ para coincidir con la columna en Supabase
     año = int(fecha_raw[:4]) if fecha_raw and len(fecha_raw) >= 4 else None
-
-    # Géneros — guardamos como string separado por comas para compatibilidad
     generos_raw = data.get("genres", [])
     genero = ", ".join(g["name"] for g in generos_raw) if generos_raw else ""
-
-    # Poster — guardamos la URL completa de TMDB (no guardamos imagen local)
     poster_path = data.get("poster_path") or ""
     imagen_url = f"{TMDB_IMG}{poster_path}" if poster_path else ""
-
-    # Sinopsis
     sinopsis = data.get("overview") or ""
-
-    # Rating
     rating = round(data.get("vote_average", 0), 1)
 
-    # tmdb_id
     return {
         "titulo":    titulo,
         "tipo":      tipo,
         "genero":    genero,
-        "año":       año,
+        "año":       año,       # ← con ñ
         "imagen_url": imagen_url,
         "sinopsis":  sinopsis,
         "rating":    rating,
@@ -125,7 +109,6 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
 # ============ ENVÍO A CANALES ============
 
 def generar_estrellas(rating: float) -> str:
-    """Convierte rating 0-10 a emojis de estrellas visuales."""
     if not rating:
         return "☆☆☆☆☆"
     estrellas_llenas = round(rating / 2)
@@ -133,23 +116,18 @@ def generar_estrellas(rating: float) -> str:
     return "★" * estrellas_llenas + "☆" * estrellas_vacias
 
 def construir_caption(item: dict) -> str:
-    """Construye el texto del mensaje de canal con formato atractivo."""
     tipo_emoji = {"pelicula": "🎬", "serie": "📺", "anime": "⛩️"}.get(item.get("tipo"), "🎬")
     tipo_label = {"pelicula": "PELÍCULA", "serie": "SERIE", "anime": "ANIME"}.get(item.get("tipo"), "")
-    
     rating    = item.get("rating") or 0
     estrellas = generar_estrellas(float(rating))
     rating_str = f"{rating:.1f}/10" if rating else "N/D"
-
-    generos = item.get("genero") or "Sin género"
-    año     = item.get("año") or "—"
-    titulo  = item.get("titulo") or "Sin título"
+    generos  = item.get("genero") or "Sin género"
+    año      = item.get("año") or "—"   # ← con ñ
+    titulo   = item.get("titulo") or "Sin título"
     sinopsis = item.get("sinopsis") or ""
-    # Recortar sinopsis a 200 caracteres
     if len(sinopsis) > 200:
         sinopsis = sinopsis[:197] + "..."
-
-    texto = (
+    return (
         f"{tipo_emoji} *{titulo}*\n"
         f"━━━━━━━━━━━━━━━\n"
         f"🏷 *Tipo:* {tipo_label}\n"
@@ -159,33 +137,26 @@ def construir_caption(item: dict) -> str:
         f"━━━━━━━━━━━━━━━\n"
         f"📝 {sinopsis}\n"
     )
-    return texto
 
 def construir_botones_canal(item: dict) -> InlineKeyboardMarkup:
     """
-    Botones inline para mensajes de canal.
-    IMPORTANTE: En canales NO se puede usar web_app=, solo url=
-    Por eso el botón de Mini App usa una URL directa al bot con parámetro start.
+    En canales SOLO se puede usar url=, NO web_app= (Telegram lo rechaza).
+    Usamos deep-links al bot.
     """
     markup = InlineKeyboardMarkup(row_width=2)
-
-    # Botón 1: Abrir Mini App via deep-link al bot (url= funciona en canales)
     btn_miniapp = InlineKeyboardButton(
         "🎬 Ver en Mini App",
         url=f"https://t.me/{BOT_USERNAME}?start=miniapp"
     )
-
-    # Botón 2: Comprar membresía — deep-link al bot (usa username cacheado, no get_me())
     btn_membresia = InlineKeyboardButton(
         "💎 Obtener Membresía VIP",
         url=f"https://t.me/{BOT_USERNAME}?start=planes"
     )
-
     markup.add(btn_miniapp, btn_membresia)
     return markup
 
 def _enviar_a_un_canal(canal_id, caption, markup, imagen):
-    """Envía a un canal específico. Retorna True/False."""
+    """Envía a un canal específico. Retorna True/False con log detallado."""
     try:
         if imagen:
             bot.send_photo(
@@ -208,66 +179,60 @@ def _enviar_a_un_canal(canal_id, caption, markup, imagen):
         print(f"❌ Error enviando a {canal_id}: {e}")
         return False
 
-
 def enviar_contenido_al_canal(item: dict):
-    """
-    Envía el contenido a AMBOS canales (público y privado) sin distinción de tipo.
-    Retorna True si al menos un canal recibió el mensaje correctamente.
-    """
+    """Envía a AMBOS canales de difusión. Retorna True si al menos uno funcionó."""
     caption = construir_caption(item)
     markup  = construir_botones_canal(item)
     imagen  = item.get("imagen_url", "")
-
-    ok_publico  = _enviar_a_un_canal(CANAL_PUBLICO_ID,  caption, markup, imagen)
-    ok_privado  = _enviar_a_un_canal(CANAL_PRIVADO_ID,  caption, markup, imagen)
-
+    ok_publico = _enviar_a_un_canal(CANAL_PUBLICO_ID, caption, markup, imagen)
+    ok_privado = _enviar_a_un_canal(CANAL_PRIVADO_ID, caption, markup, imagen)
     return ok_publico or ok_privado
 
 # ============ PROGRAMADOR AUTOMÁTICO 3x DÍA ============
-# Se llama desde el endpoint /cron/publicar_contenido
-# Configurar en cron-job.org:
-#   - Mañana:  08:00 → GET /cron/publicar_contenido
-#   - Tarde:   14:00 → GET /cron/publicar_contenido
-#   - Noche:   20:00 → GET /cron/publicar_contenido
 
 def obtener_siguiente_contenido_a_publicar():
     """
-    Devuelve el próximo ítem disponible a publicar:
-    - No publicado HOY
-    - Ordenado por año DESC, ID DESC (más recientes primero)
-    - Sin repetir en las últimas 24h
+    Devuelve el próximo ítem disponible a publicar.
+    
+    FIX TIMEZONE: Supabase guarda timestamptz en UTC.
+    Usamos hora de Lima (UTC-5) para definir "hoy" y la convertimos a UTC
+    antes de enviarla a Supabase, evitando que publicaciones nocturnas
+    (p.ej. 20:00 Lima = 01:00 UTC del día siguiente) se repitan.
     """
-    hoy_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    # "Hoy" en Lima → medianoche Lima → convertir a UTC para la query
+    ahora_lima = datetime.now(LIMA_TZ)
+    hoy_lima_medianoche = ahora_lima.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Supabase acepta ISO 8601 con offset
+    hoy_inicio_iso = hoy_lima_medianoche.isoformat()
+    print(f"DEBUG cron: ahora Lima={ahora_lima}, hoy_inicio={hoy_inicio_iso}")
 
-    # IDs ya publicados hoy
+    # IDs ya publicados HOY (en hora Lima)
     ya_publicados = supabase_service.table("publicaciones_canal") \
         .select("contenido_id") \
-        .gte("publicado_en", hoy_inicio) \
+        .gte("publicado_en", hoy_inicio_iso) \
         .execute()
 
     ids_excluidos = [p["contenido_id"] for p in ya_publicados.data]
+    print(f"DEBUG cron: ya publicados hoy: {ids_excluidos}")
 
-    # Query base
     query = supabase_service.table("contenido") \
         .select("*") \
         .eq("disponible", True)
 
-    # Excluir publicados hoy
     for excluido_id in ids_excluidos:
         query = query.neq("id", excluido_id)
 
-    # Priorizar más recientes (año DESC) y más nuevos en BD (id DESC)
     resultado = query.order("año", desc=True).order("id", desc=True).limit(1).execute()
-
     return resultado.data[0] if resultado.data else None
 
 def registrar_publicacion(contenido_id: int):
-    """Guarda en BD que este contenido fue publicado."""
+    """Guarda en BD que este contenido fue publicado (con timestamp UTC)."""
     try:
         supabase_service.table("publicaciones_canal").insert({
             "contenido_id": contenido_id,
-            "publicado_en": datetime.now().isoformat()
+            "publicado_en": datetime.now(timezone.utc).isoformat()
         }).execute()
+        print(f"✅ Publicación registrada para contenido_id={contenido_id}")
     except Exception as e:
         print(f"⚠️ Error registrando publicación: {e}")
 
@@ -301,6 +266,7 @@ def start(message):
         }).execute()
 
     args = message.text.split()
+
     if len(args) > 1 and args[1].startswith("pago_"):
         partes = args[1].split("_")
         if len(partes) == 3:
@@ -330,7 +296,7 @@ def start(message):
                 reply_markup=markup
             )
             return
-     # ✅ Manejar miniapp (explorar contenido)
+
     if len(args) > 1 and args[1] == "miniapp":
         texto = (
             "📱 *MINI APP VIP*\n\n"
@@ -345,8 +311,7 @@ def start(message):
         ))
         bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=markup)
         return
-    
-    # ✅ Manejar planes (ver membresías)
+
     if len(args) > 1 and args[1] == "planes":
         texto = (
             "💎 *PLANES CON 50% OFF* 💎\n\n"
@@ -356,13 +321,10 @@ def start(message):
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton(
             "💎 Ver Membresías",
-            web_app=telebot.types.WebAppInfo(url=f"{MINIAPP_URL}?seccion=membresias")  # Misma URL, diferente texto
+            web_app=telebot.types.WebAppInfo(url=f"{MINIAPP_URL}?seccion=membresias")
         ))
         bot.send_message(chat_id, texto, parse_mode="Markdown", reply_markup=markup)
         return
-
-    # Si no hay comando especial, mostrar menú principal
-    menu_principal(chat_id, user_name)
 
     menu_principal(chat_id, user_name)
 
@@ -641,7 +603,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             return False
 
         plan_data = plan_result.data[0]
-        duracion_plan       = plan_data['duracion_dias']
+        duracion_plan        = plan_data['duracion_dias']
         limite_pedidos_nuevo = plan_data['pedidos_por_mes']
         es_mejora = False
         dias_extra = pedidos_extra = 0
@@ -703,7 +665,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                 markup.add(
                     InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
                     InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
-                    InlineKeyboardButton("👥 Grupo Bíblico",      url=inv_grupo.invite_link),
+                    InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
                 )
                 bot.send_message(user_id,
                     "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
@@ -850,7 +812,7 @@ def get_id(message):
 
 @bot.message_handler(commands=['publicar'])
 def publicar_manual(message):
-    """Publica manualmente un contenido por ID: /publicar 42"""
+    """Publica manualmente en los canales de difusión: /publicar ID_CONTENIDO"""
     if message.from_user.id != ADMIN_ID:
         return
     partes = message.text.split()
@@ -862,18 +824,22 @@ def publicar_manual(message):
         if not res.data:
             bot.reply_to(message, f"❌ Contenido {cid} no encontrado"); return
         item = res.data[0]
+        bot.reply_to(message, f"⏳ Publicando '{item['titulo']}' en los canales...")
         ok = enviar_contenido_al_canal(item)
         if ok:
             registrar_publicacion(cid)
             bot.reply_to(message, f"✅ Publicado: {item['titulo']}")
         else:
-            bot.reply_to(message, "❌ Error al publicar")
+            bot.reply_to(message,
+                "❌ Error al publicar en ambos canales.\n"
+                "Verifica que el bot sea administrador en:\n"
+                f"• {CANAL_PUBLICO_ID}\n"
+                f"• {CANAL_PRIVADO_ID}"
+            )
+    except ValueError:
+        bot.reply_to(message, "❌ El ID debe ser un número entero")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {e}")
-
-@bot.message_handler(func=lambda m: True)
-def debug_all(message):
-    print("📩 DEBUG GLOBAL:", message.chat.id, message.text)
 
 # ============ FLASK APP ============
 from flask import Flask, request
@@ -896,7 +862,7 @@ def webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
-# ============ ENDPOINTS EXISTENTES ============
+# ============ ENDPOINTS ============
 
 @app.route("/aprobar_pago", methods=["POST"])
 def aprobar_pago():
@@ -1053,53 +1019,35 @@ def mis_pedidos():
     r.headers.add("Access-Control-Allow-Origin","*")
     return r, 200
 
-# ============ NUEVOS ENDPOINTS PARA EL ADMIN: IMPORTAR DESDE TMDB ============
-
 @app.route("/api/admin/importar_tmdb", methods=["POST"])
 def api_importar_tmdb():
-    """
-    Importa un título desde TMDB usando su ID.
-    Body JSON: { "admin_id": 123, "tmdb_id": 550, "tipo": "pelicula" | "serie" | "anime" }
-    """
     try:
-        data     = request.get_json(force=True, silent=True) or {}
+        data = request.get_json(force=True, silent=True) or {}
         print(f"DEBUG importar_tmdb recibido: {data}")
-
-        # Tolerar admin_id como int o string
         try:
             admin_id = int(data.get("admin_id", 0))
         except (ValueError, TypeError):
             admin_id = 0
-
         try:
             tmdb_id = int(data.get("tmdb_id", 0))
         except (ValueError, TypeError):
             tmdb_id = 0
-
         tipo = str(data.get("tipo", "pelicula")).lower().strip()
-
-        print(f"DEBUG parsed: admin_id={admin_id} ({type(admin_id)}), ADMIN_ID={ADMIN_ID} ({type(ADMIN_ID)}), tmdb_id={tmdb_id}, tipo={tipo}")
-
+        print(f"DEBUG parsed: admin_id={admin_id}, ADMIN_ID={ADMIN_ID}, tmdb_id={tmdb_id}, tipo={tipo}")
         if admin_id != ADMIN_ID:
             return jsonify({"error": f"No autorizado (got {admin_id}, expected {ADMIN_ID})"}), 403
         if not tmdb_id:
             return jsonify({"error": "tmdb_id requerido o invalido"}), 400
         if tipo not in ("pelicula", "serie", "anime"):
             return jsonify({"error": f"tipo invalido: '{tipo}'. Debe ser: pelicula, serie o anime"}), 400
-
         if not TMDB_API_KEY:
             return jsonify({"error": "TMDB_API_KEY no configurada en el servidor"}), 500
-
         contenido = importar_desde_tmdb(int(tmdb_id), tipo)
-
-        # Verificar si ya existe
         existe = supabase_service.table("contenido").select("id").eq("tmdb_id", int(tmdb_id)).execute()
         if existe.data:
             return jsonify({"error": f"Ya existe: {contenido['titulo']}", "id": existe.data[0]["id"]}), 409
-
         resultado = supabase_service.table("contenido").insert(contenido).execute()
         nuevo_id  = resultado.data[0]["id"] if resultado.data else None
-
         return jsonify({
             "success": True,
             "id": nuevo_id,
@@ -1110,7 +1058,6 @@ def api_importar_tmdb():
             "rating": contenido["rating"],
             "imagen_url": contenido["imagen_url"],
         }), 200
-
     except requests.HTTPError as e:
         return jsonify({"error": f"TMDB error: {e.response.status_code}"}), 400
     except Exception as e:
@@ -1119,7 +1066,6 @@ def api_importar_tmdb():
 
 @app.route("/api/admin/contenido", methods=["POST"])
 def api_admin_contenido():
-    """Lista el contenido del admin con paginación."""
     data = request.get_json()
     if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
@@ -1132,20 +1078,13 @@ def api_admin_contenido():
     resultado = query.order("id", desc=True).range(offset, offset + limit - 1).execute()
     return jsonify({"data": resultado.data, "total": resultado.count}), 200
 
-# ============ CRON ENDPOINTS ============
-
 @app.route("/cron/publicar_contenido", methods=["GET"])
 def cron_publicar_contenido():
-    """
-    Llamar desde cron-job.org 3 veces al día (08:00, 14:00, 20:00 hora Lima).
-    Publica automáticamente el siguiente contenido disponible sin repetir en el día.
-    """
     try:
         item = obtener_siguiente_contenido_a_publicar()
         if not item:
             print("ℹ️ No hay contenido disponible para publicar hoy")
             return jsonify({"message": "Sin contenido disponible"}), 200
-
         ok = enviar_contenido_al_canal(item)
         if ok:
             registrar_publicacion(item["id"])
@@ -1154,12 +1093,10 @@ def cron_publicar_contenido():
         else:
             print(f"❌ No se pudo enviar a ningún canal: {item['titulo']}")
             return jsonify({"error": "No se pudo enviar a ningún canal. Verifica que el bot sea admin en ambos canales."}), 500
-
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
-        print(f"❌ Error en cron publicar: {e}")
-        print(f"Traceback completo:\n{tb}")
+        print(f"❌ Error en cron publicar: {e}\n{tb}")
         return jsonify({"error": str(e), "traceback": tb}), 500
 
 @app.route("/cron/verificar_vencimientos", methods=["GET"])
@@ -1173,8 +1110,6 @@ def cron_verificar_vencimientos():
 def verificar_vencimientos():
     ahora = datetime.now()
     hoy   = ahora.isoformat()
-
-    # Notificar a 3 días
     en_3_dias = (ahora + timedelta(days=3)).isoformat()
     proximos = supabase_service.table("usuarios").select("*") \
         .eq("membresia_activa", True).gte("fecha_vencimiento", hoy).lte("fecha_vencimiento", en_3_dias).execute()
@@ -1184,8 +1119,6 @@ def verificar_vencimientos():
             bot.send_message(u["telegram_id"], f"⏳ *Tu membresía vence en 3 días* ({vence}).\nRenueva para no perder el acceso.", parse_mode="Markdown")
         except:
             pass
-
-    # Notificar a 3 horas
     en_3h = (ahora + timedelta(hours=3)).isoformat()
     muy_proximos = supabase_service.table("usuarios").select("*") \
         .eq("membresia_activa", True).gte("fecha_vencimiento", hoy).lte("fecha_vencimiento", en_3h).execute()
@@ -1195,8 +1128,6 @@ def verificar_vencimientos():
             bot.send_message(u["telegram_id"], f"⚠️ *¡Tu membresía vence en 3 horas!* ({vence}).\nRenueva para mantener el acceso.", parse_mode="Markdown")
         except:
             pass
-
-    # Desactivar y expulsar vencidos
     vencidos = supabase_service.table("usuarios").select("*") \
         .eq("membresia_activa", True).lt("fecha_vencimiento", hoy).execute()
     for u in vencidos.data:
@@ -1211,8 +1142,6 @@ def verificar_vencimientos():
             bot.send_message(u["telegram_id"], "❌ Tu membresía ha vencido. Renueva para seguir disfrutando.")
         except:
             pass
-
-# ============ ENDPOINTS API EXISTENTES ============
 
 @app.route("/api/usuario", methods=["POST"])
 def api_usuario():
@@ -1256,7 +1185,6 @@ def api_contenido():
         query = query.ilike("titulo", f"%{busqueda}%")
     genero = data.get("genero")
     if genero:
-        # Compatible con genero como string con comas
         query = query.ilike("genero", f"%{genero}%")
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
