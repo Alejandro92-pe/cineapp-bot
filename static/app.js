@@ -9,6 +9,25 @@ tg.expand();
 const userId = tg.initDataUnsafe?.user?.id;
 const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
 
+// Si estamos en navegador (no en Telegram) y somos admin, redirigir al panel admin
+(function checkBrowserAdmin() {
+  const isInTelegram = !!(tg.initDataUnsafe?.user?.id);
+  if (!isInTelegram) {
+    const path = window.location.pathname;
+    // Solo redirigir si estamos en la raíz, no si ya estamos en /static/admin.html
+    if (!path.includes('admin')) {
+      // Mostrar botón de acceso admin en navegador
+      window.addEventListener('DOMContentLoaded', function() {
+        const hint = document.createElement('a');
+        hint.href = '/static/admin.html';
+        hint.style.cssText = 'position:fixed;bottom:72px;right:12px;background:#e8b04b;color:#1a1200;font-size:11px;font-weight:600;padding:6px 12px;border-radius:20px;text-decoration:none;z-index:9999;opacity:0.9';
+        hint.textContent = '⚙ Admin';
+        document.body.appendChild(hint);
+      });
+    }
+  }
+})();
+
 // Variables globales
 let usuarioActual = null;
 let membresiaActiva = null;
@@ -56,22 +75,8 @@ membresiaActiva = userData.membresia;
 
 }
 
-const avatar = document.getElementById("avatarUsuario");
-const nombre = document.getElementById("nombreUsuario");
-
-if(tg.initDataUnsafe?.user){
-
-const user = tg.initDataUnsafe.user;
-
-nombre.innerText = user.first_name || "Usuario";
-
-if(user.photo_url){
-avatar.src = user.photo_url;
-}else{
-avatar.src = "https://i.pravatar.cc/100";
-}
-
-}
+// ── Inicializar user chip premium ──
+inicializarUserChip();
 
 } catch (error) {
 
@@ -90,15 +95,73 @@ cambiarVista('inicio');
 }
 
 function actualizarBadge(){
+  // ahora lo maneja inicializarUserChip()
+  inicializarUserChip();
+}
 
-const badge = document.getElementById('badge');
+// ============ AVATARES PERSONALIZADOS ============
+// Aquí puedes agregar/cambiar los avatares — son SVG paths inline
+const AVATARES_CUSTOM = [
+  { id: 'fox',    emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 2l2 4H2L4 2zm16 0l2 4h-4l2-4zM12 4C7 4 3 8 3 13c0 3.3 1.8 6.2 4.5 7.8L7 23h10l-.5-2.2C19.2 19.2 21 16.3 21 13c0-5-4-9-9-9zm-3 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm6 0a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-3 4c-1.1 0-2-.4-2.7-1h5.4c-.7.6-1.6 1-2.7 1z"/></svg>' },
+  { id: 'wolf',   emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 3l3 6H2l4 5v3c2 1 4 1.5 6 1.5s4-.5 6-1.5v-3l4-5h-3l3-6-5 3c-1-.3-2-.5-5-.5s-4 .2-5 .5L2 3zm10 10a1 1 0 110 2 1 1 0 010-2z"/></svg>' },
+  { id: 'dragon', emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6.5C15.8 4.2 14 2 12 2 9 2 7 4.5 7 7c0 1 .3 2 .7 2.8C6 11 5 13 5 15c0 3.9 3.1 7 7 7s7-3.1 7-7c0-2-.8-3.8-2-5.1l-.5-.4zM12 19c-2.2 0-4-1.8-4-4 0-1 .4-2 1-2.7.6.4 1.3.7 2 .7s1.4-.3 2-.7c.6.7 1 1.7 1 2.7 0 2.2-1.8 4-4 4z"/></svg>' },
+  { id: 'ghost',  emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9 9 0 00-9 9v11l3-3 3 3 3-3 3 3 3-3v-11a9 9 0 00-9-9zm-3 9a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm6 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg>' },
+  { id: 'cat',    emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 4v5l2 2c0 5 4 9 8 9s8-4 8-9l2-2V4l-4 3c-1-.5-2-.8-3-1l-1-2h-4l-1 2c-1 .2-2 .5-3 1L2 4zm7 7a1 1 0 110 2 1 1 0 010-2zm6 0a1 1 0 110 2 1 1 0 010-2zm-3 3c-1 0-1.7-.4-2.2-1h4.4c-.5.6-1.2 1-2.2 1z"/></svg>' },
+  { id: 'alien',  emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.1 2 5 5.8 5 10.5c0 2.1.7 4 1.8 5.5L8 22h8l1.2-6c1.1-1.5 1.8-3.4 1.8-5.5C19 5.8 15.9 2 12 2zm-2.5 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm5 0a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-2.5 5c-2 0-3-.8-3-.8s1-.2 3-.2 3 .2 3 .2-1 .8-3 .8z"/></svg>' },
+  { id: 'robot',  emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a2 2 0 012 2v1h3a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h3V4a2 2 0 012-2zM9 9a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-5 5h4v1H10v-1z"/></svg>' },
+  { id: 'ninja',  emoji: null, svg: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8 2 5 5 5 9c0 2.4 1.2 4.5 3 5.7V22h8v-7.3C17.8 13.5 19 11.4 19 9c0-4-3-7-7-7zm-2 8a1 1 0 110 2 1 1 0 010-2zm4 0a1 1 0 110 2 1 1 0 010-2zm-2 3c-.8 0-1.5-.3-2-.7h4c-.5.4-1.2.7-2 .7z"/></svg>' },
+];
 
-if(!badge) return;
+// Avatar guardado en localStorage (clave por userId)
+function getAvatarKey() { return `avatar_${userId || 'guest'}`; }
+function getAvatarSeleccionado() { return localStorage.getItem(getAvatarKey()) || 'tg'; }
+function setAvatarSeleccionado(id) { localStorage.setItem(getAvatarKey(), id); }
 
-badge.innerText = membresiaActiva
-? ` ${membresiaActiva.membresias_planes?.nombre || 'Activa'}`
-: ' Sin membresía';
+function inicializarUserChip() {
+  const chip     = document.getElementById('userChip');
+  const ucAvatar = document.getElementById('ucAvatar');
+  const ucName   = document.getElementById('ucName');
+  const ucBadge  = document.getElementById('ucBadge');
+  if (!chip) return;
 
+  const user = tg.initDataUnsafe?.user;
+  const nombre = user?.first_name || usuarioActual?.nombre || 'Perfil';
+  if (ucName) ucName.textContent = nombre;
+
+  // Badge de membresía
+  if (ucBadge) {
+    const planNombre = membresiaActiva?.membresias_planes?.nombre;
+    const starSVG = `<svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor"><path d="M12 1l3 7h7l-5.5 4 2 7L12 15l-6.5 4 2-7L2 8h7z"/></svg>`;
+    if (planNombre) {
+      ucBadge.innerHTML = `${starSVG} ${planNombre.toUpperCase()}`;
+      ucBadge.className = 'uc-badge vip';
+    } else {
+      ucBadge.innerHTML = `${starSVG} Sin membresía`;
+      ucBadge.className = 'uc-badge';
+    }
+  }
+
+  // Avatar
+  renderizarAvatarChip(ucAvatar, user);
+}
+
+function renderizarAvatarChip(container, tgUser) {
+  if (!container) return;
+  const seleccionado = getAvatarSeleccionado();
+
+  if (seleccionado === 'tg' && tgUser?.photo_url) {
+    container.innerHTML = `<img src="${tgUser.photo_url}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    const av = AVATARES_CUSTOM.find(a => a.id === seleccionado);
+    if (av) {
+      container.innerHTML = av.svg;
+    } else {
+      // fallback: inicial del nombre
+      const user = tg.initDataUnsafe?.user;
+      const inicial = (user?.first_name || usuarioActual?.nombre || 'U')[0].toUpperCase();
+      container.innerHTML = `<span style="font-size:16px;font-weight:700;color:#e8b04b">${inicial}</span>`;
+    }
+  }
 }
 
 function configurarEventosFooter(){
@@ -474,46 +537,8 @@ window.cambiarVista = async function(vista) {
     }
     
     else if (vista === 'perfil') {
-    const membresiaNombre = membresiaActiva?.membresias_planes?.nombre?.toUpperCase() || 'Sin membresía';
-    const estado = membresiaActiva ? '✅ Activa' : '❌ Inactiva';
-    const vence = membresiaActiva?.fecha_fin
-        ? new Date(membresiaActiva.fecha_fin).toLocaleDateString('es-PE')
-        : '-';
-
-    const user = tg.initDataUnsafe?.user;
-    const nombre = user?.first_name || usuarioActual?.nombre || 'Usuario';
-    const avatarSrc = user?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=1565C0&color=fff&size=128`;
-
-    let botones = '';
-    if (membresiaActiva) {
-        botones = `
-        <div class="perfil-btns">
-            <button class="btn-perfil-accion" onclick="subirPlan()">Subir Plan</button>
-            <button class="btn-perfil-accion" onclick="bajarPlan()">Bajar Plan</button>
-        </div>`;
-    } else {
-        botones = `<button class="btn-perfil-comprar" onclick="cambiarVista('membresias')">Comprar Membresía</button>`;
+        await renderizarPerfil(contenedor);
     }
-
-    contenedor.innerHTML = `
-    <div class="perfil-wrap">
-        <div class="perfil-nueva-card">
-            <img class="perfil-nueva-avatar" src="${avatarSrc}" alt="${nombre}"
-                onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=1565C0&color=fff&size=128'">
-            <div class="perfil-nueva-nombre">${nombre}</div>
-            <div class="perfil-nueva-badge">${membresiaNombre}</div>
-
-            <div class="perfil-datos">
-                <div class="perfil-dato-row"><strong>ID:</strong> <span>${userId || '—'}</span></div>
-                <div class="perfil-dato-row"><strong>Membresía:</strong> <span>${membresiaNombre}</span></div>
-                <div class="perfil-dato-row"><strong>Estado:</strong> <span>${estado}</span></div>
-                <div class="perfil-dato-row"><strong>Vence:</strong> <span>${vence}</span></div>
-            </div>
-
-            ${botones}
-        </div>
-    </div>`;
-}
     
     else if (vista === 'buscar') {
     tipoActual = 'todo';
@@ -579,6 +604,222 @@ window.cambiarVista = async function(vista) {
     }
 };
 
+
+
+// ============ FAVORITOS ============
+function getFavoritosKey() { return `favs_${userId || 'guest'}`; }
+function getFavoritos() {
+  try { return JSON.parse(localStorage.getItem(getFavoritosKey()) || '[]'); } catch { return []; }
+}
+function toggleFavorito(item) {
+  const favs = getFavoritos();
+  const idx = favs.findIndex(f => f.id === item.id);
+  if (idx >= 0) favs.splice(idx, 1);
+  else favs.unshift({ id: item.id, titulo: item.titulo, imagen_url: item.imagen_url, tipo: item.tipo, año: item.año });
+  localStorage.setItem(getFavoritosKey(), JSON.stringify(favs.slice(0, 200)));
+  return idx < 0; // true si se agregó
+}
+function esFavorito(itemId) { return getFavoritos().some(f => f.id === itemId); }
+
+window.toggleFavBtn = function(itemId, item, btn) {
+  const ahora = toggleFavorito(item);
+  btn.innerHTML = ahora ? favHeartSVG(true) : favHeartSVG(false);
+  btn.classList.toggle('fav-active', ahora);
+};
+
+function favHeartSVG(active) {
+  return active
+    ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="#e8b04b"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.53L12 21.35z"/></svg>`
+    : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.53L12 21.35z"/></svg>`;
+}
+
+// ============ HISTORIAL ============
+function getHistorialKey() { return `hist_${userId || 'guest'}`; }
+function getHistorial() {
+  try { return JSON.parse(localStorage.getItem(getHistorialKey()) || '[]'); } catch { return []; }
+}
+function agregarAlHistorial(item) {
+  const hist = getHistorial().filter(h => h.id !== item.id);
+  hist.unshift({ id: item.id, titulo: item.titulo, imagen_url: item.imagen_url, tipo: item.tipo, año: item.año, visto_en: Date.now() });
+  localStorage.setItem(getHistorialKey(), JSON.stringify(hist.slice(0, 50)));
+}
+
+// ============ PERFIL PREMIUM ============
+async function renderizarPerfil(contenedor) {
+  const user = tg.initDataUnsafe?.user;
+  const nombre = user?.first_name || usuarioActual?.nombre || 'Usuario';
+  const planNombre = membresiaActiva?.membresias_planes?.nombre?.toUpperCase() || null;
+  const vence = membresiaActiva?.fecha_fin
+    ? new Date(membresiaActiva.fecha_fin).toLocaleDateString('es-PE')
+    : null;
+  const favs = getFavoritos();
+  const hist = getHistorial();
+  const selAvatar = getAvatarSeleccionado();
+
+  const SVG_USER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+  const SVG_STAR = `<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M12 1l3 7h7l-5.5 4 2 7L12 15l-6.5 4 2-7L2 8h7z"/></svg>`;
+  const SVG_HEART = `<svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.53L12 21.35z"/></svg>`;
+  const SVG_CLOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
+  const SVG_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
+  const SVG_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M20 6L9 17l-5-5"/></svg>`;
+  const SVG_UPGRADE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+  const SVG_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
+
+  // Avatar actual
+  const avatarHTML = (() => {
+    if (selAvatar === 'tg' && user?.photo_url) {
+      return `<img src="${user.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    }
+    const av = AVATARES_CUSTOM.find(a => a.id === selAvatar);
+    return av ? av.svg : SVG_USER;
+  })();
+
+  // Generar selector de avatares
+  const tgOpcion = `<div class="pav-item ${selAvatar === 'tg' ? 'selected' : ''}" onclick="seleccionarAvatar('tg')" title="Foto de Telegram">
+    ${user?.photo_url ? `<img src="${user.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : `<svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>`}
+  </div>`;
+
+  const avsHTML = AVATARES_CUSTOM.map(av =>
+    `<div class="pav-item ${selAvatar === av.id ? 'selected' : ''}" onclick="seleccionarAvatar('${av.id}')">${av.svg}</div>`
+  ).join('');
+
+  // Favoritos row
+  const favsHTML = favs.length === 0
+    ? `<p class="perf-empty">Aún no tienes favoritos. Toca ${SVG_HEART} en cualquier tarjeta.</p>`
+    : `<div class="perf-scroll-row">${favs.slice(0,10).map(f => `
+        <div class="perf-mini-card" onclick='abrirModalContenido(${JSON.stringify(f).replace(/'/g, "\'")})'>
+          <div class="perf-mini-img" style="${f.imagen_url ? `background-image:url('${f.imagen_url}')` : 'background:#1e1e2a'}">
+            ${!f.imagen_url ? SVG_PLAY : ''}
+          </div>
+          <div class="perf-mini-title">${f.titulo}</div>
+        </div>`).join('')}
+      </div>`;
+
+  // Historial row
+  const histHTML = hist.length === 0
+    ? `<p class="perf-empty">Todavía no has abierto nada. Aparecerá aquí cuando explores contenido.</p>`
+    : `<div class="perf-scroll-row">${hist.slice(0,10).map(h => {
+        const hace = tiempoRelativo(h.visto_en);
+        return `<div class="perf-mini-card" onclick='abrirModalContenido(${JSON.stringify(h).replace(/'/g, "\'")})'>
+          <div class="perf-mini-img" style="${h.imagen_url ? `background-image:url('${h.imagen_url}')` : 'background:#1e1e2a'}">
+            ${!h.imagen_url ? SVG_PLAY : ''}
+            <span class="perf-mini-time">${hace}</span>
+          </div>
+          <div class="perf-mini-title">${h.titulo}</div>
+        </div>`;
+      }).join('')}
+      </div>`;
+
+  // Estadísticas
+  const pedidosUsados = usuarioActual?.pedidos_mes || 0;
+  const pedidosTotal  = membresiaActiva?.membresias_planes?.pedidos_por_mes || 0;
+
+  contenedor.innerHTML = `
+  <div class="perf-page">
+
+    <!-- Hero -->
+    <div class="perf-hero">
+      <div class="perf-av-ring" id="perfAvRing">${avatarHTML}</div>
+      <div class="perf-hero-info">
+        <div class="perf-hero-name">${nombre}</div>
+        ${planNombre
+          ? `<div class="perf-hero-plan">${SVG_STAR} ${planNombre}${vence ? ` · ${vence}` : ''}</div>`
+          : `<div class="perf-hero-plan no-plan">Sin membresía activa</div>`}
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="perf-stats">
+      <div class="perf-stat">
+        <span class="perf-stat-n">${favs.length}</span>
+        <span class="perf-stat-l">${SVG_HEART} Favoritos</span>
+      </div>
+      <div class="perf-stat-sep"></div>
+      <div class="perf-stat">
+        <span class="perf-stat-n">${hist.length}</span>
+        <span class="perf-stat-l">${SVG_CLOCK} Vistos</span>
+      </div>
+      <div class="perf-stat-sep"></div>
+      <div class="perf-stat">
+        <span class="perf-stat-n">${pedidosTotal}</span>
+        <span class="perf-stat-l">${SVG_CHECK} Pedidos</span>
+      </div>
+    </div>
+
+    <!-- Selector avatar -->
+    <div class="perf-section">
+      <div class="perf-section-title">Elige tu avatar</div>
+      <div class="perf-avatars" id="perfAvatarGrid">
+        ${tgOpcion}
+        ${avsHTML}
+      </div>
+    </div>
+
+    <!-- Favoritos -->
+    <div class="perf-section">
+      <div class="perf-section-title">${SVG_HEART} Mis favoritos <span class="perf-count">${favs.length}</span></div>
+      ${favsHTML}
+    </div>
+
+    <!-- Historial -->
+    <div class="perf-section">
+      <div class="perf-section-title">${SVG_CLOCK} Estabas viendo <span class="perf-count">${hist.length}</span></div>
+      ${histHTML}
+    </div>
+
+    <!-- Membresía info -->
+    <div class="perf-section">
+      <div class="perf-section-title">${SVG_STAR} Membresía</div>
+      <div class="perf-mem-card">
+        ${planNombre ? `
+          <div class="perf-mem-name">${planNombre}</div>
+          <div class="perf-mem-vence">Vence: ${vence}</div>
+              <div class="perf-mem-btns">
+            <button class="perf-btn-ghost" onclick="subirPlan()">${SVG_UPGRADE} Subir plan</button>
+            <button class="perf-btn-ghost" onclick="bajarPlan()">${SVG_DOWN} Bajar plan</button>
+          </div>
+        ` : `
+          <div class="perf-mem-empty">No tienes membresía activa. Activa una para acceder al contenido completo.</div>
+          <button class="perf-btn-gold" onclick="cambiarVista('membresias')">${SVG_STAR} Ver planes</button>
+        `}
+      </div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>`;
+}
+
+function tiempoRelativo(timestamp) {
+  const diff = Date.now() - timestamp;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'ahora';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+window.seleccionarAvatar = function(id) {
+  setAvatarSeleccionado(id);
+  // Actualizar grid visual
+  document.querySelectorAll('.pav-item').forEach(el => el.classList.remove('selected'));
+  event?.target?.closest('.pav-item')?.classList.add('selected');
+  // Actualizar hero avatar
+  const ring = document.getElementById('perfAvRing');
+  if (ring) {
+    const user = tg.initDataUnsafe?.user;
+    if (id === 'tg' && user?.photo_url) {
+      ring.innerHTML = `<img src="${user.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      const av = AVATARES_CUSTOM.find(a => a.id === id);
+      if (av) ring.innerHTML = av.svg;
+    }
+  }
+  // Actualizar chip del header
+  const ucAvatar = document.getElementById('ucAvatar');
+  const user = tg.initDataUnsafe?.user;
+  renderizarAvatarChip(ucAvatar, user);
+};
 
 // ============ FUNCIONES DE ADMIN ============
 window.cambiarAdminTab = async function(tab) {
@@ -826,23 +1067,26 @@ window.buscarContenido = async function(pagina = 1) {
 function ratingBadgeHTML(rating) {
     if (!rating || rating === 0) return '';
     const score = parseFloat(rating).toFixed(1);
-    // Color según puntuación
-    const color = score >= 7 ? '#2ecc71' : score >= 5 ? '#f1c40f' : '#b60000';
-    return `
-        <div class="rating-badge" style="--rating-color:${color}">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="${color}">
-                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
-            </svg>
-            <span>${score}</span>
-        </div>`;
+    const color = score >= 7 ? '#2ecc71' : score >= 5 ? '#f1c40f' : '#e74c3c';
+    return `<div class="rating-badge" style="--rating-color:${color}">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="${color}">
+            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+        </svg>
+        <span>${score}</span>
+    </div>`;
 }
 
 function tarjetaHTML(item) {
+    const isFav = esFavorito(item.id);
+    const heartActive = `<svg viewBox="0 0 24 24" width="16" height="16" fill="#e8b04b"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.53L12 21.35z"/></svg>`;
+    const heartInactive = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.8"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.53L12 21.35z"/></svg>`;
+    const ij = JSON.stringify(item).replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
     return `
         <div class="tarjeta" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <div class="tarjeta-imagen">
                 <img src="${item.imagen_url}" loading="lazy">
                 ${ratingBadgeHTML(item.rating)}
+                <button class="fav-btn${isFav ? ' fav-active' : ''}" onclick='event.stopPropagation();toggleFavBtn(${item.id},${JSON.stringify(item).replace(/'/g, "\\'")},this)'>${isFav ? heartActive : heartInactive}</button>
             </div>
             <div class="tarjeta-info">
                 <div class="tarjeta-titulo">${item.titulo}</div>
@@ -1106,7 +1350,6 @@ async function cargarTendencias() {
         <div class="tendencia-item" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
             <span class="numero">${index + 1}</span>
             <img src="${item.imagen_url}" alt="${item.titulo}">
-            ${ratingBadgeHTML(item.rating)}
         </div>
     `).join('');
 }
@@ -1203,16 +1446,9 @@ async function cargarGenerosEnContenedor(containerId) {
 
         let html = "";
         Object.keys(grupos).forEach(key => {
-            const peliculas = data.filter(item => {
-
-        const generosItem = (item.genero || "")
-        .toLowerCase()
-        .split(",")
-        .map(g => g.trim());
-
-        return grupos[key].some(g => generosItem.includes(g));
-
-        });
+            const peliculas = data.filter(item =>
+                grupos[key].includes((item.genero || "").toLowerCase())
+            );
             if (peliculas.length === 0) return;
             html += `
                 <section class="genero-section genero-${key}">
@@ -1221,7 +1457,6 @@ async function cargarGenerosEnContenedor(containerId) {
                         ${peliculas.slice(0, 20).map(item => `
                             <div class="genero-card" onclick='abrirModalContenido(${JSON.stringify(item).replace(/'/g, "\\'")})'>
                                 <img src="${item.imagen_url}" alt="${item.titulo}">
-                                ${ratingBadgeHTML(item.rating)}
                             </div>
                         `).join("")}
                     </div>
@@ -1477,13 +1712,14 @@ function mostrarModal(titulo, mensaje, callback) {
     };
 }
 
-// ============ MODAL DETALLE CONTENIDO (nuevo diseño) ============
+// ============ MODAL DETALLE CONTENIDO — Premium ============
 let contenidoSeleccionado = null;
 
 function abrirModalContenido(item) {
     contenidoSeleccionado = item;
+    // historial se registra SOLO cuando presiona reproducir
 
-    // Fondo blureado
+    // Fondo hero
     const bgEl = document.getElementById('detalleHeroBg');
     if (bgEl) bgEl.style.backgroundImage = `url('${item.imagen_url || ''}')`;
 
@@ -1491,86 +1727,159 @@ function abrirModalContenido(item) {
     const imgEl = document.getElementById('detalleImagen');
     if (imgEl) { imgEl.src = item.imagen_url || ''; imgEl.onerror = () => { imgEl.style.display='none'; }; }
 
-    // Año, tipo y rating (en la misma línea del hero)
+    // Badges: año · tipo · rating
     const anioTipoEl = document.getElementById('detalleAnioTipo');
     if (anioTipoEl) {
-        const partes = [item.año, item.tipo].filter(Boolean);
         const ratingVal = item.rating ? parseFloat(item.rating).toFixed(1) : null;
-        const ratingColor = ratingVal >= 7 ? '#2ecc71' : ratingVal >= 5 ? '#f1c40f' : '#da0000';
-        const ratingHtml = ratingVal ? `
-            <span class="detalle-rating-inline" style="color:${ratingColor}">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="${ratingColor}" style="vertical-align:middle;margin-right:2px">
-                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
-                </svg>${ratingVal}
-            </span>` : '';
-        anioTipoEl.innerHTML = partes.join(' | ') + (ratingHtml ? ' &nbsp;' + ratingHtml : '');
+        const rColor = ratingVal >= 7 ? '#2ecc71' : ratingVal >= 5 ? '#f1c40f' : '#e74c3c';
+        let html = '';
+        if (item.año) html += `<span class="d-badge">${item.año}</span>`;
+        if (item.tipo) html += `<span class="d-badge">${item.tipo.charAt(0).toUpperCase()+item.tipo.slice(1)}</span>`;
+        if (ratingVal) html += `<span class="d-badge d-badge-rating" style="color:${rColor};border-color:${rColor}22;background:${rColor}18">
+            <svg viewBox="0 0 24 24" width="10" height="10" fill="${rColor}"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+            ${ratingVal}
+        </span>`;
+        anioTipoEl.innerHTML = html;
     }
 
     // Título
     const tituloEl = document.getElementById('detalleTitulo');
     if (tituloEl) tituloEl.textContent = item.titulo || 'Sin título';
 
+    // Duración / tagline
+    const durEl = document.getElementById('detalleDuracion');
+    if (durEl) {
+        const parts = [];
+        if (item.duracion) parts.push(item.duracion);
+        if (item.genero) parts.push(item.genero.split(',')[0].trim());
+        durEl.textContent = parts.join(' · ');
+    }
+
     // Sinopsis
     const sinEl = document.getElementById('detalleSinopsis');
     if (sinEl) sinEl.textContent = item.sinopsis || 'Sin sinopsis disponible.';
 
-    // Meta
+    // Meta: género, protagonistas, creadores
     const metaEl = document.getElementById('detalleMeta');
     if (metaEl) {
         let metaHtml = '';
-        if (item.protagonistas) metaHtml += `<div><strong>Protagonizada por:</strong> ${item.protagonistas}</div>`;
-        if (item.creadores)     metaHtml += `<div><strong>Creada por:</strong> ${item.creadores}</div>`;
-        if (item.genero)        metaHtml += `<div><strong>Género:</strong> ${item.genero}</div>`;
+        if (item.genero) metaHtml += `<div class="d-meta-row"><span class="d-meta-label">Género</span><span class="d-meta-val">${item.genero}</span></div>`;
+        if (item.protagonistas) metaHtml += `<div class="d-meta-row"><span class="d-meta-label">Reparto</span><span class="d-meta-val">${item.protagonistas}</span></div>`;
+        if (item.creadores) metaHtml += `<div class="d-meta-row"><span class="d-meta-label">Creadores</span><span class="d-meta-val">${item.creadores}</span></div>`;
         metaEl.innerHTML = metaHtml;
+    }
+
+    // Botón GUARDAR (fav)
+    const btnFav = document.getElementById('btnFavModal');
+    if (btnFav) {
+        const isFav = esFavorito(item.id);
+        actualizarBtnFav(btnFav, isFav);
+        btnFav.onclick = () => {
+            const ahora = toggleFavorito(item);
+            actualizarBtnFav(btnFav, ahora);
+        };
+    }
+
+    // Botón ME GUSTA (local toggle visual)
+    const btnLike = document.getElementById('btnLikeModal');
+    if (btnLike) {
+        const likeKey = `like_${item.id}`;
+        const liked = localStorage.getItem(likeKey) === '1';
+        actualizarBtnLike(btnLike, liked);
+        btnLike.onclick = () => {
+            const nowLiked = localStorage.getItem(likeKey) !== '1';
+            localStorage.setItem(likeKey, nowLiked ? '1' : '0');
+            actualizarBtnLike(btnLike, nowLiked);
+        };
     }
 
     // Botón descargar
     const btnDesc = document.getElementById('btnDescargar');
-
-if (btnDesc) {
-
-    const linkDescarga = item.descarga || null;
-
-    if (linkDescarga && linkDescarga.trim() !== '') {
+    if (btnDesc) {
+        const linkDescarga = item.descarga || null;
+        if (linkDescarga && linkDescarga.trim() !== '') {
             btnDesc.style.display = 'flex';
-            // Mostrar info de contraseñas solo si tiene membresía activa
             const infoDesc = document.getElementById('infoDescarga');
             if (infoDesc) infoDesc.style.display = membresiaActiva ? 'block' : 'none';
-
-        btnDesc.onclick = (e) => {
-
-            e.stopPropagation();
-
-            // misma validación que usar "Ver ahora"
-            if (!membresiaActiva) {
-                document.getElementById("modal-vip-bloqueo").classList.add("active");
-                return;
-            }
-
-            try {
-                if (linkDescarga.includes('t.me')) {
-                    tg.openTelegramLink(linkDescarga);
-                } else {
-                    tg.openLink(linkDescarga);
-                }
-            } catch (e) {
-                window.open(linkDescarga, '_blank');
-            }
-
-        };
-
-    } else {
+            btnDesc.onclick = (e) => {
+                e.stopPropagation();
+                if (!membresiaActiva) { document.getElementById("modal-vip-bloqueo").classList.add("active"); return; }
+                try {
+                    if (linkDescarga.includes('t.me')) tg.openTelegramLink(linkDescarga);
+                    else tg.openLink(linkDescarga);
+                } catch (e) { window.open(linkDescarga, '_blank'); }
+            };
+        } else {
             btnDesc.style.display = 'none';
             const infoDesc = document.getElementById('infoDescarga');
             if (infoDesc) infoDesc.style.display = 'none';
         }
+    }
 
-}
+    // Cargar relacionados (mismo tipo/género)
+    cargarRelacionados(item);
 
     // Mostrar modal
     const modal = document.getElementById('modalDetalle');
     if (modal) { modal.classList.add('active'); modal.scrollTop = 0; }
 }
+
+function actualizarBtnFav(btn, isFav) {
+    btn.classList.toggle('d-accion-active', isFav);
+    btn.querySelector('svg').setAttribute('fill', isFav ? '#e8b04b' : 'none');
+    btn.querySelector('svg').setAttribute('stroke', isFav ? '#e8b04b' : 'currentColor');
+    btn.querySelector('span').textContent = isFav ? 'Guardado' : 'Guardar';
+}
+
+function actualizarBtnLike(btn, liked) {
+    btn.classList.toggle('d-accion-active', liked);
+    btn.querySelector('svg').setAttribute('fill', liked ? '#5b9cf6' : 'none');
+    btn.querySelector('svg').setAttribute('stroke', liked ? '#5b9cf6' : 'currentColor');
+    btn.querySelector('span').textContent = liked ? 'Te gustó' : 'Me gusta';
+}
+
+function compartirContenido() {
+    const item = contenidoSeleccionado;
+    if (!item) return;
+    const texto = `🎬 ${item.titulo}\n${item.tipo || ''} ${item.año ? '· '+item.año : ''}\n\nMíralo en QuehayApp`;
+    try {
+        if (navigator.share) {
+            navigator.share({ title: item.titulo, text: texto, url: 'https://t.me/Popcornqh_admin_bot' });
+        } else if (tg?.switchInlineQuery) {
+            tg.switchInlineQuery(item.titulo);
+        } else {
+            navigator.clipboard?.writeText(texto);
+        }
+    } catch(e) {}
+}
+
+async function cargarRelacionados(item) {
+    const wrap = document.getElementById('detalleRelacionadosWrap');
+    const grid = document.getElementById('detalleRelacionados');
+    if (!wrap || !grid) return;
+    wrap.style.display = 'none';
+    try {
+        const genero = item.genero?.split(',')[0]?.trim() || '';
+        const resp = await fetch(`${API_BASE_URL}/api/contenido`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: item.tipo, genero, limit: 8, offset: 0 })
+        });
+        const data = await resp.json();
+        const relacionados = (data.data || []).filter(r => r.id !== item.id).slice(0, 6);
+        if (!relacionados.length) return;
+        grid.innerHTML = relacionados.map(r => `
+            <div class="d-rel-card" onclick='abrirModalContenido(${JSON.stringify(r).replace(/'/g,"\'")})'  >
+                <div class="d-rel-img" style="background-image:url('${r.imagen_url}')">
+                    ${r.rating ? `<span class="d-rel-rating">★ ${parseFloat(r.rating).toFixed(1)}</span>` : ''}
+                </div>
+                <div class="d-rel-titulo">${r.titulo}</div>
+                <div class="d-rel-sub">${r.año || ''}</div>
+            </div>`).join('');
+        wrap.style.display = 'block';
+    } catch(e) { console.error('relacionados:', e); }
+}
+
 
 window.cerrarModalDetalle = function() {
     document.getElementById('modalDetalle')?.classList.remove('active');
@@ -1587,12 +1896,17 @@ document.addEventListener('DOMContentLoaded', function() {
         btnVer.addEventListener('click', function() {
             const item = contenidoSeleccionado;
             if (!item) return;
-            cerrarModalDetalle();
 
             if (!membresiaActiva) {
                 document.getElementById("modal-vip-bloqueo").classList.add("active");
                 return;
             }
+
+            // ✅ Registrar en historial SOLO cuando presiona reproducir
+            agregarAlHistorial(item);
+
+            cerrarModalDetalle();
+
             if ((!item.fuente || item.fuente === 'canal') && item.enlace_canal) {
                 if (item.enlace_canal.includes('t.me')) tg.openTelegramLink(item.enlace_canal);
                 else tg.openLink(item.enlace_canal);
