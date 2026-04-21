@@ -1225,7 +1225,9 @@ def api_contenido():
     tipo  = data.get("tipo","todo")
     limit = int(data.get("limit",20))
     offset = int(data.get("offset",0))
+    
     query = supabase_service.table("contenido").select("*", count="exact")
+    
     if tipo != "todo":
         query = query.eq("tipo", tipo)
     if busqueda:
@@ -1235,7 +1237,10 @@ def api_contenido():
         query = query.ilike("genero", f"%{genero}%")
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
-    resultados = query.order("id", desc=True).range(offset, offset+limit-1).execute()
+    
+    # 🔥 CAMBIA ESTO: Ordenar por fecha de creación (reciente primero)
+    resultados = query.order("created_at", desc=True).range(offset, offset+limit-1).execute()
+    
     return jsonify({"data": resultados.data, "total": resultados.count})
 
 @app.route("/api/admin/pagos", methods=["POST"])
