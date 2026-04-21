@@ -1417,24 +1417,34 @@ async function cargarGeneros(){
 // Reutilizable tanto para inicio como para explorar/buscar
 async function cargarGenerosEnContenedor(containerId) {
     try {
+        // Obtener TODO el contenido
         const res = await fetch(`${API_BASE_URL}/api/contenido`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ busqueda: "", tipo: "todo", limit: 300, offset: 0 })
+            body: JSON.stringify({ busqueda: "", tipo: "todo", limit: 500, offset: 0 })
         });
         const result = await res.json();
-        const data = result.data;
+        let data = result.data;
         if (!data) return;
+
+        // Limpiar y procesar los géneros al inicio
+        data = data.map(item => ({
+            ...item,
+            generosArray: item.genero ? item.genero.split(',').map(g => g.trim().toLowerCase()) : []
+        }));
 
         const grupos = {
             misterioTerror: ["misterio", "terror"],
+            suspense: ["suspense"],
             comedia: ["comedia"],
             romanceDrama: ["romance", "drama"],
             accionWestern: ["acción", "western"],
             animacionFamilia: ["animación", "familia"]
         };
+        
         const titulos = {
             misterioTerror: "Misterio y Terror",
+            suspense: "Suspense",
             comedia: "Comedia",
             romanceDrama: "Romance y Drama",
             accionWestern: "Acción y Western",
@@ -1445,11 +1455,14 @@ async function cargarGenerosEnContenedor(containerId) {
         if (!contenedor) return;
 
         let html = "";
-        Object.keys(grupos).forEach(key => {
+        for (const [key, generosGrupo] of Object.entries(grupos)) {
+            // Filtrar por coincidencia de géneros
             const peliculas = data.filter(item =>
-                grupos[key].includes((item.genero || "").toLowerCase())
+                item.generosArray.some(g => generosGrupo.includes(g))
             );
-            if (peliculas.length === 0) return;
+            
+            if (peliculas.length === 0) continue;
+            
             html += `
                 <section class="genero-section genero-${key}">
                     <h2 class="genero-titulo">${titulos[key]}</h2>
@@ -1462,7 +1475,7 @@ async function cargarGenerosEnContenedor(containerId) {
                     </div>
                 </section>
             `;
-        });
+        }
         contenedor.innerHTML = html;
     } catch (e) {
         console.error("Error cargando géneros:", e);
@@ -1841,16 +1854,65 @@ function actualizarBtnLike(btn, liked) {
 function compartirContenido() {
     const item = contenidoSeleccionado;
     if (!item) return;
-    const texto = `🎬 ${item.titulo}\n${item.tipo || ''} ${item.año ? '· '+item.año : ''}\n\nMíralo en QuehayApp`;
+
+    // Texto completo con título, tipo, año, sinopsis corta y link al bot
+    const sinCorta = item.sinopsis ? item.sinopsis.slice(0, 120) + (item.sinopsis.length > 120 ? '...' : '') : '';
+    const tipoParts = [item.tipo, item.año].filter(Boolean).join(' · ');
+    const texto = `🎬 *${item.titulo}*\n${tipoParts}\n\n${sinCorta}\n\n📲 Míralo en QuehayApp:\nhttps://t.me/${TELEGRAM_BOT_USERNAME}?start=miniapp`;
+
+    const textoPlano = texto.replace(/\*/g, '');
+
     try {
-        if (navigator.share) {
-            navigator.share({ title: item.titulo, text: texto, url: 'https://t.me/Popcornqh_admin_bot' });
-        } else if (tg?.switchInlineQuery) {
-            tg.switchInlineQuery(item.titulo);
+        const isInTelegram = !!(tg?.initDataUnsafe?.user);
+
+        if (isInTelegram) {
+            // Dentro de Telegram WebApp — copiar al portapapeles y mostrar popup nativo
+            const copyOk = (() => {
+                try {
+                    const el = document.createElement('textarea');
+                    el.value = textoPlano;
+                    el.style.position = 'fixed'; el.style.opacity = '0';
+                    document.body.appendChild(el);
+                    el.select(); el.setSelectionRange(0, 99999);
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    return true;
+                } catch { return false; }
+            })();
+
+            // Mostrar popup de Telegram con opción de abrir para compartir
+            tg.showPopup({
+                title: '¡Copiado!',
+                message: copyOk
+                    ? `El texto de "${item.titulo}" fue copiado. Pégalo en cualquier chat de Telegram.`
+                    : `Comparte "${item.titulo}" con tus amigos en Telegram.`,
+                buttons: [
+                    { id: 'abrir_bot', type: 'default', text: '📲 Abrir bot para compartir' },
+                    { id: 'cerrar', type: 'cancel', text: 'Cerrar' }
+                ]
+            }, (btnId) => {
+                if (btnId === 'abrir_bot') {
+                    tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/${TELEGRAM_BOT_USERNAME}%3Fstart%3Dminiapp&text=${encodeURIComponent(textoPlano)}`);
+                }
+            });
+
+        } else if (navigator.share) {
+            // Navegador web con soporte nativo de share sheet (incluye imagen si la tienes)
+            navigator.share({
+                title: item.titulo,
+                text: textoPlano,
+                url: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=miniapp`
+            });
         } else {
-            navigator.clipboard?.writeText(texto);
+            // Fallback: copiar al portapapeles
+            navigator.clipboard?.writeText(textoPlano).then(() => {
+                alert('¡Copiado! Pega el texto donde quieras compartirlo.');
+            });
         }
-    } catch(e) {}
+    } catch(e) {
+        // Último recurso silencioso
+        try { navigator.clipboard?.writeText(textoPlano); } catch {}
+    }
 }
 
 async function cargarRelacionados(item) {
