@@ -1,4 +1,30 @@
-pyTelegramBotAPI
-supabase
-flask
-flask-cors
+# Flask & Web
+Flask==2.3.2
+flask-cors==4.0.0
+Werkzeug==2.3.6
+
+# Telegram Bot
+pyTelegramBotAPI==4.12.0
+
+# Supabase
+supabase==2.0.3
+supabase-py==2.0.3
+
+# API & HTTP
+requests==2.31.0
+urllib3==2.0.4
+
+# Database & ORM
+python-dotenv==1.0.0
+
+# Data Processing
+python-dateutil==2.8.2
+
+# Utilities
+gunicorn==21.2.0
+
+# Development (opcional)
+# pytest==7.4.0
+# pytest-flask==1.2.0
+# black==23.7.0
+# flake8==6.0.0
