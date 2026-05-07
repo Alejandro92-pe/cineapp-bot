@@ -2,16 +2,19 @@
 Flask==2.3.2
 flask-cors==4.0.0
 Werkzeug==2.3.6
-
+python-3.11.9
 # Telegram Bot
 pyTelegramBotAPI==4.12.0
 
 # Supabase
-supabase==2.0.3
+supabase==2.1.0
+postgrest-py==0.13.0 
 
 # API & HTTP
-requests==2.31.0
-urllib3==2.0.4
+requests==2.32.0
+httpx==0.25.0
+httpcore==1.0.0
+urllib3==2.1.0
 
 # Database & ORM
 python-dotenv==1.0.0
