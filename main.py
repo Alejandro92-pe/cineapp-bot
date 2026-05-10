@@ -472,7 +472,8 @@ def recibir_foto(message):
             caption=f"📸 VOUCHER\nUsuario: {user_id}\nPlan: {plan.upper()}")
         del user_states[user_id]
         return
-    bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+    fwd = bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+    if fwd: _guardar_fwd(fwd.message_id, user_id)
     bot.send_message(chat_id, "📩 Tu imagen fue enviada a soporte.")
 
 # ============ ARCHIVOS ============
@@ -483,30 +484,66 @@ def soporte_archivos(message):
         return
     if message.from_user.id in user_states:
         return
-    bot.forward_message(GRUPO_SOPORTE_ID, message.chat.id, message.message_id)
+    fwd = bot.forward_message(GRUPO_SOPORTE_ID, message.chat.id, message.message_id)
+    if fwd: _guardar_fwd(fwd.message_id, message.from_user.id)
     bot.send_message(message.chat.id, "📩 Tu archivo fue enviado a soporte.")
 
 # ============ RESPUESTA DESDE GRUPO SOPORTE ============
 
-@bot.message_handler(func=lambda m: m.chat.id == GRUPO_SOPORTE_ID and m.reply_to_message)
+# Mapa: forward_msg_id → telegram_id del usuario (para privacidad)
+_fwd_map = {}
+
+def _guardar_fwd(fwd_msg_id, user_id):
+    _fwd_map[fwd_msg_id] = user_id
+    if len(_fwd_map) > 300:
+        for k in list(_fwd_map.keys())[:100]: _fwd_map.pop(k, None)
+
+def _uid_desde_reply(message):
+    origen = message.reply_to_message
+    if not origen: return None
+    # 1. forward_from disponible (sin privacidad)
+    if origen.forward_from:
+        return origen.forward_from.id
+    # 2. Buscamos en nuestro mapa por message_id del forward
+    uid = _fwd_map.get(origen.message_id)
+    if uid: return uid
+    # 3. Buscar ID en el texto/caption del mensaje forwarded (ej: vouchers "Usuario: 12345")
+    texto = origen.caption or origen.text or ""
+    m = re.search(r'Usuario[:\s]+(\d{5,})', texto)
+    if m: return int(m.group(1))
+    return None
+
+@bot.message_handler(
+    content_types=["text", "photo", "video", "document", "audio", "voice", "sticker"],
+    func=lambda m: m.chat.id == GRUPO_SOPORTE_ID and m.reply_to_message is not None
+)
 def responder_desde_grupo(message):
+    """Tú escribes en el grupo de soporte → el bot le manda tu respuesta al usuario."""
     try:
-        origen = message.reply_to_message
-        if origen.forward_from:
-            uid = origen.forward_from.id
-            if message.text:
-                bot.send_message(uid, f"📝 *Respuesta de soporte:*\n\n{message.text}", parse_mode="Markdown")
-            elif message.photo:
-                bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption or "")
-            elif message.document:
-                bot.send_document(uid, message.document.file_id, caption=message.caption or "")
-            elif message.video:
-                bot.send_video(uid, message.video.file_id, caption=message.caption or "")
-            bot.reply_to(message, "✅ Respuesta enviada.")
-        else:
-            bot.reply_to(message, "❌ No es un forward válido.")
+        uid = _uid_desde_reply(message)
+        if not uid:
+            bot.reply_to(message,
+                "❌ No se puede identificar al usuario (privacidad activada).\n"
+                "Usa: /reply ID_USUARIO tu mensaje")
+            return
+        if message.text:
+            bot.send_message(uid, f"📝 *Respuesta de soporte:*\n\n{message.text}", parse_mode="Markdown")
+        elif message.photo:
+            bot.send_photo(uid, message.photo[-1].file_id, caption=message.caption or "")
+        elif message.document:
+            bot.send_document(uid, message.document.file_id, caption=message.caption or "")
+        elif message.video:
+            bot.send_video(uid, message.video.file_id, caption=message.caption or "")
+        elif message.audio:
+            bot.send_audio(uid, message.audio.file_id)
+        elif message.voice:
+            bot.send_voice(uid, message.voice.file_id)
+        elif message.sticker:
+            bot.send_sticker(uid, message.sticker.file_id)
+        bot.reply_to(message, f"✅ Enviado al usuario {uid}.")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {e}")
+
 
 # ============ TEXTO LIBRE ============
 
@@ -541,7 +578,8 @@ def manejar_texto(message):
             bot.send_message(chat_id, KEYWORD_REPLIES[keyword], parse_mode="Markdown")
             return
 
-    bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+    fwd = bot.forward_message(GRUPO_SOPORTE_ID, chat_id, message.message_id)
+    if fwd: _guardar_fwd(fwd.message_id, user_id)
     bot.send_message(chat_id, "📩 Tu mensaje fue enviado a soporte.")
 
 # ============ KEYWORD REPLIES ============
@@ -825,6 +863,26 @@ def reactivar(message):
 @bot.message_handler(commands=['id'])
 def get_id(message):
     bot.reply_to(message, f"Chat ID: `{message.chat.id}`", parse_mode="Markdown")
+
+@bot.message_handler(commands=['reply'])
+def reply_directo(message):
+    """Fallback para cuando Telegram bloquea forward_from por privacidad.
+    Úsalo en el grupo de soporte: /reply 5824989040 Tu respuesta aquí
+    """
+    if message.chat.id != GRUPO_SOPORTE_ID and message.from_user.id != ADMIN_ID:
+        return
+    partes = message.text.split(None, 2)
+    if len(partes) < 3:
+        bot.reply_to(message, "❌ Uso: /reply ID_USUARIO mensaje\nEj: /reply 5824989040 Ya activé tu membresía.")
+        return
+    try:
+        uid = int(partes[1])
+        bot.send_message(uid, f"📝 *Respuesta de soporte:*\n\n{partes[2]}", parse_mode="Markdown")
+        bot.reply_to(message, f"✅ Mensaje enviado a {uid}.")
+    except ValueError:
+        bot.reply_to(message, "❌ El ID debe ser un número.")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}")
 
 @bot.message_handler(commands=['publicar'])
 def publicar_manual(message):

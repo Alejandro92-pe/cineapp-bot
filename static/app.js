@@ -615,7 +615,7 @@ function toggleFavorito(item) {
   const favs = getFavoritos();
   const idx = favs.findIndex(f => f.id === item.id);
   if (idx >= 0) favs.splice(idx, 1);
-  else favs.unshift({ id: item.id, titulo: item.titulo, imagen_url: item.imagen_url, tipo: item.tipo, año: item.año });
+  else favs.unshift({ ...item });  // guardar objeto completo para que descarga/fuente/tmdb_id estén disponibles
   localStorage.setItem(getFavoritosKey(), JSON.stringify(favs.slice(0, 200)));
   return idx < 0; // true si se agregó
 }
@@ -640,7 +640,7 @@ function getHistorial() {
 }
 function agregarAlHistorial(item) {
   const hist = getHistorial().filter(h => h.id !== item.id);
-  hist.unshift({ id: item.id, titulo: item.titulo, imagen_url: item.imagen_url, tipo: item.tipo, año: item.año, visto_en: Date.now() });
+  hist.unshift({ ...item, visto_en: Date.now() });  // guardar objeto completo
   localStorage.setItem(getHistorialKey(), JSON.stringify(hist.slice(0, 50)));
 }
 
@@ -1955,13 +1955,29 @@ function cerrarModalContenido() { cerrarModalDetalle(); }
 document.addEventListener('DOMContentLoaded', function() {
     const btnVer = document.getElementById('btnVerAhora');
     if (btnVer) {
-        btnVer.addEventListener('click', function() {
-            const item = contenidoSeleccionado;
+        btnVer.addEventListener('click', async function() {
+            let item = contenidoSeleccionado;
             if (!item) return;
 
             if (!membresiaActiva) {
                 document.getElementById("modal-vip-bloqueo").classList.add("active");
                 return;
+            }
+
+            // Si el item viene del cache (favs/historial) puede tener campos incompletos.
+            // Intentamos obtener el item completo de la API usando el id.
+            if (item.id && !item.fuente && !item.enlace_canal && !item.tmdb_id) {
+                try {
+                    const resp = await fetch(`${API_BASE_URL}/api/contenido`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ busqueda: '', tipo: 'todo', limit: 1, offset: 0, id: item.id })
+                    });
+                    const data = await resp.json();
+                    // Buscar por id en los resultados
+                    const completo = (data.data || []).find(d => d.id === item.id);
+                    if (completo) item = completo;
+                } catch(e) { console.warn('No se pudo obtener item completo:', e); }
             }
 
             // ✅ Registrar en historial SOLO cuando presiona reproducir
@@ -1976,7 +1992,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (item.fuente === 'vimeus' && item.tmdb_id) {
                 abrirReproductorVimeus(item);
+                return;
             }
+            // Fallback: si no tiene fuente ni enlace, no hace nada silenciosamente
+            console.warn('Item sin fuente ni enlace:', item);
         });
     }
 });
