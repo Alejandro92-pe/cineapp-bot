@@ -48,6 +48,25 @@ GRUPO_CONTENIDO_ID = -1002991571573
 CANAL_PUBLICO_ID   = "@mejoresanimesenlatino"
 CANAL_PRIVADO_ID   = -1002503337168
 
+# Canales VIP donde se hace ban/unban al vencer/renovar
+CANALES_VIP = [CANAL_PELICULAS_ID, CANAL_SERIES_ID, GRUPO_CONTENIDO_ID]
+
+def desbanear_usuario(user_id: int):
+    """
+    Elimina al usuario de la lista de expulsados en los 3 canales VIP.
+    Necesario antes de enviar los enlaces de acceso cuando renueva.
+    Si el usuario no estaba baneado, unban_chat_member lo ignora silenciosamente.
+    """
+    errores = []
+    for canal in CANALES_VIP:
+        try:
+            bot.unban_chat_member(chat_id=canal, user_id=user_id, only_if_banned=True)
+            print(f"✅ Unban {user_id} en {canal}")
+        except Exception as e:
+            errores.append(f"{canal}: {e}")
+            print(f"⚠️ Unban fallido {user_id} en {canal}: {e}")
+    return len(errores) == 0
+
 MINIAPP_URL = "https://cineapp-bot.onrender.com"
 BMC_URL     = "https://buymeacoffee.com/quehay/extras"
 BMC_LINKS   = {
@@ -712,9 +731,15 @@ def activar_usuario(user_id, membresia, chat_id_admin):
 
         if not tiene_activa:
             try:
-                inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{user_id}_pelis",  member_limit=1, expire_date=int(time.time()) + 604800)
-                inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{user_id}_series", member_limit=1, expire_date=int(time.time()) + 604800)
-                inv_grupo  = bot.create_chat_invite_link(GRUPO_CONTENIDO_ID, name=f"U{user_id}_grupo",  member_limit=1, expire_date=int(time.time()) + 604800)
+                # ✅ SIEMPRE desbanear primero — si renovó después de vencer,
+                # el usuario estará en la lista de expulsados y los enlaces no funcionarán
+                # sin el unban. Si nunca fue baneado, unban lo ignora sin error.
+                desbanear_usuario(user_id)
+
+                exp = int(time.time()) + 604800  # 7 días
+                inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{user_id}_pelis",  member_limit=1, expire_date=exp)
+                inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{user_id}_series", member_limit=1, expire_date=exp)
+                inv_grupo  = bot.create_chat_invite_link(GRUPO_CONTENIDO_ID, name=f"U{user_id}_grupo",  member_limit=1, expire_date=exp)
                 markup = InlineKeyboardMarkup(row_width=1)
                 markup.add(
                     InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
@@ -726,12 +751,12 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                     "👇 Toca los botones para unirte\n\n"
                     "⚠️ Enlaces de uso único - expiran en 7 días",
                     parse_mode="HTML", reply_markup=markup)
-                bot.send_message(user_id, "📍 Únete a los 3 canales, silencialos y usa la MiniApp para ver el contenido")
-                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado y 3 enlaces enviados")
+                bot.send_message(user_id, "📍 Únete a los 3 canales, silencialos y usa la MiniApp para ver el contenido.")
+                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado — unban + 3 enlaces enviados")
             except Exception as e:
                 bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
         else:
-            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} mejoró a {membresia} (sin nuevos enlaces)")
+            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} mejoró a {membresia} (ya está en canales, sin nuevos enlaces)")
 
         total_pedidos = limite_pedidos_nuevo + pedidos_extra
         if es_mejora:
@@ -830,6 +855,7 @@ def generar_enlaces(message):
         bot.reply_to(message, "❌ Usa: /generar_enlaces USER_ID"); return
     try:
         uid = int(partes[1])
+        desbanear_usuario(uid)  # eliminar de expulsados si aplica antes de crear enlaces
         inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{uid}_pelis",  member_limit=1, expire_date=int(time.time()) + 604800)
         inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{uid}_series", member_limit=1, expire_date=int(time.time()) + 604800)
         inv_grupo  = bot.create_chat_invite_link(GRUPO_CONTENIDO_ID, name=f"U{uid}_grupo",  member_limit=1, expire_date=int(time.time()) + 604800)
@@ -1238,11 +1264,12 @@ def verificar_vencimientos():
     for u in vencidos.data:
         supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
         supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado","activa").execute()
-        for canal in [CANAL_PELICULAS_ID, CANAL_SERIES_ID, GRUPO_CONTENIDO_ID]:
+        for canal in CANALES_VIP:
             try:
                 bot.ban_chat_member(chat_id=canal, user_id=u["telegram_id"])
-            except:
-                pass
+                print(f"🔨 Baneado {u['telegram_id']} de {canal}")
+            except Exception as e:
+                print(f"⚠️ Ban fallido {u['telegram_id']} en {canal}: {e}")
         try:
             bot.send_message(u["telegram_id"], "❌ Tu membresía ha vencido. Renueva para seguir disfrutando.")
         except:
@@ -1279,22 +1306,35 @@ def api_planes():
 @app.route("/api/contenido", methods=["POST"])
 def api_contenido():
     data = request.get_json()
+
     busqueda = data.get("busqueda","")
     tipo  = data.get("tipo","todo")
     limit = int(data.get("limit",20))
     offset = int(data.get("offset",0))
-    query = supabase_service.table("contenido").select("*", count="exact")
+
+    query = supabase_service.table("contenido") \
+        .select("*", count="exact") \
+        .eq("disponible", True)
+
     if tipo != "todo":
         query = query.eq("tipo", tipo)
+
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
+
     genero = data.get("genero")
     if genero:
         query = query.ilike("genero", f"%{genero}%")
+
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
+
     resultados = query.order("id", desc=True).range(offset, offset+limit-1).execute()
-    return jsonify({"data": resultados.data, "total": resultados.count})
+
+    return jsonify({
+        "data": resultados.data,
+        "total": resultados.count
+    })
 
 @app.route("/api/admin/pagos", methods=["POST"])
 def api_admin_pagos():

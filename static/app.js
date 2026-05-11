@@ -1728,7 +1728,24 @@ function mostrarModal(titulo, mensaje, callback) {
 // ============ MODAL DETALLE CONTENIDO — Premium ============
 let contenidoSeleccionado = null;
 
-function abrirModalContenido(item) {
+async function abrirModalContenido(item) {
+    // Si el item viene del cache (favs/historial), puede no tener todos los campos
+    // (descarga, fuente, tmdb_id, protagonistas...). Fetch completo por id.
+    // Si el item viene de cache viejo (antes del fix del spread),
+    // 'descarga' no existirá como key → fetch completo desde la API
+    if (item.id && !('descarga' in item)) {
+        try {
+            const resp = await fetch(`${API_BASE_URL}/api/contenido`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ busqueda: '', tipo: item.tipo || 'todo', limit: 50, offset: 0 })
+            });
+            const data = await resp.json();
+            const completo = (data.data || []).find(d => d.id === item.id);
+            if (completo) item = { ...completo };
+        } catch(e) { console.warn('No se pudo fetch item completo:', e); }
+    }
+
     contenidoSeleccionado = item;
     // historial se registra SOLO cuando presiona reproducir
 
@@ -1930,14 +1947,21 @@ async function cargarRelacionados(item) {
         const data = await resp.json();
         const relacionados = (data.data || []).filter(r => r.id !== item.id).slice(0, 6);
         if (!relacionados.length) return;
-        grid.innerHTML = relacionados.map(r => `
+        grid.innerHTML = relacionados.map(r => {
+            const score = r.rating ? parseFloat(r.rating) : 0;
+            const rColor = score >= 7 ? '#2ecc71' : score >= 5 ? '#f1c40f' : '#e74c3c';
+            const ratingBadge = score > 0
+                ? `<span class="d-rel-rating" style="color:${rColor}">★ ${score.toFixed(1)}</span>`
+                : '';
+            return `
             <div class="d-rel-card" onclick='abrirModalContenido(${JSON.stringify(r).replace(/'/g,"\'")})'  >
                 <div class="d-rel-img" style="background-image:url('${r.imagen_url}')">
-                    ${r.rating ? `<span class="d-rel-rating">★ ${parseFloat(r.rating).toFixed(1)}</span>` : ''}
+                    ${ratingBadge}
                 </div>
                 <div class="d-rel-titulo">${r.titulo}</div>
                 <div class="d-rel-sub">${r.año || ''}</div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
         wrap.style.display = 'block';
     } catch(e) { console.error('relacionados:', e); }
 }

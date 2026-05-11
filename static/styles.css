@@ -1474,7 +1474,7 @@ border-radius:10px;
     bottom: 4px; left: 4px;
     font-size: 10px;
     font-weight: 700;
-    color: #f1c40f;
+    /* color viene del inline style desde JS según la puntuación */
     background: rgba(0,0,0,0.6);
     border-radius: 3px;
     padding: 2px 5px;
