@@ -125,6 +125,34 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
         "destacado": False,
     }
 
+# ============ TEMPORADAS — IMPORTACIÓN DESDE TMDB ============
+
+def importar_temporadas_desde_tmdb(tmdb_id: int, contenido_id: int) -> dict:
+    data = tmdb_get(f"/tv/{tmdb_id}")
+    seasons_raw = data.get("seasons", [])
+    seasons = [s for s in seasons_raw if s.get("season_number", 0) > 0]
+    existentes_res = supabase_service.table("temporadas") \
+        .select("numero").eq("contenido_id", contenido_id).execute()
+    existentes = {e["numero"] for e in existentes_res.data}
+    insertadas, omitidas = [], []
+    for s in seasons:
+        num = s.get("season_number")
+        if num in existentes:
+            omitidas.append(num); continue
+        poster = s.get("poster_path") or data.get("poster_path") or ""
+        supabase_service.table("temporadas").insert({
+            "contenido_id": contenido_id,
+            "numero":       num,
+            "nombre":       s.get("name") or f"Temporada {num}",
+            "poster_url":   f"{TMDB_IMG}{poster}" if poster else "",
+            "descripcion":  s.get("overview") or "",
+            "episodios":    s.get("episode_count") or 0,
+            "enlace":       None,
+        }).execute()
+        insertadas.append(num)
+    print(f"Temporadas {contenido_id}: insertadas={insertadas}")
+    return {"insertadas": len(insertadas), "omitidas": len(omitidas), "numeros": insertadas}
+
 # ============ ENVÍO A CANALES ============
 
 def generar_estrellas(rating: float) -> str:
@@ -1209,6 +1237,84 @@ def api_admin_publicar():
         print(f"❌ Error api_admin_publicar: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/admin/importar_temporadas", methods=["POST"])
+def api_importar_temporadas():
+    """
+    Importa temporadas desde TMDB para una serie/anime ya existente.
+    Body: { admin_id, contenido_id }
+    El contenido debe tener tmdb_id guardado.
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not check_admin(data):
+            return jsonify({"error": "No autorizado"}), 403
+        contenido_id = int(data.get("contenido_id", 0))
+        if not contenido_id:
+            return jsonify({"error": "contenido_id requerido"}), 400
+
+        contenido_res = supabase_service.table("contenido").select("*").eq("id", contenido_id).execute()
+        if not contenido_res.data:
+            return jsonify({"error": "Contenido no encontrado"}), 404
+        contenido = contenido_res.data[0]
+
+        if contenido.get("tipo") not in ("serie", "anime"):
+            return jsonify({"error": "Solo se pueden importar temporadas de series o anime"}), 400
+
+        tmdb_id = contenido.get("tmdb_id")
+        if not tmdb_id:
+            return jsonify({"error": "Este contenido no tiene tmdb_id. Reimportalo desde TMDB."}), 400
+
+        resultado = importar_temporadas_desde_tmdb(int(tmdb_id), contenido_id)
+        return jsonify({"success": True, **resultado}), 200
+    except requests.HTTPError as e:
+        return jsonify({"error": f"TMDB error {e.response.status_code}"}), 400
+    except Exception as e:
+        print(f"❌ importar_temporadas: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/temporadas/<int:contenido_id>", methods=["GET"])
+def api_get_temporadas(contenido_id):
+    """Devuelve todas las temporadas de un contenido. Público."""
+    try:
+        res = supabase_service.table("temporadas")             .select("*").eq("contenido_id", contenido_id)             .order("numero").execute()
+        return jsonify({"temporadas": res.data}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/temporadas/enlace", methods=["POST"])
+def api_actualizar_enlace_temporada():
+    """
+    Actualiza el enlace de reproducción de una temporada específica.
+    Body: { admin_id, temporada_id, enlace }
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not check_admin(data):
+            return jsonify({"error": "No autorizado"}), 403
+        temporada_id = int(data.get("temporada_id", 0))
+        enlace       = data.get("enlace", "").strip()
+        if not temporada_id:
+            return jsonify({"error": "temporada_id requerido"}), 400
+        supabase_service.table("temporadas")             .update({"enlace": enlace or None})             .eq("id", temporada_id).execute()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/temporadas/delete", methods=["POST"])
+def api_eliminar_temporada():
+    """Elimina una temporada. Body: { admin_id, temporada_id }"""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not check_admin(data):
+            return jsonify({"error": "No autorizado"}), 403
+        temporada_id = int(data.get("temporada_id", 0))
+        if not temporada_id:
+            return jsonify({"error": "temporada_id requerido"}), 400
+        supabase_service.table("temporadas").delete().eq("id", temporada_id).execute()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/cron/publicar_contenido", methods=["GET"])
 def cron_publicar_contenido():
     try:
@@ -1306,35 +1412,22 @@ def api_planes():
 @app.route("/api/contenido", methods=["POST"])
 def api_contenido():
     data = request.get_json()
-
     busqueda = data.get("busqueda","")
     tipo  = data.get("tipo","todo")
     limit = int(data.get("limit",20))
     offset = int(data.get("offset",0))
-
-    query = supabase_service.table("contenido") \
-        .select("*", count="exact") \
-        .eq("disponible", True)
-
+    query = supabase_service.table("contenido").select("*", count="exact")
     if tipo != "todo":
         query = query.eq("tipo", tipo)
-
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
-
     genero = data.get("genero")
     if genero:
         query = query.ilike("genero", f"%{genero}%")
-
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
-
     resultados = query.order("id", desc=True).range(offset, offset+limit-1).execute()
-
-    return jsonify({
-        "data": resultados.data,
-        "total": resultados.count
-    })
+    return jsonify({"data": resultados.data, "total": resultados.count})
 
 @app.route("/api/admin/pagos", methods=["POST"])
 def api_admin_pagos():

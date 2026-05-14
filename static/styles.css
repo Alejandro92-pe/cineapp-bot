@@ -1,4 +1,4 @@
-* {
+* * {
                 margin: 0;
                 padding: 0;
                 box-sizing: border-box;
@@ -2690,4 +2690,70 @@ stroke:#00ffff;
     font-size: 12px;
     font-weight: 700;
     vertical-align: middle;
+}
+
+/* ============ SELECTOR DE TEMPORADAS ============ */
+.temp-wrap {
+    margin: 0 0 14px;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 12px 12px 10px;
+}
+.temp-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 10px;
+}
+.temp-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+.temp-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: rgba(255,255,255,0.06);
+    border: 0.5px solid rgba(255,255,255,0.10);
+    border-radius: 9px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    min-width: 64px;
+    -webkit-tap-highlight-color: transparent;
+}
+.temp-btn:active { transform: scale(0.94); }
+.temp-btn-active {
+    background: rgba(232,176,75,0.15);
+    border-color: rgba(232,176,75,0.45);
+}
+.temp-num {
+    font-size: 14px;
+    font-weight: 700;
+    color: #f0f0f2;
+    line-height: 1;
+}
+.temp-btn-active .temp-num { color: #e8b04b; }
+.temp-nombre {
+    font-size: 10px;
+    color: rgba(255,255,255,0.45);
+    white-space: nowrap;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+.temp-btn-active .temp-nombre { color: rgba(232,176,75,0.8); }
+.temp-eps {
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    line-height: 1;
 }

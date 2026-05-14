@@ -1,4 +1,5 @@
 // ============ CONFIGURACION ============
+// ============ CONFIGURACION ============
 const API_BASE_URL = "https://cineapp-bot.onrender.com";
 const TELEGRAM_BOT_USERNAME = "Popcornqh_admin_bot";    
 const ADMIN_ID = 5824989040;
@@ -1846,6 +1847,9 @@ async function abrirModalContenido(item) {
         }
     }
 
+    // Selector de temporadas (solo series/anime con temporadas en BD)
+    await cargarTemporadas(item);
+
     // Cargar relacionados (mismo tipo/género)
     cargarRelacionados(item);
 
@@ -1932,6 +1936,83 @@ function compartirContenido() {
     }
 }
 
+// ============ TEMPORADAS ============
+let temporadasActuales = [];  // caché de temporadas de la serie abierta
+let temporadaSeleccionada = null;
+
+async function cargarTemporadas(item) {
+    const wrap = document.getElementById('detalleTemporadasWrap');
+    if (!wrap) return;
+
+    // Solo aplica a series y anime
+    if (!['serie', 'anime'].includes(item.tipo)) {
+        wrap.style.display = 'none';
+        temporadasActuales = [];
+        temporadaSeleccionada = null;
+        return;
+    }
+
+    try {
+        const resp = await fetch(`${API_BASE_URL}/api/temporadas/${item.id}`);
+        const data = await resp.json();
+        const temps = data.temporadas || [];
+
+        if (!temps.length) {
+            wrap.style.display = 'none';
+            temporadasActuales = [];
+            temporadaSeleccionada = null;
+            return;
+        }
+
+        temporadasActuales = temps;
+        // Seleccionar la primera temporada por defecto
+        seleccionarTemporada(temps[0], item, false);
+
+        // Renderizar selector
+        wrap.style.display = 'block';
+        const grid = document.getElementById('detalleTemporadasGrid');
+        if (grid) {
+            grid.innerHTML = temps.map((t, i) => `
+                <button class="temp-btn ${i === 0 ? 'temp-btn-active' : ''}"
+                    id="tempbtn_${t.id}"
+                    onclick="seleccionarTemporada(${JSON.stringify(t).replace(/'/g, "\\'")} , contenidoSeleccionado, true, this)">
+                    <span class="temp-num">T${t.numero}</span>
+                    <span class="temp-nombre">${t.nombre || 'Temporada ' + t.numero}</span>
+                    ${t.episodios ? `<span class="temp-eps">${t.episodios} ep</span>` : ''}
+                </button>`).join('');
+        }
+    } catch(e) {
+        console.warn('Error cargando temporadas:', e);
+        wrap.style.display = 'none';
+    }
+}
+
+function seleccionarTemporada(temporada, itemBase, actualizarPoster = true, btnEl = null) {
+    temporadaSeleccionada = temporada;
+
+    // Marcar botón activo
+    document.querySelectorAll('.temp-btn').forEach(b => b.classList.remove('temp-btn-active'));
+    if (btnEl) btnEl.classList.add('temp-btn-active');
+
+    // Cambiar poster si la temporada tiene su propia portada
+    if (actualizarPoster && temporada.poster_url) {
+        const imgEl = document.getElementById('detalleImagen');
+        const bgEl  = document.getElementById('detalleHeroBg');
+        if (imgEl) imgEl.src = temporada.poster_url;
+        if (bgEl)  bgEl.style.backgroundImage = `url('${temporada.poster_url}')`;
+    }
+
+    // El botón Reproducir ahora usará el enlace de la temporada
+    // (btnVerAhora listener lo lee de temporadaSeleccionada en tiempo real)
+    const btnVer = document.getElementById('btnVerAhora');
+    if (btnVer) {
+        const tieneEnlace = temporada.enlace && temporada.enlace.trim() !== '';
+        btnVer.disabled = !tieneEnlace;
+        btnVer.title = tieneEnlace ? '' : 'Esta temporada aún no tiene enlace de reproducción';
+        btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
+    }
+}
+
 async function cargarRelacionados(item) {
     const wrap = document.getElementById('detalleRelacionadosWrap');
     const grid = document.getElementById('detalleRelacionados');
@@ -2009,6 +2090,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             cerrarModalDetalle();
 
+            // Si tiene temporada seleccionada con enlace → usar ese enlace
+            if (temporadaSeleccionada && temporadaSeleccionada.enlace) {
+                const link = temporadaSeleccionada.enlace.trim();
+                try {
+                    if (link.includes('t.me')) tg.openTelegramLink(link);
+                    else tg.openLink(link);
+                } catch(e) { window.open(link, '_blank'); }
+                return;
+            }
+
+            // Modo normal (sin temporadas)
             if ((!item.fuente || item.fuente === 'canal') && item.enlace_canal) {
                 if (item.enlace_canal.includes('t.me')) tg.openTelegramLink(item.enlace_canal);
                 else tg.openLink(item.enlace_canal);
@@ -2018,7 +2110,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 abrirReproductorVimeus(item);
                 return;
             }
-            // Fallback: si no tiene fuente ni enlace, no hace nada silenciosamente
             console.warn('Item sin fuente ni enlace:', item);
         });
     }

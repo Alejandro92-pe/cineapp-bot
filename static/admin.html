@@ -597,6 +597,39 @@
   }
   .batch-textarea:focus { border-color: var(--accent); }
   .batch-textarea::placeholder { color: var(--muted); }
+  .btn-import-temps {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(91,156,246,0.12);
+    border: 0.5px solid rgba(91,156,246,0.3);
+    border-radius: var(--radius-sm);
+    color: #90b8f8;
+    font-size: 11px; font-weight: 600;
+    padding: 5px 10px; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-import-temps:hover { opacity: 0.8; }
+  .btn-import-temps:disabled { opacity: 0.4; cursor: not-allowed; }
+  .temp-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; padding: 4px 0;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--muted);
+  }
+  .temp-row:last-child { border-bottom: none; }
+  .temp-row input {
+    flex: 1; background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 4px; color: var(--text);
+    font-size: 11px; padding: 3px 6px; outline: none;
+  }
+  .temp-row input:focus { border-color: var(--accent); }
+  .temp-save-btn {
+    background: none; border: 0.5px solid var(--border2);
+    border-radius: 4px; color: var(--muted);
+    font-size: 10px; padding: 3px 7px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .temp-save-btn:hover { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -672,6 +705,13 @@
           <div class="preview-meta" id="prev-meta"></div>
           <div class="preview-rating" id="prev-rating"></div>
           <div class="preview-generos" id="prev-generos"></div>
+          <!-- Botón temporadas — solo aparece para series/anime -->
+          <button id="btn-importar-temps" class="btn-import-temps" onclick="importarTemporadas()" style="display:none;margin-top:8px">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/></svg>
+            Importar temporadas
+          </button>
+          <div id="temps-status" style="font-size:11px;margin-top:5px;color:#7dd7a5;display:none"></div>
+          <div id="temps-list" style="margin-top:8px;display:none"></div>
         </div>
       </div>
     </div>
@@ -836,6 +876,18 @@ async function importarTMDB() {
       mostrarEstado(`✓ Importado: "${data.titulo}" (ID interno: ${data.id})`, 'success');
       mostrarPreview(data);
       document.getElementById('tmdb-id-input').value = '';
+
+      // Mostrar botón de temporadas solo si es serie o anime
+      _ultimoContenidoId = data.id;
+      const btnTemps = document.getElementById('btn-importar-temps');
+      const tempsStatus = document.getElementById('temps-status');
+      const tempsList = document.getElementById('temps-list');
+      if (btnTemps) {
+        const esSerie = ['serie','anime'].includes(data.tipo);
+        btnTemps.style.display = esSerie ? 'inline-flex' : 'none';
+        if (tempsStatus) tempsStatus.style.display = 'none';
+        if (tempsList) { tempsList.style.display = 'none'; tempsList.innerHTML = ''; }
+      }
     } else if (resp.status === 409) {
       mostrarEstado(`Ya existe en el catálogo: "${data.error}" (ID: ${data.id})`, 'error');
     } else {
@@ -1108,6 +1160,82 @@ ${data.error}`);
     btn.disabled = false;
     alert('Error de red: ' + e.message);
   }
+}
+
+// ── TEMPORADAS ──
+
+let _ultimoContenidoId = null;  // id del último contenido importado
+
+async function importarTemporadas() {
+  if (!_ultimoContenidoId) return;
+  const btn = document.getElementById('btn-importar-temps');
+  const statusEl = document.getElementById('temps-status');
+  btn.disabled = true;
+  btn.textContent = 'Importando...';
+
+  try {
+    const resp = await fetch(`${API}/api/admin/importar_temporadas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_id: Number(adminId), contenido_id: Number(_ultimoContenidoId) })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#7dd7a5';
+      statusEl.textContent = `✓ ${data.insertadas} temporadas importadas`;
+      if (data.omitidas > 0) statusEl.textContent += ` (${data.omitidas} ya existían)`;
+      cargarListaTemporadas(_ultimoContenidoId);
+    } else {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#f08080';
+      statusEl.textContent = `✗ ${data.error || 'Error'}`;
+    }
+  } catch(e) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#f08080';
+    statusEl.textContent = '✗ Error de red';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/></svg> Reimportar temporadas';
+  }
+}
+
+async function cargarListaTemporadas(contenidoId) {
+  const listEl = document.getElementById('temps-list');
+  if (!listEl) return;
+  try {
+    const resp = await fetch(`${API}/api/temporadas/${contenidoId}`);
+    const data = await resp.json();
+    const temps = data.temporadas || [];
+    if (!temps.length) { listEl.style.display = 'none'; return; }
+    listEl.style.display = 'block';
+    listEl.innerHTML = temps.map(t => `
+      <div class="temp-row">
+        <span style="min-width:24px;font-weight:600">T${t.numero}</span>
+        <input type="text" placeholder="Enlace de reproducción…" value="${t.enlace || ''}"
+          id="enlace_${t.id}" onkeydown="if(event.key==='Enter') guardarEnlaceTemp(${t.id}, this)">
+        <button class="temp-save-btn" onclick="guardarEnlaceTemp(${t.id}, document.getElementById('enlace_${t.id}'))">
+          Guardar
+        </button>
+      </div>`).join('');
+  } catch(e) { console.error('Error cargando temporadas admin:', e); }
+}
+
+async function guardarEnlaceTemp(tempId, inputEl) {
+  const enlace = inputEl.value.trim();
+  try {
+    const resp = await fetch(`${API}/api/admin/temporadas/enlace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_id: Number(adminId), temporada_id: tempId, enlace })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      inputEl.style.borderColor = '#4caf7d';
+      setTimeout(() => inputEl.style.borderColor = '', 1500);
+    }
+  } catch(e) { console.error('Error guardando enlace:', e); }
 }
 
 // ── USUARIOS ──
