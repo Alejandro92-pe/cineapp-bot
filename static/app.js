@@ -1937,14 +1937,17 @@ function compartirContenido() {
 }
 
 // ============ TEMPORADAS ============
-let temporadasActuales = [];  // caché de temporadas de la serie abierta
+let temporadasActuales = [];
 let temporadaSeleccionada = null;
 
 async function cargarTemporadas(item) {
-    const wrap = document.getElementById('detalleTemporadasWrap');
-    if (!wrap) return;
 
-    // Solo aplica a series y anime
+    const wrap = document.getElementById('detalleTemporadasWrap');
+    const grid = document.getElementById('detalleTemporadasGrid');
+
+    if (!wrap || !grid) return;
+
+    // Solo series/anime
     if (!['serie', 'anime'].includes(item.tipo)) {
         wrap.style.display = 'none';
         temporadasActuales = [];
@@ -1953,10 +1956,13 @@ async function cargarTemporadas(item) {
     }
 
     try {
+
         const resp = await fetch(`${API_BASE_URL}/api/temporadas/${item.id}`);
         const data = await resp.json();
+
         const temps = data.temporadas || [];
 
+        // Sin temporadas
         if (!temps.length) {
             wrap.style.display = 'none';
             temporadasActuales = [];
@@ -1965,51 +1971,139 @@ async function cargarTemporadas(item) {
         }
 
         temporadasActuales = temps;
-        // Seleccionar la primera temporada por defecto
-        seleccionarTemporada(temps[0], item, false);
 
-        // Renderizar selector
+        // Mostrar contenedor
         wrap.style.display = 'block';
-        const grid = document.getElementById('detalleTemporadasGrid');
-        if (grid) {
-            grid.innerHTML = temps.map((t, i) => `
-                <button class="temp-btn ${i === 0 ? 'temp-btn-active' : ''}"
-                    id="tempbtn_${t.id}"
-                    onclick="seleccionarTemporada(${JSON.stringify(t).replace(/'/g, "\\'")} , contenidoSeleccionado, true, this)">
-                    <span class="temp-num">T${t.numero}</span>
-                    <span class="temp-nombre">${t.nombre || 'Temporada ' + t.numero}</span>
-                    ${t.episodios ? `<span class="temp-eps">${t.episodios} ep</span>` : ''}
-                </button>`).join('');
-        }
-    } catch(e) {
-        console.warn('Error cargando temporadas:', e);
+
+        // Render botones
+        grid.innerHTML = temps.map((t, i) => `
+            <button 
+                type="button"
+                class="temp-btn ${i === 0 ? 'temp-btn-active' : ''}"
+                data-index="${i}"
+            >
+                <span class="temp-num">T${t.numero}</span>
+
+                <span class="temp-nombre">
+                    ${t.nombre || `Temporada ${t.numero}`}
+                </span>
+
+                ${
+                    t.episodios
+                    ? `<span class="temp-eps">${t.episodios} ep</span>`
+                    : ''
+                }
+            </button>
+        `).join('');
+
+        // Seleccionar primera temporada
+        temporadaSeleccionada = temps[0];
+
+        // Eventos click
+        const botones = grid.querySelectorAll('.temp-btn');
+
+        botones.forEach(btn => {
+
+            btn.addEventListener('click', function(e) {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                // quitar activos
+                botones.forEach(b => {
+                    b.classList.remove('temp-btn-active');
+                });
+
+                // activar actual
+                this.classList.add('temp-btn-active');
+
+                // obtener temporada
+                const index = parseInt(this.dataset.index);
+
+                const temporada = temporadasActuales[index];
+
+                if (!temporada) return;
+
+                seleccionarTemporada(
+                    temporada,
+                    item,
+                    true,
+                    this
+                );
+
+            });
+
+        });
+
+        // Inicializar primera temporada
+        seleccionarTemporada(
+            temps[0],
+            item,
+            false,
+            botones[0]
+        );
+
+    } catch (e) {
+
+        console.error('Error cargando temporadas:', e);
+
         wrap.style.display = 'none';
+
     }
 }
 
-function seleccionarTemporada(temporada, itemBase, actualizarPoster = true, btnEl = null) {
+function seleccionarTemporada(
+    temporada,
+    itemBase,
+    actualizarPoster = true,
+    btnEl = null
+) {
+
     temporadaSeleccionada = temporada;
 
-    // Marcar botón activo
-    document.querySelectorAll('.temp-btn').forEach(b => b.classList.remove('temp-btn-active'));
-    if (btnEl) btnEl.classList.add('temp-btn-active');
+    // Botón activo
+    document.querySelectorAll('.temp-btn').forEach(btn => {
+        btn.classList.remove('temp-btn-active');
+    });
 
-    // Cambiar poster si la temporada tiene su propia portada
-    if (actualizarPoster && temporada.poster_url) {
-        const imgEl = document.getElementById('detalleImagen');
-        const bgEl  = document.getElementById('detalleHeroBg');
-        if (imgEl) imgEl.src = temporada.poster_url;
-        if (bgEl)  bgEl.style.backgroundImage = `url('${temporada.poster_url}')`;
+    if (btnEl) {
+        btnEl.classList.add('temp-btn-active');
     }
 
-    // El botón Reproducir ahora usará el enlace de la temporada
-    // (btnVerAhora listener lo lee de temporadaSeleccionada en tiempo real)
+    // Cambiar poster
+    if (actualizarPoster && temporada.poster_url) {
+
+        const imgEl = document.getElementById('detalleImagen');
+        const bgEl  = document.getElementById('detalleHeroBg');
+
+        if (imgEl) {
+            imgEl.src = temporada.poster_url;
+        }
+
+        if (bgEl) {
+            bgEl.style.backgroundImage =
+                `url('${temporada.poster_url}')`;
+        }
+    }
+
+    // Estado botón reproducir
     const btnVer = document.getElementById('btnVerAhora');
+
     if (btnVer) {
-        const tieneEnlace = temporada.enlace && temporada.enlace.trim() !== '';
+
+        const tieneEnlace =
+            temporada.enlace &&
+            temporada.enlace.trim() !== '';
+
         btnVer.disabled = !tieneEnlace;
-        btnVer.title = tieneEnlace ? '' : 'Esta temporada aún no tiene enlace de reproducción';
-        btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
+
+        btnVer.style.opacity =
+            tieneEnlace ? '1' : '0.5';
+
+        btnVer.title =
+            tieneEnlace
+                ? ''
+                : 'Esta temporada aún no tiene enlace';
     }
 }
 
