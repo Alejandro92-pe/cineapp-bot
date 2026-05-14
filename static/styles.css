@@ -2713,8 +2713,13 @@ stroke:#00ffff;
 }
 .temp-grid {
     display: flex;
-    flex-wrap: wrap;
     gap: 7px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
 }
 .temp-btn {
     display: flex;
