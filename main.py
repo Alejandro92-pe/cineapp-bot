@@ -172,7 +172,7 @@ def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
                 "experience_context": {
                     "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
                     "brand_name":   "QuehayApp VIP",
-                    "locale":       "es-PE",
+                    "locale":       "en-US",
                     "landing_page": "LOGIN",
                     "user_action":  "PAY_NOW",
                     # Redirige de vuelta a tu app tras el pago
@@ -279,7 +279,7 @@ def paypal_crear_suscripcion(plan: str, telegram_id: int, email: str = "") -> di
         "custom_id": f"{telegram_id}|{plan}",   # recuperado en el webhook
         "application_context": {
             "brand_name":    "QH Membership",
-            "locale":        "es-PE",
+            "locale":        "en-US",
             "shipping_preference": "NO_SHIPPING",
             "user_action":   "SUBSCRIBE_NOW",
             "return_url": f"{render_url}/paypal/success",
