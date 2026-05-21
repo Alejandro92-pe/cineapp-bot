@@ -2762,3 +2762,251 @@ stroke:#00ffff;
     color: rgba(255,255,255,0.3);
     line-height: 1;
 }
+
+/* ============================================================
+   MODAL DE PAGO CON TARJETA — PAYPAL / BMC
+   ============================================================ */
+
+/* Overlay del modal de pago */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  display: none;
+  justify-content: center;
+  align-items: flex-end; /* bottom-sheet en móvil */
+  z-index: 9999;
+  padding: 0;
+}
+@media (min-width: 480px) {
+  .modal-overlay { align-items: center; padding: 20px; }
+}
+
+/* Caja principal */
+.modal-box.modal-pago-tarjeta {
+  background: #18181b;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 24px 36px;
+  position: relative;
+  animation: slideUp 0.28s cubic-bezier(.22,.68,0,1.2);
+  text-align: left;
+}
+@media (min-width: 480px) {
+  .modal-box.modal-pago-tarjeta {
+    border-radius: 20px;
+    animation: fadeIn 0.22s ease;
+  }
+}
+
+/* Botón X de cierre */
+.modal-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255,255,255,0.07);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(255,255,255,0.55);
+  transition: background 0.18s, color 0.18s;
+}
+.modal-close-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+/* Títulos */
+.modal-pago-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f0f0f2;
+  margin: 0 0 6px;
+  letter-spacing: -0.3px;
+}
+.modal-pago-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+/* Campo de email */
+.modal-email-input {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: #f0f0f2;
+  font-size: 15px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  transition: border-color 0.18s;
+  outline: none;
+}
+.modal-email-input:focus {
+  border-color: rgba(232,176,75,0.55);
+  background: rgba(232,176,75,0.04);
+}
+.modal-email-input::placeholder { color: rgba(255,255,255,0.28); }
+
+/* Contenedor de botones de pago */
+.modal-pago-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* Botón genérico de método de pago */
+.modal-pago-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #f0f0f2;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s, border-color 0.18s, transform 0.12s;
+  position: relative;
+  width: 100%;
+}
+.modal-pago-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(255,255,255,0.22);
+  transform: translateY(-1px);
+}
+.modal-pago-btn:active:not(:disabled) { transform: scale(0.98); }
+.modal-pago-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Ícono del método */
+.mpb-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Texto del método */
+.mpb-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.mpb-nombre { font-size: 14px; font-weight: 600; color: #f0f0f2; }
+.mpb-desc   { font-size: 11px; color: rgba(255,255,255,0.45); }
+
+/* Badge "Recomendado" */
+.mpb-recomendado {
+  font-size: 10px;
+  font-weight: 700;
+  color: #18181b;
+  background: #e8b04b;
+  border-radius: 6px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* BMC — color amarillo sutil */
+.bmc-btn { border-color: rgba(232,176,75,0.25); }
+.bmc-btn:hover:not(:disabled) {
+  background: rgba(232,176,75,0.08);
+  border-color: rgba(232,176,75,0.45);
+}
+
+/* PayPal — color azul sutil */
+.pp-btn { border-color: rgba(0,156,222,0.2); }
+.pp-btn:hover:not(:disabled) {
+  background: rgba(0,156,222,0.07);
+  border-color: rgba(0,156,222,0.4);
+}
+
+/* Enlace cancelar */
+.modal-cancelar-link {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  padding: 6px 0 0;
+  transition: color 0.18s;
+}
+.modal-cancelar-link:hover { color: rgba(255,255,255,0.65); }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   RESPONSIVE ADMIN — PANEL MÓVIL
+   ============================================================ */
+
+@media (max-width: 600px) {
+  /* Topbar compacto */
+  .topbar { padding: 10px 12px; }
+  .topbar-left span:first-child { font-size: 15px; }
+
+  /* Tabs con scroll horizontal */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding: 0 8px;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    font-size: 12px;
+    padding: 8px 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Paneles con padding reducido */
+  .panel { padding: 10px 10px 80px; }
+  .importer-card { padding: 14px; border-radius: 12px; }
+  .importer-card h2 { font-size: 15px; }
+
+  /* Fila de importación en columna */
+  .import-row { flex-direction: column; gap: 10px; }
+  .import-field { width: 100%; }
+
+  /* Grids de stats en 2 cols */
+  .stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .stat-card { padding: 12px; }
+  .stat-value { font-size: 22px; }
+
+  /* Filas de usuario más compactas */
+  .user-row { gap: 8px; padding: 10px 12px; }
+  .user-nombre { font-size: 13px; }
+  .user-id { font-size: 11px; }
+
+  /* Botones de pago más pequeños */
+  .pago-card { padding: 12px; }
+
+  /* Preview card en columna */
+  .preview-card { flex-direction: column; }
+  .preview-poster { width: 100%; max-width: 160px; border-radius: 8px; }
+
+  /* Textarea full-width */
+  .batch-textarea { font-size: 13px; }
+
+  /* Input de asunto */
+  #mkt-asunto { font-size: 13px; }
+
+  /* Botones de acción lado a lado */
+  .btn-import { font-size: 12px; padding: 9px 14px; }
+}

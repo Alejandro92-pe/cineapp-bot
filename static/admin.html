@@ -663,10 +663,20 @@
 
 Accede a todo el catálogo por solo S/11 este fin de semana.
 ¿Te unirías?" style="min-height:100px"></textarea>
+
+      <!-- Asunto para email -->
+      <input type="text" id="mkt-asunto" placeholder="Asunto del email (opcional — por defecto: Oferta especial)"
+        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+        background:rgba(255,255,255,0.05);color:#f0f0f2;font-size:13px;margin-top:8px;box-sizing:border-box">
+
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
         <button class="btn-import" onclick="enviarMasivo('todos')">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-          Enviar a todos sin membresía
+          Telegram masivo
+        </button>
+        <button class="btn-import" onclick="enviarEmailMasivo('todos')" style="background:rgba(234,100,50,0.18);border-color:rgba(234,100,50,0.4)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+          Gmail masivo
         </button>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
           <input type="checkbox" id="mkt-con-botones" checked style="accent-color:var(--accent)"> Con botones de planes
@@ -864,7 +874,7 @@ if (savedId) {
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    const tabs = ['importar','catalogo','pagos','pedidos','usuarios'];
+    const tabs = ['importar','catalogo','pagos','pedidos','usuarios','marketing'];
     t.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -1324,6 +1334,13 @@ function renderMktUsuarios() {
     const ini = (u.nombre || '?')[0].toUpperCase();
     const tieneEmail = u.email ? `<span style="font-size:10px;color:#7dd7a5">✉ ${u.email}</span>` : '';
     const tienePago = u.ultimo_pago ? `<span style="font-size:10px;color:#f1c40f">⚡ Inició ${u.ultimo_pago.membresia_comprada?.toUpperCase()}</span>` : '';
+    const emailBtn = u.email
+      ? `<button class="btn-aprobar" style="font-size:11px;padding:5px 8px;background:rgba(234,100,50,0.18);border-color:rgba(234,100,50,0.4)"
+           title="Enviar email a ${u.email}"
+           onclick="enviarEmailIndividual(${u.telegram_id}, '${(u.email||'').replace(/'/g,'')}', '${(u.nombre||'').replace(/'/g,'')}', this)">
+           ✉
+         </button>`
+      : '';
     return `<div class="user-row">
       <div class="user-avatar">${ini}</div>
       <div class="user-info">
@@ -1332,11 +1349,15 @@ function renderMktUsuarios() {
           <span>${u.telegram_id}</span>${tieneEmail}${tienePago}
         </div>
       </div>
-      <button class="btn-aprobar" style="font-size:11px;padding:5px 10px"
-        onclick="enviarIndividual(${u.telegram_id}, '${(u.nombre||'').replace(/'/g,'')}', this)">
-        Enviar
-      </button>
+      <div style="display:flex;gap:4px">
+        <button class="btn-aprobar" style="font-size:11px;padding:5px 10px"
+          onclick="enviarIndividual(${u.telegram_id}, '${(u.nombre||'').replace(/'/g,'')}', this)">
+          📨
+        </button>
+        ${emailBtn}
+      </div>
     </div>`;
+  }).join('');
   }).join('');
 }
 
@@ -1406,6 +1427,81 @@ async function enviarIndividual(telegramId, nombre, btn) {
       btn.textContent = '✗'; btn.disabled = false;
     }
   } catch(e) { btn.textContent = '✗'; btn.disabled = false; }
+}
+
+async function enviarEmailMasivo(target) {
+  const mensaje = document.getElementById('mkt-mensaje').value.trim();
+  if (!mensaje) {
+    mostrarMktStatus('Escribe un mensaje primero', 'error'); return;
+  }
+  const asunto = document.getElementById('mkt-asunto')?.value?.trim() ||
+    '🎬 Oferta especial — QuehayApp VIP';
+  const statusEl = document.getElementById('mkt-status');
+  statusEl.className = 'import-status loading';
+  statusEl.textContent = 'Enviando emails via Gmail...';
+  statusEl.style.display = 'block';
+
+  try {
+    const resp = await fetch(`${API}/api/admin/marketing/enviar_email_manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_id: Number(adminId),
+        telegram_ids: target,
+        asunto,
+        mensaje
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      statusEl.className = 'import-status success';
+      statusEl.textContent =
+        `✓ Gmail: ${data.enviados} enviados` +
+        (data.errores   ? ` · ${data.errores} errores`   : '') +
+        (data.sin_email ? ` · ${data.sin_email} sin email` : '');
+    } else {
+      statusEl.className = 'import-status error';
+      statusEl.textContent = `Error: ${data.error || 'desconocido'}`;
+    }
+  } catch(e) {
+    statusEl.className = 'import-status error';
+    statusEl.textContent = 'Error de red: ' + e.message;
+  }
+}
+
+async function enviarEmailIndividual(telegramId, email, nombre, btn) {
+  const mensaje = document.getElementById('mkt-mensaje').value.trim();
+  if (!mensaje) { alert('Escribe un mensaje en el área de texto primero'); return; }
+  const asunto = document.getElementById('mkt-asunto')?.value?.trim() ||
+    '🎬 Oferta especial — QuehayApp VIP';
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const resp = await fetch(`${API}/api/admin/marketing/enviar_email_manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_id: Number(adminId),
+        telegram_ids: [telegramId],
+        asunto,
+        mensaje
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success && data.enviados > 0) {
+      btn.textContent = '✓'; btn.style.background = 'rgba(76,175,125,0.2)';
+      setTimeout(() => { btn.textContent = '✉'; btn.style.background = ''; btn.disabled = false; }, 2000);
+    } else {
+      btn.textContent = '✗'; btn.disabled = false;
+      alert(data.error || (data.sin_email ? 'Usuario sin email registrado' : 'Error desconocido'));
+    }
+  } catch(e) { btn.textContent = '✗'; btn.disabled = false; }
+}
+
+function mostrarMktStatus(msg, tipo) {
+  const el = document.getElementById('mkt-status');
+  el.className = `import-status ${tipo}`;
+  el.textContent = msg;
+  el.style.display = 'block';
 }
 
 // ── USUARIOS ──

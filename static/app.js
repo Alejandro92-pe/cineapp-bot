@@ -1268,7 +1268,7 @@ window.confirmarPagoPayPal = async function() {
     const nombreBtn = btn ? btn.querySelector(".mpb-nombre") : null;
     const descBtn   = btn ? btn.querySelector(".mpb-desc")   : null;
     if (btn) { btn.disabled = true; btn.style.opacity = "0.7"; }
-    if (nombreBtn) nombreBtn.textContent = "Creando orden...";
+    if (nombreBtn) nombreBtn.textContent = "Creando suscripción...";
     if (descBtn)   descBtn.textContent   = "Conectando con PayPal";
 
     try {
@@ -1278,42 +1278,63 @@ window.confirmarPagoPayPal = async function() {
             body: JSON.stringify({
                 telegram_id: userId,
                 plan: window.planSeleccionado.toLowerCase(),
-                email
+                email,
+                modo: "suscripcion"   // ← suscripción mensual recurrente
             })
         });
         const data = await resp.json();
+
+        // Si no hay plan_id configurado, caer a pago único
+        if (!resp.ok && data.error && data.error.includes("PAYPAL_PLAN_ID")) {
+            console.warn("Plan ID no configurado, usando pago único como fallback");
+            const resp2 = await fetch(`${API_BASE_URL}/api/admin/marketing/crear_pago_paypal`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    telegram_id: userId,
+                    plan: window.planSeleccionado.toLowerCase(),
+                    email,
+                    modo: "unico"
+                })
+            });
+            const data2 = await resp2.json();
+            if (!resp2.ok) { alert("Error PayPal: " + (data2.error || "desconocido")); return; }
+            cerrarModal();
+            _abrirPayPal(data2.url);
+            return;
+        }
+
         if (!resp.ok) {
             alert("Error PayPal: " + (data.error || "desconocido"));
             return;
         }
-        // Cerrar modal y abrir PayPal en navegador externo
-        // (el popup nativo de PayPal no funciona dentro de Telegram WebApp)
+
         cerrarModal();
-        try {
-            // Telegram WebApp: abre en el navegador del sistema
-            tg.openLink(data.url);
-        } catch(e) {
-            window.open(data.url, "_blank");
-        }
-        // Mostrar aviso al usuario
-        setTimeout(() => {
-            try {
-                tg.showPopup({
-                    title: "PayPal abierto",
-                    message: "Completa el pago en el navegador. Tu membresía se activará automáticamente al finalizar.",
-                    buttons: [{ type: "ok" }]
-                });
-            } catch(e) {}
-        }, 800);
+        _abrirPayPal(data.url, data.tipo === "suscripcion");
 
     } catch(e) {
         alert("Error de conexión: " + e.message);
     } finally {
         if (btn) { btn.disabled = false; btn.style.opacity = ""; }
         if (nombreBtn) nombreBtn.textContent = "PayPal";
-        if (descBtn)   descBtn.textContent   = "Cuenta PayPal · Disponible en Perú";
+        if (descBtn)   descBtn.textContent   = "Suscripción mensual · Cancela cuando quieras";
     }
 };
+
+function _abrirPayPal(url, esSuscripcion = false) {
+    try { tg.openLink(url); } catch(e) { window.open(url, "_blank"); }
+    setTimeout(() => {
+        try {
+            tg.showPopup({
+                title: esSuscripcion ? "Suscripción PayPal" : "PayPal abierto",
+                message: esSuscripcion
+                    ? "Completa la suscripción en el navegador. Se renovará automáticamente cada mes. Tu membresía se activará en segundos."
+                    : "Completa el pago en el navegador. Tu membresía se activará automáticamente al finalizar.",
+                buttons: [{ type: "ok" }]
+            });
+        } catch(e) {}
+    }, 800);
+}
 
 async function confirmarPago() { await confirmarPagoBMC(); }
 

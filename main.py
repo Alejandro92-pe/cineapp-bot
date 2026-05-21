@@ -1,6 +1,10 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
+import smtplib
+import traceback
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
@@ -78,23 +82,42 @@ BMC_LINKS   = {
 }
 
 # PayPal REST API — Variables de Render:
-# PAYPAL_CLIENT_ID     = AXxx...
-# PAYPAL_CLIENT_SECRET = EKxx...
-# PAYPAL_WEBHOOK_ID    = WH-xxx... (del dashboard de PayPal)
-# PAYPAL_MODE          = live  (o sandbox para pruebas)
+# PAYPAL_CLIENT_ID          = AXxx...
+# PAYPAL_CLIENT_SECRET      = EKxx...
+# PAYPAL_WEBHOOK_ID         = WH-xxx... (del dashboard de PayPal → Webhooks)
+# PAYPAL_MODE               = live  (o sandbox para pruebas)
+#
+# Plan IDs de SUSCRIPCIÓN (crear en PayPal → Catalog → Products → Plans):
+# PAYPAL_PLAN_ID_COPPER     = P-xxx
+# PAYPAL_PLAN_ID_SILVER     = P-xxx
+# PAYPAL_PLAN_ID_GOLD       = P-xxx
+# PAYPAL_PLAN_ID_PLATINUM   = P-xxx
+# PAYPAL_PLAN_ID_DIAMOND    = P-xxx
+# PAYPAL_WEBHOOK_ID_SUB     = WH-xxx (webhook para suscripciones, puede ser el mismo)
 PAYPAL_CLIENT_ID     = os.getenv("PAYPAL_CLIENT_ID", "")
 PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "")
 PAYPAL_WEBHOOK_ID    = os.getenv("PAYPAL_WEBHOOK_ID", "")
 PAYPAL_MODE          = os.getenv("PAYPAL_MODE", "live")
 PAYPAL_BASE          = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
 
-# Precios en USD por plan (con descuento 50%)
+# Precios en USD por plan (con descuento 50%) — para pagos únicos
 PAYPAL_PRECIOS = {
     "copper":   "3.00",
     "silver":   "4.50",
     "gold":     "11.49",
     "platinum": "22.00",
     "diamond":  "46.99",
+}
+
+# Plan IDs de suscripción mensual recurrente de PayPal
+# Créalos en: https://www.paypal.com/billing/plans
+# Catálogo → Productos → crear producto → crear plan MONTHLY
+PAYPAL_PLAN_IDS = {
+    "copper":   os.getenv("PAYPAL_PLAN_ID_COPPER",   ""),
+    "silver":   os.getenv("PAYPAL_PLAN_ID_SILVER",   ""),
+    "gold":     os.getenv("PAYPAL_PLAN_ID_GOLD",     ""),
+    "platinum": os.getenv("PAYPAL_PLAN_ID_PLATINUM", ""),
+    "diamond":  os.getenv("PAYPAL_PLAN_ID_DIAMOND",  ""),
 }
 
 # ============================================================
@@ -225,6 +248,104 @@ def paypal_verificar_webhook(headers: dict, body_bytes: bytes) -> bool:
         return result == "SUCCESS"
     print(f"⚠️ Error verificando webhook PayPal: {resp.text}")
     return False
+
+# ============================================================
+# PAYPAL SUBSCRIPTIONS API
+# ============================================================
+
+def paypal_crear_suscripcion(plan: str, telegram_id: int, email: str = "") -> dict:
+    """
+    Crea una suscripción RECURRENTE mensual con PayPal Subscriptions API.
+    Requiere que ya existan los plan_id en las env vars PAYPAL_PLAN_ID_*.
+
+    Diferencia clave vs pago único:
+    - Pago único (CAPTURE): el usuario paga una vez.
+    - Suscripción: PayPal cobra automáticamente cada mes hasta que se cancele.
+
+    Retorna: { "subscription_id": "I-xxx", "approve_url": "https://..." }
+    """
+    plan_id = PAYPAL_PLAN_IDS.get(plan, "")
+    if not plan_id:
+        raise ValueError(
+            f"No hay PAYPAL_PLAN_ID configurado para el plan '{plan}'. "
+            f"Agrega la variable PAYPAL_PLAN_ID_{plan.upper()} en Render."
+        )
+
+    token = paypal_get_token()
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "https://cineapp-bot.onrender.com")
+
+    body = {
+        "plan_id": plan_id,
+        "quantity": "1",
+        "custom_id": f"{telegram_id}|{plan}",   # recuperado en el webhook
+        "subscriber": {},
+        "application_context": {
+            "brand_name":    "QuehayApp VIP",
+            "locale":        "es-PE",
+            "shipping_preference": "NO_SHIPPING",
+            "user_action":   "SUBSCRIBE_NOW",
+            "payment_method": {
+                "payer_selected":  "PAYPAL",
+                "payee_preferred": "IMMEDIATE_PAYMENT_REQUIRED"
+            },
+            "return_url": f"{render_url}/paypal/success",
+            "cancel_url": f"{render_url}/paypal/cancel",
+        }
+    }
+
+    if email:
+        body["subscriber"]["email_address"] = email
+
+    resp = requests.post(
+        f"{PAYPAL_BASE}/v1/billing/subscriptions",
+        json=body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type":  "application/json",
+            "Prefer":        "return=representation",
+        },
+        timeout=15
+    )
+    resp.raise_for_status()
+    sub = resp.json()
+
+    approve_link = next(
+        (l["href"] for l in sub.get("links", []) if l["rel"] == "approve"),
+        None
+    )
+    return {
+        "subscription_id": sub.get("id"),
+        "approve_url":     approve_link,
+        "status":          sub.get("status")
+    }
+
+
+def paypal_cancelar_suscripcion(subscription_id: str, motivo: str = "Cancelado por el usuario") -> bool:
+    """Cancela una suscripción activa en PayPal."""
+    try:
+        token = paypal_get_token()
+        resp  = requests.post(
+            f"{PAYPAL_BASE}/v1/billing/subscriptions/{subscription_id}/cancel",
+            json={"reason": motivo},
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            timeout=10
+        )
+        return resp.status_code == 204
+    except Exception as e:
+        print(f"⚠️ Error cancelando suscripción {subscription_id}: {e}")
+        return False
+
+
+def paypal_obtener_suscripcion(subscription_id: str) -> dict:
+    """Obtiene detalles de una suscripción PayPal."""
+    token = paypal_get_token()
+    resp  = requests.get(
+        f"{PAYPAL_BASE}/v1/billing/subscriptions/{subscription_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 # Gmail SMTP — usa App Password de Google Account
 # Google Account → Seguridad → Contraseñas de aplicación
@@ -1129,10 +1250,14 @@ def publicar_manual(message):
         bot.reply_to(message, f"❌ Error inesperado: {e}")
 
 # ============ FLASK APP ============
-from flask import Flask, request
+from marketing import marketing_bp, init_marketing, enviar_email as _enviar_email_mkt, _html_bienvenida as _html_bienvenida_mkt
 
 app = Flask(__name__)
 CORS(app)
+
+# Registrar módulo de marketing
+app.register_blueprint(marketing_bp)
+init_marketing(supabase_service, bot, ADMIN_ID, BOT_USERNAME)
 
 @app.route("/")
 def serve_miniapp():
@@ -1472,131 +1597,9 @@ def api_eliminar_temporada():
         return jsonify({"error": str(e)}), 500
 
 
-# ============================================================
-# EMAIL — GMAIL SMTP
-# ============================================================
-def enviar_email(dest: str, asunto: str, html: str) -> bool:
-    """Envía email via Gmail SMTP con App Password."""
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        print("⚠️ Gmail no configurado (GMAIL_USER / GMAIL_PASSWORD)")
-        return False
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = asunto
-        msg["From"]    = f"{GMAIL_FROM_NAME} <{GMAIL_USER}>"
-        msg["To"]      = dest
-        msg.attach(MIMEText(html, "html", "utf-8"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
-            srv.login(GMAIL_USER, GMAIL_PASSWORD)
-            srv.sendmail(GMAIL_USER, dest, msg.as_string())
-        print(f"✅ Email enviado a {dest}")
-        return True
-    except Exception as e:
-        print(f"❌ Email error {dest}: {e}")
-        return False
-
-def _html_recordatorio(nombre: str, plan: str, monto) -> str:
-    return (
-        "<html><body style='font-family:Arial,sans-serif;background:#0d0d0f;color:#f0f0f2;padding:20px'>"
-        "<div style='max-width:460px;margin:0 auto;background:#17171a;border-radius:12px;"
-        "padding:24px;border:1px solid rgba(255,255,255,0.08)'>"
-        f"<h2 style='color:#e8b04b'>👋 Hola {nombre},</h2>"
-        f"<p style='color:#aaa;line-height:1.6'>Empezaste a activar tu membresía "
-        f"<b style='color:#fff'>{plan.upper()}</b> (S/{monto}) pero no completaste el pago.</p>"
-        f"<div style='text-align:center;margin:20px 0'>"
-        f"<a href='https://t.me/{BOT_USERNAME}?start=planes' "
-        "style='background:#e8b04b;color:#1a1200;font-weight:700;padding:12px 28px;"
-        "border-radius:8px;text-decoration:none;display:inline-block'>✅ Completar membresía</a></div>"
-        "<p style='color:#666;font-size:12px;text-align:center'>QuehayApp VIP</p>"
-        "</div></body></html>"
-    )
-
-def _html_bienvenida(nombre: str, plan: str) -> str:
-    return (
-        "<html><body style='font-family:Arial,sans-serif;background:#0d0d0f;color:#f0f0f2;padding:20px'>"
-        "<div style='max-width:460px;margin:0 auto;background:#17171a;border-radius:12px;"
-        "padding:24px;border:1px solid rgba(255,255,255,0.08)'>"
-        f"<h2 style='color:#e8b04b'>🎉 ¡Bienvenido al VIP, {nombre}!</h2>"
-        f"<p style='color:#aaa;line-height:1.6'>Tu membresía "
-        f"<b style='color:#fff'>{plan.upper()}</b> fue activada con éxito.</p>"
-        f"<div style='text-align:center;margin:20px 0'>"
-        f"<a href='https://t.me/{BOT_USERNAME}?start=miniapp' "
-        "style='background:#e8b04b;color:#1a1200;font-weight:700;padding:12px 28px;"
-        "border-radius:8px;text-decoration:none;display:inline-block'>🎬 Ir a la Mini App</a></div>"
-        "</div></body></html>"
-    )
 
 # ============================================================
-# MARKETING — RECORDATORIO ANTI-ABANDONO
-# ============================================================
-# SQL (ejecutar una vez en Supabase):
-# ALTER TABLE pagos_manuales
-#   ADD COLUMN IF NOT EXISTS recordatorio_enviado BOOLEAN DEFAULT false,
-#   ADD COLUMN IF NOT EXISTS recordatorio_enviado_en TIMESTAMPTZ DEFAULT NULL;
-
-def recordatorio_pagos_pendientes():
-    """
-    Detecta pagos en estado 'pendiente' de más de 24h y envía recordatorio
-    UNA SOLA VEZ por pago (anti-spam via columna recordatorio_enviado).
-    """
-    hace_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    pendientes = supabase_service.table("pagos_manuales")         .select("*, usuarios!inner(*)")         .eq("estado", "pendiente")         .eq("recordatorio_enviado", False)         .lt("fecha_pago", hace_24h)         .execute()
-
-    print(f"DEBUG marketing: {len(pendientes.data)} pagos sin recordatorio")
-    for p in pendientes.data:
-        u       = p.get("usuarios", {})
-        tid     = u.get("telegram_id")
-        nombre  = u.get("nombre", "")
-        email   = u.get("email", "")
-        plan    = p.get("membresia_comprada", "").upper()
-        monto   = p.get("monto", "?")
-        enviado = False
-
-        if tid:
-            try:
-                markup = InlineKeyboardMarkup(row_width=1)
-                markup.add(
-                    InlineKeyboardButton("✅ Completar mi membresía",
-                        url=f"https://t.me/{BOT_USERNAME}?start=planes"),
-                    InlineKeyboardButton("❓ Tengo una duda",
-                        url=f"https://t.me/{BOT_USERNAME}"),
-                )
-                bot.send_message(tid,
-                    f"👋 Hola *{nombre}*,\n\n"
-                    f"Vimos que empezaste a activar tu membresía *{plan}* "
-                    f"(S/{monto}) pero no completaste el pago.\n\n"
-                    "¿Necesitas ayuda? ¡Estamos aquí! 😊",
-                    parse_mode="Markdown", reply_markup=markup)
-                enviado = True
-                print(f"✅ Recordatorio Telegram → {tid}")
-            except Exception as e:
-                print(f"⚠️ Error Telegram {tid}: {e}")
-
-        if email:
-            try:
-                html = _html_recordatorio(nombre, plan.lower(), monto)
-                if enviar_email(email, f"¿Completamos tu membresía {plan}? 🎬", html):
-                    enviado = True
-            except Exception as e:
-                print(f"⚠️ Error email {email}: {e}")
-
-        # Marcar enviado (aunque falle, para no reintentar infinito)
-        supabase_service.table("pagos_manuales").update({
-            "recordatorio_enviado":    True,
-            "recordatorio_enviado_en": datetime.now(timezone.utc).isoformat()
-        }).eq("id", p["id"]).execute()
-
-def obtener_usuarios_sin_pago() -> list:
-    """Usuarios sin membresía activa con info de último pago."""
-    res = supabase_service.table("usuarios").select("*")         .eq("membresia_activa", False).order("id", desc=True).execute()
-    usuarios = res.data or []
-    for u in usuarios:
-        pagos = supabase_service.table("pagos_manuales")             .select("estado,membresia_comprada,fecha_pago")             .eq("usuario_id", u["telegram_id"])             .order("fecha_pago", desc=True).limit(1).execute()
-        u["ultimo_pago"] = pagos.data[0] if pagos.data else None
-    return usuarios
-
-# ============================================================
-# WEBHOOK — PAYPAL REST (PAYMENT.CAPTURE.COMPLETED)
+# WEBHOOK — PAYPAL REST (PAGOS ÚNICOS + SUSCRIPCIONES)
 # ============================================================
 @app.route("/webhook/paypal", methods=["POST"])
 def webhook_paypal():
@@ -1604,7 +1607,13 @@ def webhook_paypal():
     Recibe eventos de PayPal REST API.
     Configurar en developer.paypal.com → Apps → Webhooks:
       URL:    https://cineapp-bot.onrender.com/webhook/paypal
-      Eventos: PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.DENIED
+      Eventos:
+        - PAYMENT.CAPTURE.COMPLETED       (pago único)
+        - PAYMENT.CAPTURE.DENIED
+        - BILLING.SUBSCRIPTION.ACTIVATED  (suscripción nueva)
+        - BILLING.SUBSCRIPTION.RENEWED    (renovación mensual)
+        - BILLING.SUBSCRIPTION.CANCELLED  (cancelación)
+        - BILLING.SUBSCRIPTION.SUSPENDED  (suspendida por fallo de cobro)
     """
     try:
         body_bytes = request.get_data()
@@ -1615,54 +1624,140 @@ def webhook_paypal():
         if not paypal_verificar_webhook(request.headers, body_bytes):
             return jsonify({"error": "Verificación fallida"}), 400
 
-        if event_type != "PAYMENT.CAPTURE.COMPLETED":
-            return jsonify({"received": True}), 200
+        # ── PAGO ÚNICO ──────────────────────────────────────────
+        if event_type == "PAYMENT.CAPTURE.COMPLETED":
+            resource    = data.get("resource", {})
+            custom_id   = resource.get("custom_id", "")
+            payer_email = (resource.get("payer", {}) or {}).get("email_address", "")
+            amount      = resource.get("amount", {}).get("value", "0")
 
-        resource    = data.get("resource", {})
-        custom_id   = resource.get("custom_id", "")
-        payer_email = (resource.get("payer", {}) or {}).get("email_address", "")
-        amount      = resource.get("amount", {}).get("value", "0")
+            if not custom_id:
+                units     = resource.get("purchase_units", [{}])
+                custom_id = units[0].get("custom_id", "") if units else ""
 
-        if not custom_id:
-            units     = resource.get("purchase_units", [{}])
-            custom_id = units[0].get("custom_id", "") if units else ""
+            partes = custom_id.split("|")
+            if len(partes) < 2:
+                print(f"⚠️ custom_id malformado: {custom_id}")
+                return jsonify({"error": "custom_id inválido"}), 400
 
-        partes = custom_id.split("|")
-        if len(partes) < 2:
-            print(f"⚠️ custom_id malformado: {custom_id}")
-            return jsonify({"error": "custom_id inválido"}), 400
+            telegram_id = int(partes[0])
+            plan        = partes[1].lower()
+            print(f"✅ PayPal pago único: {telegram_id} → {plan} (${amount})")
 
-        telegram_id = int(partes[0])
-        plan        = partes[1].lower()
-        print(f"✅ PayPal pago: {telegram_id} → {plan} (${amount})")
-
-        if payer_email:
-            supabase_service.table("usuarios").update({"email": payer_email}) \
-                .eq("telegram_id", telegram_id).execute()
-
-        supabase_service.table("pagos_manuales").insert({
-            "usuario_id":           telegram_id,
-            "membresia_comprada":   plan,
-            "monto":                float(amount),
-            "metodo":               "paypal",
-            "estado":               "aprobado",
-            "activado":             False,
-            "email":                payer_email or None,
-            "fecha_pago":           datetime.now().isoformat(),
-            "recordatorio_enviado": True,
-        }).execute()
-
-        ok = activar_usuario(telegram_id, plan, ADMIN_ID)
-        if ok:
-            supabase_service.table("pagos_manuales") \
-                .update({"activado": True}) \
-                .eq("usuario_id", telegram_id).eq("metodo", "paypal") \
-                .eq("estado", "aprobado").eq("activado", False).execute()
             if payer_email:
-                nr = supabase_service.table("usuarios").select("nombre") \
+                supabase_service.table("usuarios").update({"email": payer_email}) \
                     .eq("telegram_id", telegram_id).execute()
-                nombre = nr.data[0]["nombre"] if nr.data else "VIP"
-                enviar_email(payer_email, "🎉 ¡Membresía activada!", _html_bienvenida(nombre, plan))
+
+            supabase_service.table("pagos_manuales").insert({
+                "usuario_id":           telegram_id,
+                "membresia_comprada":   plan,
+                "monto":                float(amount),
+                "metodo":               "paypal",
+                "estado":               "aprobado",
+                "activado":             False,
+                "email":                payer_email or None,
+                "fecha_pago":           datetime.now().isoformat(),
+                "recordatorio_enviado": True,
+            }).execute()
+
+            ok = activar_usuario(telegram_id, plan, ADMIN_ID)
+            if ok:
+                supabase_service.table("pagos_manuales") \
+                    .update({"activado": True}) \
+                    .eq("usuario_id", telegram_id).eq("metodo", "paypal") \
+                    .eq("estado", "aprobado").eq("activado", False).execute()
+                if payer_email:
+                    nr = supabase_service.table("usuarios").select("nombre") \
+                        .eq("telegram_id", telegram_id).execute()
+                    nombre = nr.data[0]["nombre"] if nr.data else "VIP"
+                    _enviar_email_mkt(payer_email, "🎉 ¡Membresía activada!", _html_bienvenida_mkt(nombre, plan, BOT_USERNAME))
+
+        # ── SUSCRIPCIÓN ACTIVADA O RENOVADA ────────────────────
+        elif event_type in ("BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.RENEWED"):
+            resource       = data.get("resource", {})
+            subscription_id = resource.get("id", "")
+            custom_id      = resource.get("custom_id", "")
+            payer_email    = (resource.get("subscriber", {}) or {}).get("email_address", "")
+
+            partes = custom_id.split("|") if custom_id else []
+            if len(partes) < 2:
+                # Intentar obtener datos del subscriber
+                print(f"⚠️ Suscripción sin custom_id: {subscription_id}")
+                return jsonify({"received": True}), 200
+
+            telegram_id = int(partes[0])
+            plan        = partes[1].lower()
+            amount_str  = PAYPAL_PRECIOS.get(plan, "0")
+            print(f"✅ PayPal suscripción {event_type}: {telegram_id} → {plan} (sub_id={subscription_id})")
+
+            if payer_email:
+                supabase_service.table("usuarios").update({
+                    "email": payer_email,
+                    "paypal_subscription_id": subscription_id
+                }).eq("telegram_id", telegram_id).execute()
+
+            supabase_service.table("pagos_manuales").insert({
+                "usuario_id":           telegram_id,
+                "membresia_comprada":   plan,
+                "monto":                float(amount_str),
+                "metodo":               "paypal_subscription",
+                "estado":               "aprobado",
+                "activado":             False,
+                "email":                payer_email or None,
+                "fecha_pago":           datetime.now().isoformat(),
+                "recordatorio_enviado": True,
+            }).execute()
+
+            ok = activar_usuario(telegram_id, plan, ADMIN_ID)
+            if ok:
+                supabase_service.table("pagos_manuales") \
+                    .update({"activado": True}) \
+                    .eq("usuario_id", telegram_id).eq("metodo", "paypal_subscription") \
+                    .eq("estado", "aprobado").eq("activado", False).execute()
+                if payer_email:
+                    nr = supabase_service.table("usuarios").select("nombre") \
+                        .eq("telegram_id", telegram_id).execute()
+                    nombre = nr.data[0]["nombre"] if nr.data else "VIP"
+                    _enviar_email_mkt(payer_email, "🎉 ¡Suscripción activada!", _html_bienvenida_mkt(nombre, plan, BOT_USERNAME))
+
+                tipo_msg = "renovada" if event_type == "BILLING.SUBSCRIPTION.RENEWED" else "activada"
+                try:
+                    bot.send_message(
+                        telegram_id,
+                        f"🔄 *¡Suscripción {tipo_msg}!*\n\n"
+                        f"💎 Plan: *{plan.upper()}*\n"
+                        "📅 Tu membresía se renova automáticamente cada mes.\n\n"
+                        "Para cancelar en cualquier momento escribe /cancelar\\_suscripcion",
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    print(f"⚠️ No se pudo notificar a {telegram_id}: {e}")
+
+        # ── SUSCRIPCIÓN CANCELADA O SUSPENDIDA ─────────────────
+        elif event_type in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.SUSPENDED"):
+            resource       = data.get("resource", {})
+            subscription_id = resource.get("id", "")
+            custom_id      = resource.get("custom_id", "")
+
+            partes = custom_id.split("|") if custom_id else []
+            if len(partes) >= 1:
+                try:
+                    telegram_id = int(partes[0])
+                    # Desactivar membresía al vencer el período actual
+                    # (no se desactiva de inmediato — el usuario ya pagó hasta fin de período)
+                    try:
+                        bot.send_message(
+                            telegram_id,
+                            "⚠️ *Suscripción cancelada*\n\n"
+                            "Tu suscripción fue cancelada. Seguirás teniendo acceso hasta que venza tu período actual.\n\n"
+                            "Puedes renovar cuando quieras desde la Mini App.",
+                            parse_mode="Markdown"
+                        )
+                    except:
+                        pass
+                    print(f"ℹ️ Suscripción {subscription_id} cancelada para {telegram_id}")
+                except Exception as e:
+                    print(f"⚠️ Error procesando cancelación: {e}")
 
         return jsonify({"success": True}), 200
 
@@ -1697,68 +1792,28 @@ def paypal_cancel():
     </div></body></html>""", 200
 
 # ============================================================
-# ENDPOINTS — MARKETING
+# ENDPOINT — CREAR SUSCRIPCIÓN PAYPAL (RECURRENTE MENSUAL)
 # ============================================================
-@app.route("/api/admin/marketing/usuarios_sin_pago", methods=["POST"])
-def api_usuarios_sin_pago():
-    data = request.get_json(force=True, silent=True) or {}
-    if not check_admin(data):
-        return jsonify({"error": "No autorizado"}), 403
-    try:
-        usuarios = obtener_usuarios_sin_pago()
-        return jsonify({"usuarios": usuarios, "total": len(usuarios)}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/admin/marketing/enviar_mensaje", methods=["POST"])
-def api_enviar_mensaje_marketing():
-    """Envío individual o masivo por Telegram."""
-    data = request.get_json(force=True, silent=True) or {}
-    if not check_admin(data):
-        return jsonify({"error": "No autorizado"}), 403
-    mensaje     = data.get("mensaje", "").strip()
-    ids_target  = data.get("telegram_ids", [])
-    con_botones = data.get("con_botones", True)
-    if not mensaje:
-        return jsonify({"error": "mensaje requerido"}), 400
-
-    if ids_target == "todos":
-        usuarios   = obtener_usuarios_sin_pago()
-        ids_target = [u["telegram_id"] for u in usuarios if u.get("telegram_id")]
-
-    markup = None
-    if con_botones:
-        markup = InlineKeyboardMarkup(row_width=1)
-        markup.add(
-            InlineKeyboardButton("💎 Ver planes VIP", url=f"https://t.me/{BOT_USERNAME}?start=planes"),
-            InlineKeyboardButton("🎬 Explorar catálogo", url=f"https://t.me/{BOT_USERNAME}?start=miniapp"),
-        )
-
-    enviados = errores = 0
-    for tid in ids_target:
-        try:
-            bot.send_message(int(tid), mensaje, parse_mode="Markdown", reply_markup=markup)
-            enviados += 1
-            time.sleep(0.05)
-        except Exception as e:
-            print(f"⚠️ Error enviando a {tid}: {e}")
-            errores += 1
-
-    return jsonify({"success": True, "enviados": enviados, "errores": errores}), 200
-
 @app.route("/api/admin/marketing/crear_pago_paypal", methods=["POST"])
 def api_crear_pago_paypal():
     """
-    Crea una orden PayPal REST y devuelve el link de aprobación.
-    El usuario va a ese link, aprueba, PayPal redirige a /paypal/success
-    y el webhook activa la membresía automáticamente.
-    Body: { telegram_id, plan, email }
+    Crea una SUSCRIPCIÓN recurrente mensual via PayPal Subscriptions API.
+    Requiere configurar en Render los PAYPAL_PLAN_ID_* para cada plan.
+
+    Flujo:
+      1. Frontend llama aquí con { telegram_id, plan, email, modo }
+      2. Si modo == "suscripcion" → crea suscripción recurrente mensual
+      3. Si modo == "unico"       → crea orden de pago único (comportamiento anterior)
+      4. Devuelve { url } para redirigir al usuario a PayPal
+
+    Body: { telegram_id, plan, email, modo: "suscripcion"|"unico" }
     """
     try:
         data        = request.get_json(force=True, silent=True) or {}
         telegram_id = data.get("telegram_id")
         plan        = data.get("plan", "").lower()
         email       = data.get("email", "")
+        modo        = data.get("modo", "unico")   # "suscripcion" o "unico"
 
         if not telegram_id or not plan:
             return jsonify({"error": "telegram_id y plan requeridos"}), 400
@@ -1769,22 +1824,60 @@ def api_crear_pago_paypal():
             supabase_service.table("usuarios").update({"email": email}) \
                 .eq("telegram_id", telegram_id).execute()
 
-        orden = paypal_crear_orden(plan, int(telegram_id), email)
+        if modo == "suscripcion":
+            # ── Suscripción recurrente mensual ──────────────────
+            plan_id = PAYPAL_PLAN_IDS.get(plan, "")
+            if not plan_id:
+                return jsonify({
+                    "error": f"Suscripción no configurada para el plan '{plan}'. "
+                             f"Agrega PAYPAL_PLAN_ID_{plan.upper()} en Render."
+                }), 400
 
-        supabase_service.table("pagos_manuales").insert({
-            "usuario_id":           telegram_id,
-            "membresia_comprada":   plan,
-            "monto":                float(PAYPAL_PRECIOS.get(plan, 0)),
-            "metodo":               "paypal",
-            "estado":               "pendiente_webhook",
-            "activado":             False,
-            "email":                email or None,
-            "fecha_pago":           datetime.now().isoformat(),
-            "recordatorio_enviado": False,
-        }).execute()
+            sub = paypal_crear_suscripcion(plan, int(telegram_id), email)
 
-        print(f"✅ Orden PayPal creada: {orden['order_id']} para {telegram_id}|{plan}")
-        return jsonify({"success": True, "url": orden["approve_url"], "order_id": orden["order_id"]}), 200
+            supabase_service.table("pagos_manuales").insert({
+                "usuario_id":           telegram_id,
+                "membresia_comprada":   plan,
+                "monto":                float(PAYPAL_PRECIOS.get(plan, 0)),
+                "metodo":               "paypal_subscription",
+                "estado":               "pendiente_webhook",
+                "activado":             False,
+                "email":                email or None,
+                "fecha_pago":           datetime.now().isoformat(),
+                "recordatorio_enviado": False,
+            }).execute()
+
+            print(f"✅ Suscripción PayPal creada: {sub['subscription_id']} para {telegram_id}|{plan}")
+            return jsonify({
+                "success": True,
+                "url":             sub["approve_url"],
+                "subscription_id": sub["subscription_id"],
+                "tipo":            "suscripcion"
+            }), 200
+
+        else:
+            # ── Pago único (comportamiento original) ───────────
+            orden = paypal_crear_orden(plan, int(telegram_id), email)
+
+            supabase_service.table("pagos_manuales").insert({
+                "usuario_id":           telegram_id,
+                "membresia_comprada":   plan,
+                "monto":                float(PAYPAL_PRECIOS.get(plan, 0)),
+                "metodo":               "paypal",
+                "estado":               "pendiente_webhook",
+                "activado":             False,
+                "email":                email or None,
+                "fecha_pago":           datetime.now().isoformat(),
+                "recordatorio_enviado": False,
+            }).execute()
+
+            print(f"✅ Orden PayPal creada: {orden['order_id']} para {telegram_id}|{plan}")
+            return jsonify({
+                "success":  True,
+                "url":      orden["approve_url"],
+                "order_id": orden["order_id"],
+                "tipo":     "unico"
+            }), 200
 
     except requests.HTTPError as e:
         print(f"❌ PayPal API error: {e.response.text}")
@@ -1793,19 +1886,6 @@ def api_crear_pago_paypal():
         print(f"❌ crear_pago_paypal: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
-
-@app.route("/cron/recordatorio_pagos", methods=["GET"])
-def cron_recordatorio_pagos():
-    """
-    Configura en cron-job.org: 1 vez al día.
-    Envía recordatorio a pagos pendientes de +24h. Anti-spam incluido.
-    """
-    try:
-        recordatorio_pagos_pendientes()
-        return jsonify({"success": True, "message": "Recordatorios procesados"}), 200
-    except Exception as e:
-        print(f"❌ cron recordatorio: {traceback.format_exc()}")
-        return jsonify({"error": str(e)}), 500
 
 @app.route("/cron/publicar_contenido", methods=["GET"])
 def cron_publicar_contenido():
