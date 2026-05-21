@@ -1,5 +1,4 @@
 // ============ CONFIGURACION ============
-// ============ CONFIGURACION ============
 const API_BASE_URL = "https://cineapp-bot.onrender.com";
 const TELEGRAM_BOT_USERNAME = "Popcornqh_admin_bot";    
 const ADMIN_ID = 5824989040;
@@ -1226,46 +1225,100 @@ window.copiarNumero = function(num) {
 
 window.pagarInternacional = function(plan) {
     window.planSeleccionado = plan;
-    document.getElementById("modal-email").style.display = "flex";
+    const modal = document.getElementById("modal-email");
+    modal.style.display = "flex";
+    const inp = document.getElementById("email-input");
+    if (inp && usuarioActual?.email) inp.value = usuarioActual.email;
 };
 
-async function confirmarPago() {
-
-    const email = document.getElementById("email-input").value;
-
-    if (!email) {
-        alert("Ingresa un correo");
-        return;
+function _validarEmailModal() {
+    const email = document.getElementById("email-input")?.value?.trim();
+    const inp   = document.getElementById("email-input");
+    if (!email || !email.includes("@")) {
+        if (inp) { inp.style.borderColor = "#e74c3c"; inp.placeholder = "Ingresa un email válido"; }
+        return null;
     }
+    if (inp) inp.style.borderColor = "";
+    return email;
+}
+
+window.confirmarPagoBMC = async function() {
+    const email = _validarEmailModal();
+    if (!email) return;
+    const btn = document.querySelector(".bmc-btn");
+    if (btn) { btn.disabled = true; btn.style.opacity = "0.6"; }
+    try {
+        const resp = await fetch(`${API_BASE_URL}/crear_pago_tarjeta`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ telegram_id: userId, plan: window.planSeleccionado.toLowerCase(), email })
+        });
+        const data = await resp.json();
+        if (!resp.ok) { alert("Error: " + (data.error || "desconocido")); return; }
+        cerrarModal();
+        tg.openLink(data.url);
+    } catch(e) { alert("Error de conexión"); }
+    finally { if (btn) { btn.disabled = false; btn.style.opacity = ""; } }
+};
+
+window.confirmarPagoPayPal = async function() {
+    const email = _validarEmailModal();
+    if (!email) return;
+
+    const btn = document.querySelector(".pp-btn");
+    const nombreBtn = btn ? btn.querySelector(".mpb-nombre") : null;
+    const descBtn   = btn ? btn.querySelector(".mpb-desc")   : null;
+    if (btn) { btn.disabled = true; btn.style.opacity = "0.7"; }
+    if (nombreBtn) nombreBtn.textContent = "Creando orden...";
+    if (descBtn)   descBtn.textContent   = "Conectando con PayPal";
 
     try {
-        const response = await fetch(`${API_BASE_URL}/crear_pago_tarjeta`, {
+        const resp = await fetch(`${API_BASE_URL}/api/admin/marketing/crear_pago_paypal`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 telegram_id: userId,
                 plan: window.planSeleccionado.toLowerCase(),
-                email: email
+                email
             })
         });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert("Error");
+        const data = await resp.json();
+        if (!resp.ok) {
+            alert("Error PayPal: " + (data.error || "desconocido"));
             return;
         }
+        // Cerrar modal y abrir PayPal en navegador externo
+        // (el popup nativo de PayPal no funciona dentro de Telegram WebApp)
+        cerrarModal();
+        try {
+            // Telegram WebApp: abre en el navegador del sistema
+            tg.openLink(data.url);
+        } catch(e) {
+            window.open(data.url, "_blank");
+        }
+        // Mostrar aviso al usuario
+        setTimeout(() => {
+            try {
+                tg.showPopup({
+                    title: "PayPal abierto",
+                    message: "Completa el pago en el navegador. Tu membresía se activará automáticamente al finalizar.",
+                    buttons: [{ type: "ok" }]
+                });
+            } catch(e) {}
+        }, 800);
 
-        tg.openLink(data.url);
-
-    } catch (e) {
-        alert("Error conexión");
+    } catch(e) {
+        alert("Error de conexión: " + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.style.opacity = ""; }
+        if (nombreBtn) nombreBtn.textContent = "PayPal";
+        if (descBtn)   descBtn.textContent   = "Cuenta PayPal · Disponible en Perú";
     }
-}
+};
+
+async function confirmarPago() { await confirmarPagoBMC(); }
 
 function cerrarModal() {
     document.getElementById("modal-email").style.display = "none";
-    document.getElementById("email-input").value = "";
 }
 
 
@@ -1937,17 +1990,14 @@ function compartirContenido() {
 }
 
 // ============ TEMPORADAS ============
-let temporadasActuales = [];
+let temporadasActuales = [];  // caché de temporadas de la serie abierta
 let temporadaSeleccionada = null;
 
 async function cargarTemporadas(item) {
-
     const wrap = document.getElementById('detalleTemporadasWrap');
-    const grid = document.getElementById('detalleTemporadasGrid');
+    if (!wrap) return;
 
-    if (!wrap || !grid) return;
-
-    // Solo series/anime
+    // Solo aplica a series y anime
     if (!['serie', 'anime'].includes(item.tipo)) {
         wrap.style.display = 'none';
         temporadasActuales = [];
@@ -1956,13 +2006,10 @@ async function cargarTemporadas(item) {
     }
 
     try {
-
         const resp = await fetch(`${API_BASE_URL}/api/temporadas/${item.id}`);
         const data = await resp.json();
-
         const temps = data.temporadas || [];
 
-        // Sin temporadas
         if (!temps.length) {
             wrap.style.display = 'none';
             temporadasActuales = [];
@@ -1971,139 +2018,51 @@ async function cargarTemporadas(item) {
         }
 
         temporadasActuales = temps;
+        // Seleccionar la primera temporada por defecto
+        seleccionarTemporada(temps[0], item, false);
 
-        // Mostrar contenedor
+        // Renderizar selector
         wrap.style.display = 'block';
-
-        // Render botones
-        grid.innerHTML = temps.map((t, i) => `
-            <button 
-                type="button"
-                class="temp-btn ${i === 0 ? 'temp-btn-active' : ''}"
-                data-index="${i}"
-            >
-                <span class="temp-num">T${t.numero}</span>
-
-                <span class="temp-nombre">
-                    ${t.nombre || `Temporada ${t.numero}`}
-                </span>
-
-                ${
-                    t.episodios
-                    ? `<span class="temp-eps">${t.episodios} ep</span>`
-                    : ''
-                }
-            </button>
-        `).join('');
-
-        // Seleccionar primera temporada
-        temporadaSeleccionada = temps[0];
-
-        // Eventos click
-        const botones = grid.querySelectorAll('.temp-btn');
-
-        botones.forEach(btn => {
-
-            btn.addEventListener('click', function(e) {
-
-                e.preventDefault();
-                e.stopPropagation();
-
-                // quitar activos
-                botones.forEach(b => {
-                    b.classList.remove('temp-btn-active');
-                });
-
-                // activar actual
-                this.classList.add('temp-btn-active');
-
-                // obtener temporada
-                const index = parseInt(this.dataset.index);
-
-                const temporada = temporadasActuales[index];
-
-                if (!temporada) return;
-
-                seleccionarTemporada(
-                    temporada,
-                    item,
-                    true,
-                    this
-                );
-
-            });
-
-        });
-
-        // Inicializar primera temporada
-        seleccionarTemporada(
-            temps[0],
-            item,
-            false,
-            botones[0]
-        );
-
-    } catch (e) {
-
-        console.error('Error cargando temporadas:', e);
-
+        const grid = document.getElementById('detalleTemporadasGrid');
+        if (grid) {
+            grid.innerHTML = temps.map((t, i) => `
+                <button class="temp-btn ${i === 0 ? 'temp-btn-active' : ''}"
+                    id="tempbtn_${t.id}"
+                    onclick="seleccionarTemporada(${JSON.stringify(t).replace(/'/g, "\\'")} , contenidoSeleccionado, true, this)">
+                    <span class="temp-num">T${t.numero}</span>
+                    <span class="temp-nombre">${t.nombre || 'Temporada ' + t.numero}</span>
+                    ${t.episodios ? `<span class="temp-eps">${t.episodios} ep</span>` : ''}
+                </button>`).join('');
+        }
+    } catch(e) {
+        console.warn('Error cargando temporadas:', e);
         wrap.style.display = 'none';
-
     }
 }
 
-function seleccionarTemporada(
-    temporada,
-    itemBase,
-    actualizarPoster = true,
-    btnEl = null
-) {
-
+function seleccionarTemporada(temporada, itemBase, actualizarPoster = true, btnEl = null) {
     temporadaSeleccionada = temporada;
 
-    // Botón activo
-    document.querySelectorAll('.temp-btn').forEach(btn => {
-        btn.classList.remove('temp-btn-active');
-    });
+    // Marcar botón activo
+    document.querySelectorAll('.temp-btn').forEach(b => b.classList.remove('temp-btn-active'));
+    if (btnEl) btnEl.classList.add('temp-btn-active');
 
-    if (btnEl) {
-        btnEl.classList.add('temp-btn-active');
-    }
-
-    // Cambiar poster
+    // Cambiar poster si la temporada tiene su propia portada
     if (actualizarPoster && temporada.poster_url) {
-
         const imgEl = document.getElementById('detalleImagen');
         const bgEl  = document.getElementById('detalleHeroBg');
-
-        if (imgEl) {
-            imgEl.src = temporada.poster_url;
-        }
-
-        if (bgEl) {
-            bgEl.style.backgroundImage =
-                `url('${temporada.poster_url}')`;
-        }
+        if (imgEl) imgEl.src = temporada.poster_url;
+        if (bgEl)  bgEl.style.backgroundImage = `url('${temporada.poster_url}')`;
     }
 
-    // Estado botón reproducir
+    // El botón Reproducir ahora usará el enlace de la temporada
+    // (btnVerAhora listener lo lee de temporadaSeleccionada en tiempo real)
     const btnVer = document.getElementById('btnVerAhora');
-
     if (btnVer) {
-
-        const tieneEnlace =
-            temporada.enlace &&
-            temporada.enlace.trim() !== '';
-
+        const tieneEnlace = temporada.enlace && temporada.enlace.trim() !== '';
         btnVer.disabled = !tieneEnlace;
-
-        btnVer.style.opacity =
-            tieneEnlace ? '1' : '0.5';
-
-        btnVer.title =
-            tieneEnlace
-                ? ''
-                : 'Esta temporada aún no tiene enlace';
+        btnVer.title = tieneEnlace ? '' : 'Esta temporada aún no tiene enlace de reproducción';
+        btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
     }
 }
 

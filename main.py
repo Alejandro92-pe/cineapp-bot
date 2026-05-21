@@ -77,6 +77,162 @@ BMC_LINKS   = {
     "diamond":  "https://buymeacoffee.com/quehay/e/510552",
 }
 
+# PayPal REST API — Variables de Render:
+# PAYPAL_CLIENT_ID     = AXxx...
+# PAYPAL_CLIENT_SECRET = EKxx...
+# PAYPAL_WEBHOOK_ID    = WH-xxx... (del dashboard de PayPal)
+# PAYPAL_MODE          = live  (o sandbox para pruebas)
+PAYPAL_CLIENT_ID     = os.getenv("PAYPAL_CLIENT_ID", "")
+PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "")
+PAYPAL_WEBHOOK_ID    = os.getenv("PAYPAL_WEBHOOK_ID", "")
+PAYPAL_MODE          = os.getenv("PAYPAL_MODE", "live")
+PAYPAL_BASE          = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
+
+# Precios en USD por plan (con descuento 50%)
+PAYPAL_PRECIOS = {
+    "copper":   "3.00",
+    "silver":   "4.50",
+    "gold":     "11.49",
+    "platinum": "22.00",
+    "diamond":  "46.99",
+}
+
+# ============================================================
+# PAYPAL REST API HELPERS
+# ============================================================
+_paypal_token_cache = {"token": None, "expires_at": 0}
+
+def paypal_get_token() -> str:
+    """Obtiene access token de PayPal con caché para no pedir uno en cada llamada."""
+    import time as _time
+    now = _time.time()
+    if _paypal_token_cache["token"] and now < _paypal_token_cache["expires_at"] - 60:
+        return _paypal_token_cache["token"]
+
+    resp = requests.post(
+        f"{PAYPAL_BASE}/v1/oauth2/token",
+        auth=(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
+        data={"grant_type": "client_credentials"},
+        timeout=10
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    _paypal_token_cache["token"]      = data["access_token"]
+    _paypal_token_cache["expires_at"] = now + data.get("expires_in", 3600)
+    return _paypal_token_cache["token"]
+
+def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
+    """
+    Crea una orden de pago en PayPal y devuelve el link de aprobación.
+    El campo custom_id = telegram_id|plan para identificarlo en el webhook.
+    """
+    precio = PAYPAL_PRECIOS.get(plan)
+    if not precio:
+        raise ValueError(f"Plan desconocido: {plan}")
+
+    token = paypal_get_token()
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "https://cineapp-bot.onrender.com")
+
+    body = {
+        "intent": "CAPTURE",
+        "purchase_units": [{
+            "reference_id": f"{telegram_id}_{plan}",
+            "custom_id":    f"{telegram_id}|{plan}",   # lo recuperamos en el webhook
+            "description":  f"QuehayApp VIP — Plan {plan.upper()}",
+            "amount": {
+                "currency_code": "USD",
+                "value":         precio,
+            }
+        }],
+        "payment_source": {
+            "paypal": {
+                "experience_context": {
+                    "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
+                    "brand_name":   "QuehayApp VIP",
+                    "locale":       "es-PE",
+                    "landing_page": "LOGIN",
+                    "user_action":  "PAY_NOW",
+                    # Redirige de vuelta a tu app tras el pago
+                    "return_url": f"{render_url}/paypal/success",
+                    "cancel_url": f"{render_url}/paypal/cancel",
+                }
+            }
+        }
+    }
+
+    if email:
+        body["payment_source"]["paypal"]["email_address"] = email
+
+    resp = requests.post(
+        f"{PAYPAL_BASE}/v2/checkout/orders",
+        json=body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type":  "application/json",
+            "Prefer":        "return=representation",
+        },
+        timeout=15
+    )
+    resp.raise_for_status()
+    orden = resp.json()
+
+    # Extraer el link de aprobación (el usuario va a esta URL para pagar)
+    approve_link = next(
+        (l["href"] for l in orden.get("links", []) if l["rel"] == "payer-action"),
+        None
+    )
+    return {"order_id": orden["id"], "approve_url": approve_link}
+
+def paypal_capturar_orden(order_id: str) -> dict:
+    """Captura el pago de una orden ya aprobada por el usuario."""
+    token = paypal_get_token()
+    resp = requests.post(
+        f"{PAYPAL_BASE}/v2/checkout/orders/{order_id}/capture",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        timeout=15
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+def paypal_verificar_webhook(headers: dict, body_bytes: bytes) -> bool:
+    """
+    Verifica la firma del webhook de PayPal para evitar fraudes.
+    https://developer.paypal.com/api/rest/webhooks/rest/
+    """
+    if not PAYPAL_WEBHOOK_ID:
+        print("⚠️ PAYPAL_WEBHOOK_ID no configurado — omitiendo verificación")
+        return True  # solo en desarrollo
+
+    token = paypal_get_token()
+    verification_body = {
+        "transmission_id":   headers.get("PAYPAL-TRANSMISSION-ID", ""),
+        "transmission_time": headers.get("PAYPAL-TRANSMISSION-TIME", ""),
+        "cert_url":          headers.get("PAYPAL-CERT-URL", ""),
+        "auth_algo":         headers.get("PAYPAL-AUTH-ALGO", ""),
+        "transmission_sig":  headers.get("PAYPAL-TRANSMISSION-SIG", ""),
+        "webhook_id":        PAYPAL_WEBHOOK_ID,
+        "webhook_event":     body_bytes.decode("utf-8"),
+    }
+    resp = requests.post(
+        f"{PAYPAL_BASE}/v1/notifications/verify-webhook-signature",
+        json=verification_body,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        timeout=10
+    )
+    if resp.ok:
+        result = resp.json().get("verification_status")
+        print(f"DEBUG PayPal webhook verification: {result}")
+        return result == "SUCCESS"
+    print(f"⚠️ Error verificando webhook PayPal: {resp.text}")
+    return False
+
+# Gmail SMTP — usa App Password de Google Account
+# Google Account → Seguridad → Contraseñas de aplicación
+GMAIL_USER      = os.getenv("GMAIL_USER", "")
+GMAIL_PASSWORD  = os.getenv("GMAIL_PASSWORD", "")
+GMAIL_FROM_NAME = "QuehayApp VIP"
+
+
 user_states = {}
 
 # ============ TMDB HELPERS ============
@@ -1313,6 +1469,342 @@ def api_eliminar_temporada():
         supabase_service.table("temporadas").delete().eq("id", temporada_id).execute()
         return jsonify({"success": True}), 200
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================
+# EMAIL — GMAIL SMTP
+# ============================================================
+def enviar_email(dest: str, asunto: str, html: str) -> bool:
+    """Envía email via Gmail SMTP con App Password."""
+    if not GMAIL_USER or not GMAIL_PASSWORD:
+        print("⚠️ Gmail no configurado (GMAIL_USER / GMAIL_PASSWORD)")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = asunto
+        msg["From"]    = f"{GMAIL_FROM_NAME} <{GMAIL_USER}>"
+        msg["To"]      = dest
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
+            srv.login(GMAIL_USER, GMAIL_PASSWORD)
+            srv.sendmail(GMAIL_USER, dest, msg.as_string())
+        print(f"✅ Email enviado a {dest}")
+        return True
+    except Exception as e:
+        print(f"❌ Email error {dest}: {e}")
+        return False
+
+def _html_recordatorio(nombre: str, plan: str, monto) -> str:
+    return (
+        "<html><body style='font-family:Arial,sans-serif;background:#0d0d0f;color:#f0f0f2;padding:20px'>"
+        "<div style='max-width:460px;margin:0 auto;background:#17171a;border-radius:12px;"
+        "padding:24px;border:1px solid rgba(255,255,255,0.08)'>"
+        f"<h2 style='color:#e8b04b'>👋 Hola {nombre},</h2>"
+        f"<p style='color:#aaa;line-height:1.6'>Empezaste a activar tu membresía "
+        f"<b style='color:#fff'>{plan.upper()}</b> (S/{monto}) pero no completaste el pago.</p>"
+        f"<div style='text-align:center;margin:20px 0'>"
+        f"<a href='https://t.me/{BOT_USERNAME}?start=planes' "
+        "style='background:#e8b04b;color:#1a1200;font-weight:700;padding:12px 28px;"
+        "border-radius:8px;text-decoration:none;display:inline-block'>✅ Completar membresía</a></div>"
+        "<p style='color:#666;font-size:12px;text-align:center'>QuehayApp VIP</p>"
+        "</div></body></html>"
+    )
+
+def _html_bienvenida(nombre: str, plan: str) -> str:
+    return (
+        "<html><body style='font-family:Arial,sans-serif;background:#0d0d0f;color:#f0f0f2;padding:20px'>"
+        "<div style='max-width:460px;margin:0 auto;background:#17171a;border-radius:12px;"
+        "padding:24px;border:1px solid rgba(255,255,255,0.08)'>"
+        f"<h2 style='color:#e8b04b'>🎉 ¡Bienvenido al VIP, {nombre}!</h2>"
+        f"<p style='color:#aaa;line-height:1.6'>Tu membresía "
+        f"<b style='color:#fff'>{plan.upper()}</b> fue activada con éxito.</p>"
+        f"<div style='text-align:center;margin:20px 0'>"
+        f"<a href='https://t.me/{BOT_USERNAME}?start=miniapp' "
+        "style='background:#e8b04b;color:#1a1200;font-weight:700;padding:12px 28px;"
+        "border-radius:8px;text-decoration:none;display:inline-block'>🎬 Ir a la Mini App</a></div>"
+        "</div></body></html>"
+    )
+
+# ============================================================
+# MARKETING — RECORDATORIO ANTI-ABANDONO
+# ============================================================
+# SQL (ejecutar una vez en Supabase):
+# ALTER TABLE pagos_manuales
+#   ADD COLUMN IF NOT EXISTS recordatorio_enviado BOOLEAN DEFAULT false,
+#   ADD COLUMN IF NOT EXISTS recordatorio_enviado_en TIMESTAMPTZ DEFAULT NULL;
+
+def recordatorio_pagos_pendientes():
+    """
+    Detecta pagos en estado 'pendiente' de más de 24h y envía recordatorio
+    UNA SOLA VEZ por pago (anti-spam via columna recordatorio_enviado).
+    """
+    hace_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    pendientes = supabase_service.table("pagos_manuales")         .select("*, usuarios!inner(*)")         .eq("estado", "pendiente")         .eq("recordatorio_enviado", False)         .lt("fecha_pago", hace_24h)         .execute()
+
+    print(f"DEBUG marketing: {len(pendientes.data)} pagos sin recordatorio")
+    for p in pendientes.data:
+        u       = p.get("usuarios", {})
+        tid     = u.get("telegram_id")
+        nombre  = u.get("nombre", "")
+        email   = u.get("email", "")
+        plan    = p.get("membresia_comprada", "").upper()
+        monto   = p.get("monto", "?")
+        enviado = False
+
+        if tid:
+            try:
+                markup = InlineKeyboardMarkup(row_width=1)
+                markup.add(
+                    InlineKeyboardButton("✅ Completar mi membresía",
+                        url=f"https://t.me/{BOT_USERNAME}?start=planes"),
+                    InlineKeyboardButton("❓ Tengo una duda",
+                        url=f"https://t.me/{BOT_USERNAME}"),
+                )
+                bot.send_message(tid,
+                    f"👋 Hola *{nombre}*,\n\n"
+                    f"Vimos que empezaste a activar tu membresía *{plan}* "
+                    f"(S/{monto}) pero no completaste el pago.\n\n"
+                    "¿Necesitas ayuda? ¡Estamos aquí! 😊",
+                    parse_mode="Markdown", reply_markup=markup)
+                enviado = True
+                print(f"✅ Recordatorio Telegram → {tid}")
+            except Exception as e:
+                print(f"⚠️ Error Telegram {tid}: {e}")
+
+        if email:
+            try:
+                html = _html_recordatorio(nombre, plan.lower(), monto)
+                if enviar_email(email, f"¿Completamos tu membresía {plan}? 🎬", html):
+                    enviado = True
+            except Exception as e:
+                print(f"⚠️ Error email {email}: {e}")
+
+        # Marcar enviado (aunque falle, para no reintentar infinito)
+        supabase_service.table("pagos_manuales").update({
+            "recordatorio_enviado":    True,
+            "recordatorio_enviado_en": datetime.now(timezone.utc).isoformat()
+        }).eq("id", p["id"]).execute()
+
+def obtener_usuarios_sin_pago() -> list:
+    """Usuarios sin membresía activa con info de último pago."""
+    res = supabase_service.table("usuarios").select("*")         .eq("membresia_activa", False).order("id", desc=True).execute()
+    usuarios = res.data or []
+    for u in usuarios:
+        pagos = supabase_service.table("pagos_manuales")             .select("estado,membresia_comprada,fecha_pago")             .eq("usuario_id", u["telegram_id"])             .order("fecha_pago", desc=True).limit(1).execute()
+        u["ultimo_pago"] = pagos.data[0] if pagos.data else None
+    return usuarios
+
+# ============================================================
+# WEBHOOK — PAYPAL REST (PAYMENT.CAPTURE.COMPLETED)
+# ============================================================
+@app.route("/webhook/paypal", methods=["POST"])
+def webhook_paypal():
+    """
+    Recibe eventos de PayPal REST API.
+    Configurar en developer.paypal.com → Apps → Webhooks:
+      URL:    https://cineapp-bot.onrender.com/webhook/paypal
+      Eventos: PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.DENIED
+    """
+    try:
+        body_bytes = request.get_data()
+        data       = request.get_json(force=True, silent=True) or {}
+        event_type = data.get("event_type", "")
+        print(f"DEBUG PayPal webhook event: {event_type}")
+
+        if not paypal_verificar_webhook(request.headers, body_bytes):
+            return jsonify({"error": "Verificación fallida"}), 400
+
+        if event_type != "PAYMENT.CAPTURE.COMPLETED":
+            return jsonify({"received": True}), 200
+
+        resource    = data.get("resource", {})
+        custom_id   = resource.get("custom_id", "")
+        payer_email = (resource.get("payer", {}) or {}).get("email_address", "")
+        amount      = resource.get("amount", {}).get("value", "0")
+
+        if not custom_id:
+            units     = resource.get("purchase_units", [{}])
+            custom_id = units[0].get("custom_id", "") if units else ""
+
+        partes = custom_id.split("|")
+        if len(partes) < 2:
+            print(f"⚠️ custom_id malformado: {custom_id}")
+            return jsonify({"error": "custom_id inválido"}), 400
+
+        telegram_id = int(partes[0])
+        plan        = partes[1].lower()
+        print(f"✅ PayPal pago: {telegram_id} → {plan} (${amount})")
+
+        if payer_email:
+            supabase_service.table("usuarios").update({"email": payer_email}) \
+                .eq("telegram_id", telegram_id).execute()
+
+        supabase_service.table("pagos_manuales").insert({
+            "usuario_id":           telegram_id,
+            "membresia_comprada":   plan,
+            "monto":                float(amount),
+            "metodo":               "paypal",
+            "estado":               "aprobado",
+            "activado":             False,
+            "email":                payer_email or None,
+            "fecha_pago":           datetime.now().isoformat(),
+            "recordatorio_enviado": True,
+        }).execute()
+
+        ok = activar_usuario(telegram_id, plan, ADMIN_ID)
+        if ok:
+            supabase_service.table("pagos_manuales") \
+                .update({"activado": True}) \
+                .eq("usuario_id", telegram_id).eq("metodo", "paypal") \
+                .eq("estado", "aprobado").eq("activado", False).execute()
+            if payer_email:
+                nr = supabase_service.table("usuarios").select("nombre") \
+                    .eq("telegram_id", telegram_id).execute()
+                nombre = nr.data[0]["nombre"] if nr.data else "VIP"
+                enviar_email(payer_email, "🎉 ¡Membresía activada!", _html_bienvenida(nombre, plan))
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        print(f"❌ PayPal webhook error: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/paypal/success", methods=["GET"])
+def paypal_success():
+    """PayPal redirige aquí tras pago exitoso. El webhook ya activó la membresía."""
+    return f"""<html><head><meta charset="utf-8">
+    <meta http-equiv="refresh" content="3;url=https://t.me/{BOT_USERNAME}">
+    <style>body{{font-family:Arial;background:#0d0d0f;color:#f0f0f2;display:flex;
+    align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center}}</style>
+    </head><body><div>
+    <div style="font-size:52px">🎉</div>
+    <h2 style="color:#e8b04b">¡Pago completado!</h2>
+    <p style="color:#aaa">Tu membresía se activará en segundos.<br>Redirigiendo al bot...</p>
+    </div></body></html>""", 200
+
+@app.route("/paypal/cancel", methods=["GET"])
+def paypal_cancel():
+    """PayPal redirige aquí si el usuario cancela."""
+    return f"""<html><head><meta charset="utf-8">
+    <meta http-equiv="refresh" content="3;url=https://t.me/{BOT_USERNAME}">
+    <style>body{{font-family:Arial;background:#0d0d0f;color:#f0f0f2;display:flex;
+    align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center}}</style>
+    </head><body><div>
+    <div style="font-size:52px">↩️</div>
+    <h2 style="color:#aaa">Pago cancelado</h2>
+    <p style="color:#666">No se realizó ningún cargo. Regresando al bot...</p>
+    </div></body></html>""", 200
+
+# ============================================================
+# ENDPOINTS — MARKETING
+# ============================================================
+@app.route("/api/admin/marketing/usuarios_sin_pago", methods=["POST"])
+def api_usuarios_sin_pago():
+    data = request.get_json(force=True, silent=True) or {}
+    if not check_admin(data):
+        return jsonify({"error": "No autorizado"}), 403
+    try:
+        usuarios = obtener_usuarios_sin_pago()
+        return jsonify({"usuarios": usuarios, "total": len(usuarios)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/marketing/enviar_mensaje", methods=["POST"])
+def api_enviar_mensaje_marketing():
+    """Envío individual o masivo por Telegram."""
+    data = request.get_json(force=True, silent=True) or {}
+    if not check_admin(data):
+        return jsonify({"error": "No autorizado"}), 403
+    mensaje     = data.get("mensaje", "").strip()
+    ids_target  = data.get("telegram_ids", [])
+    con_botones = data.get("con_botones", True)
+    if not mensaje:
+        return jsonify({"error": "mensaje requerido"}), 400
+
+    if ids_target == "todos":
+        usuarios   = obtener_usuarios_sin_pago()
+        ids_target = [u["telegram_id"] for u in usuarios if u.get("telegram_id")]
+
+    markup = None
+    if con_botones:
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            InlineKeyboardButton("💎 Ver planes VIP", url=f"https://t.me/{BOT_USERNAME}?start=planes"),
+            InlineKeyboardButton("🎬 Explorar catálogo", url=f"https://t.me/{BOT_USERNAME}?start=miniapp"),
+        )
+
+    enviados = errores = 0
+    for tid in ids_target:
+        try:
+            bot.send_message(int(tid), mensaje, parse_mode="Markdown", reply_markup=markup)
+            enviados += 1
+            time.sleep(0.05)
+        except Exception as e:
+            print(f"⚠️ Error enviando a {tid}: {e}")
+            errores += 1
+
+    return jsonify({"success": True, "enviados": enviados, "errores": errores}), 200
+
+@app.route("/api/admin/marketing/crear_pago_paypal", methods=["POST"])
+def api_crear_pago_paypal():
+    """
+    Crea una orden PayPal REST y devuelve el link de aprobación.
+    El usuario va a ese link, aprueba, PayPal redirige a /paypal/success
+    y el webhook activa la membresía automáticamente.
+    Body: { telegram_id, plan, email }
+    """
+    try:
+        data        = request.get_json(force=True, silent=True) or {}
+        telegram_id = data.get("telegram_id")
+        plan        = data.get("plan", "").lower()
+        email       = data.get("email", "")
+
+        if not telegram_id or not plan:
+            return jsonify({"error": "telegram_id y plan requeridos"}), 400
+        if not PAYPAL_CLIENT_ID or not PAYPAL_CLIENT_SECRET:
+            return jsonify({"error": "PayPal no configurado en el servidor"}), 500
+
+        if email:
+            supabase_service.table("usuarios").update({"email": email}) \
+                .eq("telegram_id", telegram_id).execute()
+
+        orden = paypal_crear_orden(plan, int(telegram_id), email)
+
+        supabase_service.table("pagos_manuales").insert({
+            "usuario_id":           telegram_id,
+            "membresia_comprada":   plan,
+            "monto":                float(PAYPAL_PRECIOS.get(plan, 0)),
+            "metodo":               "paypal",
+            "estado":               "pendiente_webhook",
+            "activado":             False,
+            "email":                email or None,
+            "fecha_pago":           datetime.now().isoformat(),
+            "recordatorio_enviado": False,
+        }).execute()
+
+        print(f"✅ Orden PayPal creada: {orden['order_id']} para {telegram_id}|{plan}")
+        return jsonify({"success": True, "url": orden["approve_url"], "order_id": orden["order_id"]}), 200
+
+    except requests.HTTPError as e:
+        print(f"❌ PayPal API error: {e.response.text}")
+        return jsonify({"error": f"PayPal API error {e.response.status_code}"}), 400
+    except Exception as e:
+        print(f"❌ crear_pago_paypal: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/cron/recordatorio_pagos", methods=["GET"])
+def cron_recordatorio_pagos():
+    """
+    Configura en cron-job.org: 1 vez al día.
+    Envía recordatorio a pagos pendientes de +24h. Anti-spam incluido.
+    """
+    try:
+        recordatorio_pagos_pendientes()
+        return jsonify({"success": True, "message": "Recordatorios procesados"}), 200
+    except Exception as e:
+        print(f"❌ cron recordatorio: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/cron/publicar_contenido", methods=["GET"])

@@ -652,7 +652,43 @@
     </div>
     <button class="btn-login" onclick="intentarLogin()">Entrar al panel</button>
     <div class="login-error" id="login-error">ID o contraseña incorrectos.</div>
+  
+  <!-- MARKETING -->
+  <div class="panel" id="panel-marketing">
+    <!-- Mensaje masivo -->
+    <div class="importer-card">
+      <h2>📣 Envío masivo</h2>
+      <p class="sub">Escribe el mensaje que le llegará a los usuarios sin membresía. Usa *negrita* y _cursiva_ con formato Markdown.</p>
+      <textarea class="batch-textarea" id="mkt-mensaje" placeholder="Ejemplo: 🎬 *¡Oferta especial!*
+
+Accede a todo el catálogo por solo S/11 este fin de semana.
+¿Te unirías?" style="min-height:100px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn-import" onclick="enviarMasivo('todos')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+          Enviar a todos sin membresía
+        </button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="mkt-con-botones" checked style="accent-color:var(--accent)"> Con botones de planes
+        </label>
+      </div>
+      <div class="import-status" id="mkt-status"></div>
+    </div>
+
+    <!-- Usuarios sin pago -->
+    <div class="importer-card">
+      <h2>👥 Usuarios sin membresía <span class="topbar-badge" id="mkt-count">—</span></h2>
+      <p class="sub">Lista de usuarios registrados que no han completado ningún pago. Puedes enviarles un mensaje individual.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="filtro-btn active" onclick="filtrarMkt('todos',this)">Todos</button>
+        <button class="filtro-btn" onclick="filtrarMkt('con_email',this)">Con email</button>
+        <button class="filtro-btn" onclick="filtrarMkt('iniciaron_pago',this)">Iniciaron pago</button>
+      </div>
+      <div id="mkt-usuarios-list"></div>
+    </div>
   </div>
+
+</div>
 </div>
 
 <!-- ADMIN APP -->
@@ -671,6 +707,7 @@
     <div class="tab" onclick="switchTab('pagos')">💰 Pagos</div>
     <div class="tab" onclick="switchTab('pedidos')">📦 Pedidos</div>
     <div class="tab" onclick="switchTab('usuarios')">👥 Usuarios</div>
+    <div class="tab" onclick="switchTab('marketing')">📣 Marketing</div>
   </div>
 
   <!-- IMPORTAR TMDB -->
@@ -836,6 +873,7 @@ function switchTab(tab) {
   if (tab === 'pagos') cargarPagos();
   else if (tab === 'pedidos') cargarPedidos();
   else if (tab === 'usuarios') cargarUsuarios();
+  else if (tab === 'marketing') cargarMarketing();
   else if (tab === 'catalogo') { catalogoOffset = 0; cargarCatalogo(); }
 }
 
@@ -1236,6 +1274,138 @@ async function guardarEnlaceTemp(tempId, inputEl) {
       setTimeout(() => inputEl.style.borderColor = '', 1500);
     }
   } catch(e) { console.error('Error guardando enlace:', e); }
+}
+
+// ── MARKETING ──
+
+let _mktUsuarios = [];
+let _mktFiltro = 'todos';
+
+async function cargarMarketing() {
+  document.getElementById('mkt-status').className = 'import-status loading';
+  document.getElementById('mkt-status').textContent = 'Cargando usuarios...';
+  document.getElementById('mkt-status').style.display = 'block';
+  try {
+    const resp = await fetch(`${API}/api/admin/marketing/usuarios_sin_pago`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_id: Number(adminId) })
+    });
+    const data = await resp.json();
+    _mktUsuarios = data.usuarios || [];
+    document.getElementById('mkt-count').textContent = _mktUsuarios.length;
+    document.getElementById('mkt-status').style.display = 'none';
+    renderMktUsuarios();
+  } catch(e) {
+    document.getElementById('mkt-status').className = 'import-status error';
+    document.getElementById('mkt-status').textContent = 'Error cargando: ' + e.message;
+  }
+}
+
+function filtrarMkt(filtro, btn) {
+  _mktFiltro = filtro;
+  document.querySelectorAll('#panel-marketing .filtro-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMktUsuarios();
+}
+
+function renderMktUsuarios() {
+  const list = document.getElementById('mkt-usuarios-list');
+  if (!list) return;
+  let usuarios = _mktUsuarios;
+  if (_mktFiltro === 'con_email') usuarios = usuarios.filter(u => u.email);
+  if (_mktFiltro === 'iniciaron_pago') usuarios = usuarios.filter(u => u.ultimo_pago);
+
+  if (!usuarios.length) {
+    list.innerHTML = '<div class="empty-state">Sin usuarios en este filtro</div>';
+    return;
+  }
+  list.innerHTML = usuarios.map(u => {
+    const ini = (u.nombre || '?')[0].toUpperCase();
+    const tieneEmail = u.email ? `<span style="font-size:10px;color:#7dd7a5">✉ ${u.email}</span>` : '';
+    const tienePago = u.ultimo_pago ? `<span style="font-size:10px;color:#f1c40f">⚡ Inició ${u.ultimo_pago.membresia_comprada?.toUpperCase()}</span>` : '';
+    return `<div class="user-row">
+      <div class="user-avatar">${ini}</div>
+      <div class="user-info">
+        <div class="user-nombre">${u.nombre || 'Sin nombre'}</div>
+        <div class="user-id" style="display:flex;gap:6px;flex-wrap:wrap">
+          <span>${u.telegram_id}</span>${tieneEmail}${tienePago}
+        </div>
+      </div>
+      <button class="btn-aprobar" style="font-size:11px;padding:5px 10px"
+        onclick="enviarIndividual(${u.telegram_id}, '${(u.nombre||'').replace(/'/g,'')}', this)">
+        Enviar
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function enviarMasivo(target) {
+  const mensaje = document.getElementById('mkt-mensaje').value.trim();
+  if (!mensaje) {
+    document.getElementById('mkt-status').className = 'import-status error';
+    document.getElementById('mkt-status').textContent = 'Escribe un mensaje primero';
+    document.getElementById('mkt-status').style.display = 'block';
+    return;
+  }
+  const conBotones = document.getElementById('mkt-con-botones')?.checked ?? true;
+  const statusEl = document.getElementById('mkt-status');
+  statusEl.className = 'import-status loading';
+  statusEl.textContent = 'Enviando mensajes...';
+  statusEl.style.display = 'block';
+
+  try {
+    const resp = await fetch(`${API}/api/admin/marketing/enviar_mensaje`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_id: Number(adminId),
+        telegram_ids: target,
+        mensaje,
+        con_botones: conBotones
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      statusEl.className = 'import-status success';
+      statusEl.textContent = `✓ Enviado a ${data.enviados} usuarios${data.errores ? ` (${data.errores} errores)` : ''}`;
+    } else {
+      statusEl.className = 'import-status error';
+      statusEl.textContent = `Error: ${data.error || 'desconocido'}`;
+    }
+  } catch(e) {
+    statusEl.className = 'import-status error';
+    statusEl.textContent = 'Error de red';
+  }
+}
+
+async function enviarIndividual(telegramId, nombre, btn) {
+  const mensaje = document.getElementById('mkt-mensaje').value.trim();
+  if (!mensaje) {
+    alert('Escribe un mensaje en el área de texto primero');
+    return;
+  }
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const resp = await fetch(`${API}/api/admin/marketing/enviar_mensaje`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_id: Number(adminId),
+        telegram_ids: [telegramId],
+        mensaje,
+        con_botones: document.getElementById('mkt-con-botones')?.checked ?? true
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      btn.textContent = '✓';
+      btn.style.background = 'rgba(76,175,125,0.2)';
+      setTimeout(() => { btn.textContent = 'Enviar'; btn.style.background = ''; btn.disabled = false; }, 2000);
+    } else {
+      btn.textContent = '✗'; btn.disabled = false;
+    }
+  } catch(e) { btn.textContent = '✗'; btn.disabled = false; }
 }
 
 // ── USUARIOS ──
