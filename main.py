@@ -1612,6 +1612,11 @@ def webhook_paypal():
         event_type = data.get("event_type", "")
         print(f"DEBUG PayPal webhook event: {event_type}")
 
+        # ESTE BLOQUE NUEVO
+        if event_type == "BILLING.SUBSCRIPTION.CREATED":
+            print("ℹ️ Suscripción creada")
+            return jsonify({"success": True}), 200
+
         if not paypal_verificar_webhook(request.headers, body_bytes):
             return jsonify({"error": "Verificación fallida"}), 400
 
