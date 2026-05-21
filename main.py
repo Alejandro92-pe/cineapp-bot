@@ -276,25 +276,16 @@ def paypal_crear_suscripcion(plan: str, telegram_id: int, email: str = "") -> di
 
     body = {
         "plan_id": plan_id,
-        "quantity": "1",
         "custom_id": f"{telegram_id}|{plan}",   # recuperado en el webhook
-        "subscriber": {},
         "application_context": {
-            "brand_name":    "QuehayApp VIP",
+            "brand_name":    "QH Membership",
             "locale":        "es-PE",
             "shipping_preference": "NO_SHIPPING",
             "user_action":   "SUBSCRIBE_NOW",
-            "payment_method": {
-                "payer_selected":  "PAYPAL",
-                "payee_preferred": "IMMEDIATE_PAYMENT_REQUIRED"
-            },
             "return_url": f"{render_url}/paypal/success",
             "cancel_url": f"{render_url}/paypal/cancel",
         }
     }
-
-    if email:
-        body["subscriber"]["email_address"] = email
 
     resp = requests.post(
         f"{PAYPAL_BASE}/v1/billing/subscriptions",
