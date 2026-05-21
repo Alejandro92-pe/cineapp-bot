@@ -1292,23 +1292,39 @@ let _mktUsuarios = [];
 let _mktFiltro = 'todos';
 
 async function cargarMarketing() {
-  document.getElementById('mkt-status').className = 'import-status loading';
-  document.getElementById('mkt-status').textContent = 'Cargando usuarios...';
-  document.getElementById('mkt-status').style.display = 'block';
+  const statusEl = document.getElementById('mkt-status');
+  const list = document.getElementById('mkt-usuarios-list');
+  statusEl.className = 'import-status loading';
+  statusEl.textContent = 'Cargando usuarios sin membresía...';
+  statusEl.style.display = 'block';
+  if (list) list.innerHTML = '';
+
   try {
     const resp = await fetch(`${API}/api/admin/marketing/usuarios_sin_pago`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ admin_id: Number(adminId) })
     });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+
     const data = await resp.json();
     _mktUsuarios = data.usuarios || [];
     document.getElementById('mkt-count').textContent = _mktUsuarios.length;
-    document.getElementById('mkt-status').style.display = 'none';
-    renderMktUsuarios();
+    statusEl.style.display = 'none';
+
+    if (_mktUsuarios.length === 0) {
+      if (list) list.innerHTML = '<div class="empty-state">🎉 Todos los usuarios tienen membresía activa</div>';
+    } else {
+      renderMktUsuarios();
+    }
   } catch(e) {
-    document.getElementById('mkt-status').className = 'import-status error';
-    document.getElementById('mkt-status').textContent = 'Error cargando: ' + e.message;
+    statusEl.className = 'import-status error';
+    statusEl.textContent = '❌ Error cargando usuarios: ' + e.message;
+    console.error('cargarMarketing error:', e);
   }
 }
 

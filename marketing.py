@@ -138,17 +138,40 @@ def _html_mensaje_marketing(nombre: str, mensaje: str, bot_username: str) -> str
 # ══════════════════════════════════════════════════════════════════════════════
 
 def obtener_usuarios_sin_pago() -> list:
-    """Usuarios sin membresía activa con info de su último intento de pago."""
-    res = _supabase.table("usuarios").select("*") \
-        .eq("membresia_activa", False).order("id", desc=True).execute()
-    usuarios = res.data or []
-    for u in usuarios:
-        pagos = _supabase.table("pagos_manuales") \
-            .select("estado,membresia_comprada,fecha_pago") \
-            .eq("usuario_id", u["telegram_id"]) \
-            .order("fecha_pago", desc=True).limit(1).execute()
-        u["ultimo_pago"] = pagos.data[0] if pagos.data else None
-    return usuarios
+    """
+    Usuarios sin membresía activa.
+    La columna membresia_activa puede ser FALSE o NULL (ambos significan sin membresía).
+    Se excluyen solo los TRUE explícitos.
+    """
+    # Traer TODOS y filtrar en Python — más confiable que depender
+    # del tipo booleano en Supabase (puede venir como NULL, False, "false", etc.)
+    res = _supabase.table("usuarios").select(
+        "id, telegram_id, nombre, email, membresia_activa, membresia_tipo, fecha_inicio, fecha_vencimiento"
+    ).order("id", desc=True).execute()
+
+    todos = res.data or []
+    # Excluir solo los que tienen membresia_activa = True explícito
+    sin_pago = [u for u in todos if not u.get("membresia_activa")]
+
+    # Enriquecer con último pago (en lote para no hacer N queries)
+    if sin_pago:
+        ids = [u["telegram_id"] for u in sin_pago if u.get("telegram_id")]
+        pagos_res = _supabase.table("pagos_manuales") \
+            .select("usuario_id, estado, membresia_comprada, fecha_pago") \
+            .in_("usuario_id", ids) \
+            .order("fecha_pago", desc=True).execute()
+
+        # Construir dict telegram_id → último pago
+        ultimo_pago_map = {}
+        for p in (pagos_res.data or []):
+            uid = p["usuario_id"]
+            if uid not in ultimo_pago_map:
+                ultimo_pago_map[uid] = p
+
+        for u in sin_pago:
+            u["ultimo_pago"] = ultimo_pago_map.get(u["telegram_id"])
+
+    return sin_pago
 
 
 def recordatorio_pagos_pendientes():
@@ -234,9 +257,11 @@ def api_usuarios_sin_pago():
         return jsonify({"error": "No autorizado"}), 403
     try:
         usuarios = obtener_usuarios_sin_pago()
+        print(f"DEBUG marketing: {len(usuarios)} usuarios sin membresía activa")
         return jsonify({"usuarios": usuarios, "total": len(usuarios)}), 200
     except Exception as e:
-        print(f"❌ usuarios_sin_pago: {e}")
+        import traceback
+        print(f"❌ usuarios_sin_pago ERROR: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 

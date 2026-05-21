@@ -146,8 +146,11 @@ def paypal_get_token() -> str:
 
 def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
     """
-    Crea una orden de pago en PayPal y devuelve el link de aprobación.
-    El campo custom_id = telegram_id|plan para identificarlo en el webhook.
+    Crea una orden de pago único en PayPal.
+    
+    IMPORTANTE: No incluir 'payment_source.paypal.email_address' porque
+    causa PAYEE_ACCOUNT_RESTRICTED si la cuenta tiene restricciones de WooCommerce.
+    Se usa el merchant por defecto de la app (CLIENT_ID/SECRET).
     """
     precio = PAYPAL_PRECIOS.get(plan)
     if not precio:
@@ -160,31 +163,23 @@ def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
         "intent": "CAPTURE",
         "purchase_units": [{
             "reference_id": f"{telegram_id}_{plan}",
-            "custom_id":    f"{telegram_id}|{plan}",   # lo recuperamos en el webhook
+            "custom_id":    f"{telegram_id}|{plan}",
             "description":  f"QuehayApp VIP — Plan {plan.upper()}",
             "amount": {
                 "currency_code": "USD",
                 "value":         precio,
             }
         }],
-        "payment_source": {
-            "paypal": {
-                "experience_context": {
-                    "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
-                    "brand_name":   "QuehayApp VIP",
-                    "locale":       "en-US",
-                    "landing_page": "LOGIN",
-                    "user_action":  "PAY_NOW",
-                    # Redirige de vuelta a tu app tras el pago
-                    "return_url": f"{render_url}/paypal/success",
-                    "cancel_url": f"{render_url}/paypal/cancel",
-                }
-            }
+        "application_context": {
+            "brand_name":          "QuehayApp VIP",
+            "locale":              "en-US",
+            "landing_page":        "LOGIN",
+            "shipping_preference": "NO_SHIPPING",
+            "user_action":         "PAY_NOW",
+            "return_url": f"{render_url}/paypal/success",
+            "cancel_url": f"{render_url}/paypal/cancel",
         }
     }
-
-    if email:
-        body["payment_source"]["paypal"]["email_address"] = email
 
     resp = requests.post(
         f"{PAYPAL_BASE}/v2/checkout/orders",
