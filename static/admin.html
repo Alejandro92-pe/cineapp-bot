@@ -653,50 +653,7 @@
     <button class="btn-login" onclick="intentarLogin()">Entrar al panel</button>
     <div class="login-error" id="login-error">ID o contraseña incorrectos.</div>
   
-  <!-- MARKETING -->
-  <div class="panel" id="panel-marketing">
-    <!-- Mensaje masivo -->
-    <div class="importer-card">
-      <h2>📣 Envío masivo</h2>
-      <p class="sub">Escribe el mensaje que le llegará a los usuarios sin membresía. Usa *negrita* y _cursiva_ con formato Markdown.</p>
-      <textarea class="batch-textarea" id="mkt-mensaje" placeholder="Ejemplo: 🎬 *¡Oferta especial!*
 
-Accede a todo el catálogo por solo S/11 este fin de semana.
-¿Te unirías?" style="min-height:100px"></textarea>
-
-      <!-- Asunto para email -->
-      <input type="text" id="mkt-asunto" placeholder="Asunto del email (opcional — por defecto: Oferta especial)"
-        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
-        background:rgba(255,255,255,0.05);color:#f0f0f2;font-size:13px;margin-top:8px;box-sizing:border-box">
-
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
-        <button class="btn-import" onclick="enviarMasivo('todos')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-          Telegram masivo
-        </button>
-        <button class="btn-import" onclick="enviarEmailMasivo('todos')" style="background:rgba(234,100,50,0.18);border-color:rgba(234,100,50,0.4)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
-          Gmail masivo
-        </button>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
-          <input type="checkbox" id="mkt-con-botones" checked style="accent-color:var(--accent)"> Con botones de planes
-        </label>
-      </div>
-      <div class="import-status" id="mkt-status"></div>
-    </div>
-
-    <!-- Usuarios sin pago -->
-    <div class="importer-card">
-      <h2>👥 Usuarios sin membresía <span class="topbar-badge" id="mkt-count">—</span></h2>
-      <p class="sub">Lista de usuarios registrados que no han completado ningún pago. Puedes enviarles un mensaje individual.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="filtro-btn active" onclick="filtrarMkt('todos',this)">Todos</button>
-        <button class="filtro-btn" onclick="filtrarMkt('con_email',this)">Con email</button>
-        <button class="filtro-btn" onclick="filtrarMkt('iniciaron_pago',this)">Iniciaron pago</button>
-      </div>
-      <div id="mkt-usuarios-list"></div>
-    </div>
-  </div>
 
 </div>
 </div>
@@ -810,6 +767,51 @@ Accede a todo el catálogo por solo S/11 este fin de semana.
       <div class="stat-card"><div class="stat-label">Con membresía</div><div class="stat-value" id="stat-activos-usr">—</div></div>
     </div>
     <div id="usuarios-list"></div>
+  </div>
+
+  <!-- MARKETING -->
+  <div class="panel" id="panel-marketing">
+    <!-- Mensaje masivo -->
+    <div class="importer-card">
+      <h2>📣 Envío masivo</h2>
+      <p class="sub">Escribe el mensaje que le llegará a los usuarios sin membresía. Usa *negrita* y _cursiva_ con formato Markdown.</p>
+      <textarea class="batch-textarea" id="mkt-mensaje" placeholder="Ejemplo: 🎬 *¡Oferta especial!*
+
+Accede a todo el catálogo por solo S/11 este fin de semana.
+¿Te unirías?" style="min-height:100px"></textarea>
+
+      <!-- Asunto para email -->
+      <input type="text" id="mkt-asunto" placeholder="Asunto del email (opcional — por defecto: Oferta especial)"
+        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+        background:rgba(255,255,255,0.05);color:#f0f0f2;font-size:13px;margin-top:8px;box-sizing:border-box">
+
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn-import" onclick="enviarMasivo('todos')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+          Telegram masivo
+        </button>
+        <button class="btn-import" onclick="enviarEmailMasivo('todos')" style="background:rgba(234,100,50,0.18);border-color:rgba(234,100,50,0.4)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+          Gmail masivo
+        </button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="mkt-con-botones" checked style="accent-color:var(--accent)"> Con botones de planes
+        </label>
+      </div>
+      <div class="import-status" id="mkt-status"></div>
+    </div>
+
+    <!-- Usuarios sin pago -->
+    <div class="importer-card">
+      <h2>👥 Usuarios sin membresía <span class="topbar-badge" id="mkt-count">—</span></h2>
+      <p class="sub">Lista de usuarios registrados que no han completado ningún pago. Puedes enviarles un mensaje individual.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="filtro-btn active" onclick="filtrarMkt('todos',this)">Todos</button>
+        <button class="filtro-btn" onclick="filtrarMkt('con_email',this)">Con email</button>
+        <button class="filtro-btn" onclick="filtrarMkt('iniciaron_pago',this)">Iniciaron pago</button>
+      </div>
+      <div id="mkt-usuarios-list"></div>
+    </div>
   </div>
 </div>
 
