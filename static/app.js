@@ -1909,10 +1909,22 @@ async function abrirModalContenido(item) {
             btnDesc.onclick = (e) => {
                 e.stopPropagation();
                 if (!membresiaActiva) { document.getElementById("modal-vip-bloqueo").classList.add("active"); return; }
+                // Usar proxy /dl para evitar el bug de Google Drive en Telegram móvil
+                // (sin proxy, Google Drive abre el selector de cuentas Gmail en lugar de descargar)
+                let urlFinal = linkDescarga;
+                if (!linkDescarga.includes('t.me')) {
+                    urlFinal = '/dl?url=' + encodeURIComponent(linkDescarga);
+                }
                 try {
-                    if (linkDescarga.includes('t.me')) tg.openTelegramLink(linkDescarga);
-                    else tg.openLink(linkDescarga);
-                } catch (e) { window.open(linkDescarga, '_blank'); }
+                    if (linkDescarga.includes('t.me')) {
+                        tg.openTelegramLink(linkDescarga);
+                    } else {
+                        // openLink con el proxy — Telegram lo trata como link externo normal
+                        tg.openLink(window.location.origin + urlFinal);
+                    }
+                } catch (err) {
+                    window.open(window.location.origin + urlFinal, '_blank');
+                }
             };
         } else {
             btnDesc.style.display = 'none';

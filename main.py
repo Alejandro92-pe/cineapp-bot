@@ -48,12 +48,13 @@ GRUPO_SOPORTE_ID   = -1003805629374
 CANAL_PELICULAS_ID = -1003890553566
 CANAL_SERIES_ID    = -1003879512007
 GRUPO_CONTENIDO_ID = -1002991571573
+CANAL_ANIME_ID     = int(os.getenv("CANAL_ANIME_ID", "0"))  # agrega CANAL_ANIME_ID en Render con el ID negativo del canal
 # Canales de difusión pública (cron publica aquí para atraer miembros)
 CANAL_PUBLICO_ID   = "@mejoresanimesenlatino"
 CANAL_PRIVADO_ID   = -1002503337168
 
 # Canales VIP donde se hace ban/unban al vencer/renovar
-CANALES_VIP = [CANAL_PELICULAS_ID, CANAL_SERIES_ID, GRUPO_CONTENIDO_ID]
+CANALES_VIP = [CANAL_PELICULAS_ID, CANAL_SERIES_ID, GRUPO_CONTENIDO_ID] + ([CANAL_ANIME_ID] if CANAL_ANIME_ID else [])
 
 def desbanear_usuario(user_id: int):
     """
@@ -1037,13 +1038,21 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                     InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
                     InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
                 )
+                # 4to canal (anime) — solo si está configurado
+                if CANAL_ANIME_ID:
+                    try:
+                        inv_anime = bot.create_chat_invite_link(CANAL_ANIME_ID, name=f"U{user_id}_anime", member_limit=1, expire_date=exp)
+                        markup.add(InlineKeyboardButton("📺 Grupo Series V2", url=inv_anime.invite_link))
+                    except Exception as e_anime:
+                        print(f"⚠️ No se pudo crear enlace de anime: {e_anime}")
                 bot.send_message(user_id,
                     "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
                     "👇 Toca los botones para unirte\n\n"
                     "⚠️ Enlaces de uso único - expiran en 7 días",
                     parse_mode="HTML", reply_markup=markup)
-                bot.send_message(user_id, "📍 Únete a los 3 canales, silencialos y usa la MiniApp para ver el contenido.")
-                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado — unban + 3 enlaces enviados")
+                canales_n = "4" if CANAL_ANIME_ID else "3"
+                bot.send_message(user_id, f"📍 Únete a los {canales_n} canales, silencialos y usa la MiniApp para ver el contenido.")
+                bot.send_message(chat_id_admin, f"✅ Usuario {user_id} activado — unban + {canales_n} enlaces enviados")
             except Exception as e:
                 bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
         else:
@@ -1147,21 +1156,28 @@ def generar_enlaces(message):
     try:
         uid = int(partes[1])
         desbanear_usuario(uid)  # eliminar de expulsados si aplica antes de crear enlaces
-        inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{uid}_pelis",  member_limit=1, expire_date=int(time.time()) + 604800)
-        inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{uid}_series", member_limit=1, expire_date=int(time.time()) + 604800)
-        inv_grupo  = bot.create_chat_invite_link(GRUPO_CONTENIDO_ID, name=f"U{uid}_grupo",  member_limit=1, expire_date=int(time.time()) + 604800)
+        exp_ts = int(time.time()) + 604800
+        inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{uid}_pelis",  member_limit=1, expire_date=exp_ts)
+        inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{uid}_series", member_limit=1, expire_date=exp_ts)
+        inv_grupo  = bot.create_chat_invite_link(GRUPO_CONTENIDO_ID, name=f"U{uid}_grupo",  member_limit=1, expire_date=exp_ts)
         markup = InlineKeyboardMarkup(row_width=1)
         markup.add(
             InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
             InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
             InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
         )
+        if CANAL_ANIME_ID:
+            try:
+                inv_anime = bot.create_chat_invite_link(CANAL_ANIME_ID, name=f"U{uid}_anime", member_limit=1, expire_date=exp_ts)
+                markup.add(InlineKeyboardButton("📺 Grupo Series V2", url=inv_anime.invite_link))
+            except Exception as e_anime:
+                print(f"⚠️ Error enlace anime: {e_anime}")
         bot.send_message(uid,
             "🔐 <b>ACCESO A TUS CANALES</b>\n\n"
             "👇 Toca los botones para unirte\n\n"
             "⚠️ Enlaces de uso único - expiran en 7 días",
             parse_mode="HTML", reply_markup=markup)
-        bot.reply_to(message, f"✅ Enlaces enviados a {uid}")
+        bot.reply_to(message, f"✅ {'4' if CANAL_ANIME_ID else '3'} enlaces enviados a {uid}")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {e}")
 
@@ -1587,6 +1603,39 @@ def api_eliminar_temporada():
 # ============================================================
 # WEBHOOK — PAYPAL REST (PAGOS ÚNICOS + SUSCRIPCIONES)
 # ============================================================
+
+# ============================================================
+# PROXY DE DESCARGA — soluciona el bug de Google Drive en móvil
+# ============================================================
+@app.route("/dl")
+def proxy_descarga():
+    """
+    Redirige la descarga sin pasar por el interceptor de Google en Telegram WebApp.
+    Uso: /dl?url=<url_codificada>
+    
+    El problema: tg.openLink() con URLs de Google Drive/Docs en móvil
+    abre el selector de cuentas Gmail en lugar de descargar el archivo.
+    La solución: redirigir desde nuestro propio dominio — así Telegram
+    lo trata como un link externo normal y abre el navegador del sistema.
+    """
+    from urllib.parse import unquote
+    url = request.args.get("url", "")
+    if not url:
+        return "URL requerida", 400
+    url = unquote(url)
+    # Seguridad básica: solo permitir URLs http/https
+    if not url.startswith(("http://", "https://")):
+        return "URL inválida", 400
+    # Convertir URLs de Google Drive "view" a descarga directa
+    # https://drive.google.com/file/d/FILE_ID/view → https://drive.google.com/uc?export=download&id=FILE_ID
+    import re as _re
+    gd_match = _re.search(r"drive\.google\.com/file/d/([\w-]+)", url)
+    if gd_match:
+        file_id = gd_match.group(1)
+        url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+    from flask import redirect
+    return redirect(url, code=302)
+
 @app.route("/webhook/paypal", methods=["POST"])
 def webhook_paypal():
     """
