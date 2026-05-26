@@ -1899,39 +1899,70 @@ async function abrirModalContenido(item) {
     }
 
     // Botón descargar
-    const btnDesc = document.getElementById('btnDescargar');
-    if (btnDesc) {
-        const linkDescarga = item.descarga || null;
-        if (linkDescarga && linkDescarga.trim() !== '') {
-            btnDesc.style.display = 'flex';
-            const infoDesc = document.getElementById('infoDescarga');
-            if (infoDesc) infoDesc.style.display = membresiaActiva ? 'block' : 'none';
-            btnDesc.onclick = (e) => {
-                e.stopPropagation();
-                if (!membresiaActiva) { document.getElementById("modal-vip-bloqueo").classList.add("active"); return; }
-                // Usar proxy /dl para evitar el bug de Google Drive en Telegram móvil
-                // (sin proxy, Google Drive abre el selector de cuentas Gmail en lugar de descargar)
-                let urlFinal = linkDescarga;
-                if (!linkDescarga.includes('t.me')) {
-                    urlFinal = '/dl?url=' + encodeURIComponent(linkDescarga);
-                }
-                try {
-                    if (linkDescarga.includes('t.me')) {
-                        tg.openTelegramLink(linkDescarga);
-                    } else {
-                        // openLink con el proxy — Telegram lo trata como link externo normal
-                        tg.openLink(window.location.origin + urlFinal);
-                    }
-                } catch (err) {
-                    window.open(window.location.origin + urlFinal, '_blank');
-                }
-            };
-        } else {
-            btnDesc.style.display = 'none';
-            const infoDesc = document.getElementById('infoDescarga');
-            if (infoDesc) infoDesc.style.display = 'none';
+const btnDesc = document.getElementById('btnDescargar');
+
+if (btnDesc) {
+
+    const linkDescarga = item.descarga || null;
+
+    if (linkDescarga && linkDescarga.trim() !== '') {
+
+        btnDesc.style.display = 'flex';
+
+        const infoDesc = document.getElementById('infoDescarga');
+
+        if (infoDesc) {
+            infoDesc.style.display = membresiaActiva ? 'block' : 'none';
         }
+
+        btnDesc.onclick = (e) => {
+
+            e.stopPropagation();
+
+            // Verificar membresía
+            if (!membresiaActiva) {
+                document
+                    .getElementById("modal-vip-bloqueo")
+                    .classList.add("active");
+                return;
+            }
+
+            try {
+
+                // Links de Telegram
+                if (linkDescarga.includes('t.me')) {
+
+                    tg.openTelegramLink(linkDescarga);
+
+                } else {
+
+                    // Abrir navegador externo
+                    window.open(linkDescarga, '_blank');
+
+                }
+
+            } catch (error) {
+
+                // Fallback
+                window.open(linkDescarga, '_blank');
+
+            }
+
+        };
+
+    } else {
+
+        btnDesc.style.display = 'none';
+
+        const infoDesc = document.getElementById('infoDescarga');
+
+        if (infoDesc) {
+            infoDesc.style.display = 'none';
+        }
+
     }
+
+}
 
     // Selector de temporadas (solo series/anime con temporadas en BD)
     await cargarTemporadas(item);
@@ -2058,14 +2089,23 @@ async function cargarTemporadas(item) {
         wrap.style.display = 'block';
         const grid = document.getElementById('detalleTemporadasGrid');
         if (grid) {
+            // Usar data-idx en lugar de JSON inline en onclick
+            // para evitar Unexpected end of input cuando el título tiene comillas
             grid.innerHTML = temps.map((t, i) => `
                 <button class="temp-btn ${i === 0 ? 'temp-btn-active' : ''}"
                     id="tempbtn_${t.id}"
-                    onclick="seleccionarTemporada(${JSON.stringify(t).replace(/'/g, "\\'")} , contenidoSeleccionado, true, this)">
+                    data-idx="${i}">
                     <span class="temp-num">T${t.numero}</span>
                     <span class="temp-nombre">${t.nombre || 'Temporada ' + t.numero}</span>
                     ${t.episodios ? `<span class="temp-eps">${t.episodios} ep</span>` : ''}
                 </button>`).join('');
+            // Agregar listeners después de insertar el HTML (seguro con cualquier carácter)
+            grid.querySelectorAll('.temp-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    seleccionarTemporada(temporadasActuales[idx], contenidoSeleccionado, true, this);
+                });
+            });
         }
     } catch(e) {
         console.warn('Error cargando temporadas:', e);

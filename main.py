@@ -1036,7 +1036,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                 markup.add(
                     InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
                     InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
-                    InlineKeyboardButton("👥 Grupo Privado",      url=inv_grupo.invite_link),
+                    InlineKeyboardButton("📘 Grupo Bíblico Vip",      url=inv_grupo.invite_link),
                 )
                 # 4to canal (anime) — solo si está configurado
                 if CANAL_ANIME_ID:
@@ -1604,37 +1604,6 @@ def api_eliminar_temporada():
 # WEBHOOK — PAYPAL REST (PAGOS ÚNICOS + SUSCRIPCIONES)
 # ============================================================
 
-# ============================================================
-# PROXY DE DESCARGA — soluciona el bug de Google Drive en móvil
-# ============================================================
-@app.route("/dl")
-def proxy_descarga():
-    """
-    Redirige la descarga sin pasar por el interceptor de Google en Telegram WebApp.
-    Uso: /dl?url=<url_codificada>
-    
-    El problema: tg.openLink() con URLs de Google Drive/Docs en móvil
-    abre el selector de cuentas Gmail en lugar de descargar el archivo.
-    La solución: redirigir desde nuestro propio dominio — así Telegram
-    lo trata como un link externo normal y abre el navegador del sistema.
-    """
-    from urllib.parse import unquote
-    url = request.args.get("url", "")
-    if not url:
-        return "URL requerida", 400
-    url = unquote(url)
-    # Seguridad básica: solo permitir URLs http/https
-    if not url.startswith(("http://", "https://")):
-        return "URL inválida", 400
-    # Convertir URLs de Google Drive "view" a descarga directa
-    # https://drive.google.com/file/d/FILE_ID/view → https://drive.google.com/uc?export=download&id=FILE_ID
-    import re as _re
-    gd_match = _re.search(r"drive\.google\.com/file/d/([\w-]+)", url)
-    if gd_match:
-        file_id = gd_match.group(1)
-        url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
-    from flask import redirect
-    return redirect(url, code=302)
 
 @app.route("/webhook/paypal", methods=["POST"])
 def webhook_paypal():
