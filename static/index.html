@@ -113,6 +113,13 @@ window.Telegram.WebApp.ready();
     <div class="detalle-hero-contenido">
       <img id="detalleImagen" class="detalle-poster" src="" alt="">
       <div class="detalle-info-hero">
+        <!-- Badge "Ya lo viste" — pequeño, izquierda, sobre año/tipo/rating -->
+        <div id="badgeVisto" style="display:none;align-items:center;gap:4px;
+            background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.35);
+            border-radius:20px;padding:2px 8px;width:fit-content;margin-bottom:5px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+          <span style="font-size:10px;color:#10b981;font-weight:600;letter-spacing:0.3px">Ya lo viste</span>
+        </div>
         <div class="detalle-badges-row" id="detalleAnioTipo"></div>
         <div class="detalle-titulo" id="detalleTitulo"></div>
         <div class="detalle-tagline" id="detalleDuracion"></div>
@@ -132,14 +139,6 @@ window.Telegram.WebApp.ready();
       <div class="temp-grid" id="detalleTemporadasGrid"></div>
     </div>
 
-    <!-- Badge VISTO (aparece si ya presionó Reproducir antes) -->
-    <div id="badgeVisto" style="display:none;align-items:center;gap:6px;
-        background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);
-        border-radius:20px;padding:4px 12px;width:fit-content;margin-bottom:10px">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-      <span style="font-size:12px;color:#10b981;font-weight:600">Ya lo viste</span>
-    </div>
-
     <!-- Botones principales: REPRODUCIR + TRAILER -->
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button id="btnVerAhora" class="detalle-btn-reproducir" style="flex:1">
@@ -151,7 +150,7 @@ window.Telegram.WebApp.ready();
             display:flex;align-items:center;gap:6px;padding:0 16px;
             border-radius:12px;border:1.5px solid rgba(255,0,0,0.4);
             background:rgba(255,0,0,0.1);color:#ff4444;
-            font-size:13px;font-weight:600;cursor:pointer;height:100%;
+            font-size:13px;font-weight:600;cursor:pointer;margin-bottom: 10px;
             transition:background 0.15s">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff4444"><polygon points="5,3 19,12 5,21"/></svg>
           Trailer
@@ -369,6 +368,30 @@ Cerrar reproductor
     </iframe>
   </div>
 </div>
+
+  <!-- MODAL TRAILER YOUTUBE (embed dentro de la miniapp) -->
+  <div id="modalTrailer" style="display:none;position:fixed;inset:0;z-index:99999;
+      background:rgba(0,0,0,0.95);flex-direction:column;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:480px;padding:0 16px;position:relative">
+      <!-- Cerrar -->
+      <button onclick="cerrarTrailer()" style="
+          position:absolute;top:-40px;right:16px;background:rgba(255,255,255,0.1);
+          border:none;border-radius:50%;width:34px;height:34px;color:#fff;
+          font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        ✕
+      </button>
+      <!-- Iframe YouTube responsive -->
+      <div style="position:relative;padding-bottom:56.25%;height:0;border-radius:12px;overflow:hidden">
+        <iframe id="trailerIframe"
+          src=""
+          style="position:absolute;top:0;left:0;width:100%;height:100%;border:none"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+      <p id="trailerTitulo" style="color:rgba(255,255,255,0.6);font-size:13px;text-align:center;margin-top:10px"></p>
+    </div>
+  </div>
 
 </body>
 </html>

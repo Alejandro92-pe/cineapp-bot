@@ -1253,57 +1253,70 @@ window.irAlBot = function() {
     mostrarConfirmacionPago();
 };
 
-function mostrarConfirmacionPago() {
-    const div = document.createElement("div");
+// Referencia global al div de confirmación de pago Yape
+// para poder eliminarlo cuando el usuario regresa
+let _divConfirmPago = null;
 
+function cerrarConfirmacionPago() {
+    if (_divConfirmPago && _divConfirmPago.parentNode) {
+        _divConfirmPago.parentNode.removeChild(_divConfirmPago);
+        _divConfirmPago = null;
+    }
+}
+
+function mostrarConfirmacionPago() {
+    // Limpiar uno previo si quedó abierto
+    cerrarConfirmacionPago();
+
+    const div = document.createElement("div");
+    div.id = "divConfirmPago";
     div.innerHTML = `
     <div style="
-        position:fixed;
-        top:0;
-        left:0;
-        width:100%;
-        height:100%;
-        background:rgba(0,0,0,0.9);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        z-index:99999;
-        color:white;
-        text-align:center;
-    ">
-        <div>
-            <h2>✅ Pago enviado por confirmar</h2>
-            <p>Ahora regresa al bot y envia el vucher ⬆</p>
-
-            <button onclick="abrirBotManual()" class="btn-ir-bot">
-           🤖 Ir al bot
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.92);display:flex;align-items:center;
+        justify-content:center;z-index:99999;color:white;text-align:center;
+        padding:24px;box-sizing:border-box">
+        <div style="max-width:320px;width:100%">
+            <div style="font-size:48px;margin-bottom:12px">✅</div>
+            <h2 style="font-size:18px;margin:0 0 8px;font-weight:700">Pago enviado por confirmar</h2>
+            <p style="color:rgba(255,255,255,0.6);font-size:14px;margin:0 0 24px;line-height:1.5">
+                Ahora ve al bot y envía el voucher 📸
+            </p>
+            <button onclick="abrirBotManual()" class="btn-ir-bot" style="width:100%;margin-bottom:10px">
+                🤖 Ir al bot
+            </button>
+            <button onclick="cerrarConfirmacionPago()"
+                style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);
+                background:transparent;color:rgba(255,255,255,0.5);font-size:13px;cursor:pointer">
+                Volver a la app
             </button>
         </div>
-    </div>
-    `;
+    </div>`;
 
     document.body.appendChild(div);
+    _divConfirmPago = div;
+
+    // Auto-cerrar si el usuario regresa a la miniapp (evento de visibilidad)
+    const limpiarAlVolver = () => {
+        if (!document.hidden) {
+            cerrarConfirmacionPago();
+            document.removeEventListener('visibilitychange', limpiarAlVolver);
+        }
+    };
+    document.addEventListener('visibilitychange', limpiarAlVolver);
 }
 
 function abrirBotManual() {
-
     if (!window.urlBotPago) return;
-
     const url = window.urlBotPago;
-
     try {
         if (window.Telegram?.WebApp) {
-
             Telegram.WebApp.openTelegramLink(url);
-
-            setTimeout(() => {
-                Telegram.WebApp.close();
-            }, 300);
-
+            // NO llamar close() — el usuario puede querer volver a la miniapp
+            // El div se limpia automáticamente con el evento visibilitychange
         } else {
             window.open(url, "_blank");
         }
-
     } catch (e) {
         window.location.href = url;
     }
@@ -2066,11 +2079,8 @@ if (btnDesc) {
     if (trailerZona && btnTrailer) {
         const trailerUrl = item.trailer_url || '';
         if (trailerUrl) {
-            trailerZona.style.display = 'block';
-            btnTrailer.onclick = () => {
-                try { tg.openLink(trailerUrl); }
-                catch(e) { window.open(trailerUrl, '_blank'); }
-            };
+            trailerZona.style.display = 'flex';
+            btnTrailer.onclick = () => abrirTrailerEmbed(trailerUrl, item.titulo || '');
         } else {
             trailerZona.style.display = 'none';
         }
@@ -2654,6 +2664,60 @@ function cerrarVideo() {
     document.getElementById("video-frame").src = "";
 }
 // iniciarContadorOferta();
+// ============ TRAILER YOUTUBE EMBED ============
+
+function abrirTrailerEmbed(youtubeUrl, titulo) {
+    // Extraer el video ID de cualquier formato de URL de YouTube
+    const match = youtubeUrl.match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/
+    );
+    if (!match) {
+        // Fallback: abrir en navegador si no se puede parsear
+        try { tg.openLink(youtubeUrl); } catch(e) { window.open(youtubeUrl, '_blank'); }
+        return;
+    }
+    const videoId = match[1];
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
+
+    const modal   = document.getElementById('modalTrailer');
+    const iframe  = document.getElementById('trailerIframe');
+    const titEl   = document.getElementById('trailerTitulo');
+
+    if (!modal || !iframe) return;
+
+    iframe.src = embedUrl;
+    if (titEl) titEl.textContent = titulo || '';
+    modal.style.display = 'flex';
+
+    // Pausar si el usuario cierra la miniapp
+    document.addEventListener('visibilitychange', _pausarTrailerAlOcultar);
+}
+
+function cerrarTrailer() {
+    const modal  = document.getElementById('modalTrailer');
+    const iframe = document.getElementById('trailerIframe');
+    if (iframe) iframe.src = '';   // detiene el video y libera audio
+    if (modal)  modal.style.display = 'none';
+    document.removeEventListener('visibilitychange', _pausarTrailerAlOcultar);
+}
+
+function _pausarTrailerAlOcultar() {
+    if (document.hidden) {
+        const iframe = document.getElementById('trailerIframe');
+        // Guardar src y vaciar para pausar
+        if (iframe && iframe.src) {
+            iframe._savedSrc = iframe.src;
+            iframe.src = '';
+        }
+    } else {
+        const iframe = document.getElementById('trailerIframe');
+        if (iframe && iframe._savedSrc) {
+            iframe.src = iframe._savedSrc;
+            iframe._savedSrc = '';
+        }
+    }
+}
+
 // ============ FILTROS COMBINADOS ============
 
 function _poblarSelectGeneros() {
