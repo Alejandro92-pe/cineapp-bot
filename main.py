@@ -1427,19 +1427,34 @@ def marcar_entregado():
     data = request.get_json()
     if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
-    pedido_id = data.get("pedido_id")
+    pedido_id  = data.get("pedido_id")
+    new_estado = data.get("estado", "entregado")  # permite pasar "recibido", "en_proceso", "entregado"
+
+    if new_estado not in ("recibido", "en_proceso", "entregado"):
+        return jsonify({"error": "Estado inválido"}), 400
+
     pedido_res = supabase_service.table("pedidos").select("*, usuarios!inner(*)").eq("id", pedido_id).execute()
     if not pedido_res.data:
         return jsonify({"error": "Pedido no encontrado"}), 404
     pedido = pedido_res.data[0]
-    supabase_service.table("pedidos").update({"estado": "entregado", "fecha_respuesta": datetime.now().isoformat()}).eq("id", pedido_id).execute()
+
+    update_data = {"estado": new_estado}
+    if new_estado == "entregado":
+        update_data["fecha_respuesta"] = datetime.now().isoformat()
+
+    supabase_service.table("pedidos").update(update_data).eq("id", pedido_id).execute()
+
+    # Notificar al usuario según el estado
+    mensajes = {
+        "recibido":   f"👀 Hemos *recibido* tu pedido\n\n🎬 *{pedido['titulo_pedido']}*\n\nEstamos procesándolo, te avisamos pronto.",
+        "en_proceso": f"⚙️ Tu pedido está *en proceso*\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa lo estamos subiendo, casi listo.",
+        "entregado":  f"✅ ¡Tu pedido ya está disponible!\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa puedes verlo en los canales.",
+    }
     try:
-        bot.send_message(pedido["usuarios"]["telegram_id"],
-            f"✅ ¡Tu pedido ya está disponible!\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa puedes verlo en los canales.",
-            parse_mode="Markdown")
+        bot.send_message(pedido["usuarios"]["telegram_id"], mensajes[new_estado], parse_mode="Markdown")
     except:
         pass
-    r = jsonify({"success": True})
+    r = jsonify({"success": True, "estado": new_estado})
     r.headers.add("Access-Control-Allow-Origin","*")
     return r, 200
 
@@ -1457,6 +1472,9 @@ def mis_pedidos():
     pedidos = [{"id":p["id"],"titulo":p["titulo_pedido"],"tipo":p.get("tipo","pelicula"),
                 "estado":p["estado"],"fecha":datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M")}
                for p in pedidos_res.data]
+    # Incluir fecha de respuesta si existe
+    for p_dict, p_raw in zip(pedidos, pedidos_res.data):
+        p_dict["fecha_respuesta"] = p_raw.get("fecha_respuesta", None)
     usuario_res = supabase_service.table("usuarios").select("membresia_tipo,membresia_activa").eq("telegram_id",telegram_id).execute()
     r = jsonify({"pedidos": pedidos, "total": len(pedidos), "usuario": usuario_res.data[0] if usuario_res.data else None})
     r.headers.add("Access-Control-Allow-Origin","*")

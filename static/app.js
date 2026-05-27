@@ -962,7 +962,8 @@ window.filtrarPedidos = function(filtro) {
     event?.target.classList.add('activo');
     
     let filtrados = window.pedidosData;
-    if (filtro === 'pendientes') filtrados = window.pedidosData.filter(p => p.estado === 'pendiente');
+    if (filtro === 'pendientes')   filtrados = window.pedidosData.filter(p => p.estado === 'pendiente');
+    else if (filtro === 'proceso') filtrados = window.pedidosData.filter(p => ['recibido','en_proceso'].includes(p.estado));
     else if (filtro === 'entregados') filtrados = window.pedidosData.filter(p => p.estado === 'entregado');
     
     if (filtrados.length === 0) {
@@ -1037,43 +1038,57 @@ window.filtrarPedidos = function(filtro) {
                 </div>
             </div>
 
-            ${isPend ? `
-            <button onclick="marcarEntregado(${p.id})" style="
-                width:100%;padding:8px;border-radius:8px;border:none;
-                background:rgba(16,185,129,0.15);color:#10b981;
-                font-size:12px;font-weight:600;cursor:pointer;
-                border:1px solid rgba(16,185,129,0.3);
-                transition:background 0.15s;
-            " onmouseover="this.style.background='rgba(16,185,129,0.25)'"
-               onmouseout="this.style.background='rgba(16,185,129,0.15)'">
-                ✅ Marcar como entregado
-            </button>` : ''}
+            ${p.estado !== 'entregado' ? `
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${p.estado === 'pendiente' ? `
+                <button onclick="avanzarEstadoPedido(${p.id},'recibido',this)" style="
+                    flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
+                    background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)">
+                    👀 Marcar recibido
+                </button>` : ''}
+                ${p.estado === 'recibido' ? `
+                <button onclick="avanzarEstadoPedido(${p.id},'en_proceso',this)" style="
+                    flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
+                    background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3)">
+                    ⚙️ En proceso
+                </button>` : ''}
+                ${['recibido','en_proceso'].includes(p.estado) ? `
+                <button onclick="avanzarEstadoPedido(${p.id},'entregado',this)" style="
+                    flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
+                    background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.3)">
+                    ✅ Entregado
+                </button>` : ''}
+            </div>` : `
+            <div style="text-align:center;font-size:11px;color:rgba(255,255,255,0.25);padding:4px 0">
+                ✅ Completado
+            </div>`}
         </div>`;
     });
     lista.innerHTML = html;
 };
 
 window.marcarEntregado = async function(pedidoId) {
-    if (!confirm("¿Marcar este pedido como entregado?")) return;
-    
-    const btn = event.target;
-    btn.disabled = true;
-    btn.innerText = "⏳";
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/marcar_entregado`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pedido_id: pedidoId, admin_id: userId })
-        });
+    await avanzarEstadoPedido(pedidoId, 'entregado', null);
+};
 
-        if (!response.ok) throw new Error("Error");
-        
-        alert("✅ Pedido marcado como entregado");
-        // Recargar la pestaña de pedidos
-        cargarPedidosAdmin(document.getElementById('admin-contenido'));
-    } catch (error) {
-        alert("❌ Error");
+window.avanzarEstadoPedido = async function(pedidoId, nuevoEstado, btn) {
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+    try {
+        const resp = await fetch(`${API_BASE_URL}/marcar_entregado`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pedido_id: pedidoId, estado: nuevoEstado, admin_id: Number(adminId) })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            cargarPedidos();
+        } else {
+            alert('❌ Error: ' + (data.error || 'desconocido'));
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        }
+    } catch(e) {
+        alert('❌ Error de conexión');
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
 };
 
@@ -1502,18 +1517,85 @@ async function cargarPedidos() {
             return;
         }
 
+        const pasos = [
+            { id: 'pendiente',   icon: '📤', label: 'Enviado'    },
+            { id: 'recibido',    icon: '👀', label: 'Recibido'   },
+            { id: 'en_proceso',  icon: '⚙️', label: 'En proceso' },
+            { id: 'entregado',   icon: '✅', label: 'Listo'      },
+        ];
+        const ordenEstado = { pendiente: 0, recibido: 1, en_proceso: 2, entregado: 3 };
+        const colores = {
+            pendiente:  '#f59e0b',
+            recibido:   '#3b82f6',
+            en_proceso: '#a855f7',
+            entregado:  '#10b981',
+        };
+
         let html = '';
         result.pedidos.forEach(p => {
+            const nivelActual = ordenEstado[p.estado] ?? 0;
+            const color = colores[p.estado] || '#f59e0b';
+
+            // Construir los 4 pasos del timeline
+            const stepsHtml = pasos.map((paso, idx) => {
+                const hecho    = idx <= nivelActual;
+                const esActual = idx === nivelActual;
+                const c = hecho ? colores[paso.id] : 'rgba(255,255,255,0.12)';
+                return `
+                <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+                    <div style="
+                        width:32px;height:32px;border-radius:50%;
+                        background:${hecho ? c : 'rgba(255,255,255,0.06)'};
+                        border:2px solid ${c};
+                        display:flex;align-items:center;justify-content:center;
+                        font-size:${esActual ? '16px' : '13px'};
+                        transition:all 0.3s;
+                        ${esActual ? 'box-shadow:0 0 10px '+c+'66' : ''}
+                    ">${hecho ? paso.icon : '<span style="color:rgba(255,255,255,0.2);font-size:10px">●</span>'}</div>
+                    <span style="font-size:9px;font-weight:${esActual?'700':'400'};
+                        color:${esActual ? c : 'rgba(255,255,255,0.3)'};
+                        text-align:center;line-height:1.2">${paso.label}</span>
+                </div>
+                ${idx < pasos.length - 1 ? `
+                <div style="flex:1;height:2px;margin-bottom:18px;
+                    background:${idx < nivelActual ? colores[pasos[idx+1].id] : 'rgba(255,255,255,0.08)'};
+                    border-radius:2px;transition:background 0.3s">
+                </div>` : ''}`;
+            }).join('');
+
             html += `
-                <div class="perfil-item pedido-item">
-                    <div style="display: flex; justify-content: space-between;">
-                        <div><strong>${p.titulo}</strong><br><small>${p.tipo} • ${p.fecha}</small></div>
-                        <div class="${p.estado === 'entregado' ? 'estado-entregado' : 'estado-pendiente'}">
-                            ${p.estado === 'entregado' ? '✅' : '⏳'} ${p.estado}
+            <div style="
+                background:rgba(255,255,255,0.04);
+                border:1px solid rgba(255,255,255,0.08);
+                border-left:3px solid ${color};
+                border-radius:14px;
+                padding:14px 14px 16px;
+                margin-bottom:12px;
+            ">
+                <!-- Título y fecha -->
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+                    <div style="flex:1;min-width:0">
+                        <div style="font-weight:700;font-size:14px;color:#f0f0f2;
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                            🎬 ${p.titulo}
+                        </div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px">
+                            ${p.tipo} · Pedido el ${p.fecha}
                         </div>
                     </div>
+                    <span style="
+                        font-size:10px;font-weight:700;white-space:nowrap;
+                        background:${color}22;color:${color};
+                        border:1px solid ${color}44;
+                        border-radius:20px;padding:3px 9px;margin-left:8px;flex-shrink:0
+                    ">${pasos[nivelActual].icon} ${pasos[nivelActual].label}</span>
                 </div>
-            `;
+
+                <!-- Timeline de 4 pasos -->
+                <div style="display:flex;align-items:flex-start;gap:0;padding:0 4px">
+                    ${stepsHtml}
+                </div>
+            </div>`;
         });
         contenedor.innerHTML = html;
 
@@ -2348,22 +2430,26 @@ document.addEventListener('DOMContentLoaded', function() {
             // Marcar como visto en localStorage
             localStorage.setItem(`visto_${item.id}`, '1');
 
-            cerrarModalDetalle();
+            // ── NO cerrar el modal antes de navegar ──
+            // Si se cierra ANTES de openTelegramLink/openLink, cuando el usuario
+            // vuelva a la miniapp ya no verá el modal. Se cierra solo si es Vimeus.
 
             // Si tiene temporada seleccionada con enlace → usar ese enlace
             if (temporadaSeleccionada && temporadaSeleccionada.enlace) {
                 const link = temporadaSeleccionada.enlace.trim();
                 try {
-                    if (link.includes('t.me')) tg.openTelegramLink(link);
-                    else tg.openLink(link);
+                    // Usar openLink siempre (no openTelegramLink) para que
+                    // Telegram abra el navegador externo sin cerrar la WebApp
+                    tg.openLink(link);
                 } catch(e) { window.open(link, '_blank'); }
                 return;
             }
 
             // Modo normal (sin temporadas)
             if ((!item.fuente || item.fuente === 'canal') && item.enlace_canal) {
-                if (item.enlace_canal.includes('t.me')) tg.openTelegramLink(item.enlace_canal);
-                else tg.openLink(item.enlace_canal);
+                try {
+                    tg.openLink(item.enlace_canal);
+                } catch(e) { window.open(item.enlace_canal, '_blank'); }
                 return;
             }
             if (item.fuente === 'vimeus' && item.tmdb_id) {
