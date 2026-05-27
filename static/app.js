@@ -281,12 +281,13 @@ window.cambiarVista = async function(vista) {
     }
 
     else if (vista === 'explorar') {
-        // reset scroll state
         tipoActual = tipoActual || 'todo';
         const tipoInicial = tipoActual;
         paginaActual = 1;
         totalPaginas = 1;
         cargando = false;
+        window.filtroGenero = window.filtroGenero || '';
+        window.filtroAnio   = window.filtroAnio   || '';
 
         contenedor.innerHTML = `
             <div class="buscador">
@@ -294,13 +295,38 @@ window.cambiarVista = async function(vista) {
                 <span>🔍</span>
             </div>
 
-            <div class="tabs">
+            <!-- Tabs de tipo -->
+            <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none">
                 <div class="tab ${tipoInicial==='todo'?'activo':''}"     onclick="cambiarTipo('todo', event)">Todo</div>
                 <div class="tab ${tipoInicial==='pelicula'?'activo':''}" onclick="cambiarTipo('pelicula', event)">Películas</div>
                 <div class="tab ${tipoInicial==='serie'?'activo':''}"    onclick="cambiarTipo('serie', event)">Series</div>
                 <div class="tab ${tipoInicial==='biblico'?'activo':''}"  onclick="cambiarTipo('biblico', event)">Bíblico</div>
                 <div class="tab ${tipoInicial==='anime'?'activo':''}"    onclick="cambiarTipo('anime', event)">Anime</div>
-                <div class="tab ${tipoInicial==='Peliculas anime'?'activo':''}"    onclick="cambiarTipo('Peliculas anime', event)">Peliculas anime</div>
+                <div class="tab ${tipoInicial==='Peliculas anime'?'activo':''}" onclick="cambiarTipo('Peliculas anime', event)">Pel. Anime</div>
+            </div>
+
+            <!-- Filtros combinados: Género + Año -->
+            <div id="filtros-extra" style="display:flex;gap:8px;padding:8px 0 4px;overflow-x:auto;scrollbar-width:none">
+                <select id="filtroGeneroSel" onchange="aplicarFiltrosExtra()"
+                    style="flex:1;min-width:120px;padding:8px 10px;border-radius:10px;
+                    border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);
+                    color:#f0f0f2;font-size:13px;outline:none;cursor:pointer">
+                    <option value="">🎭 Género</option>
+                </select>
+                <select id="filtroAnioSel" onchange="aplicarFiltrosExtra()"
+                    style="flex:1;min-width:100px;padding:8px 10px;border-radius:10px;
+                    border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);
+                    color:#f0f0f2;font-size:13px;outline:none;cursor:pointer">
+                    <option value="">📅 Año</option>
+                    ${Array.from({length: 35}, (_,i) => new Date().getFullYear() - i)
+                        .map(y => `<option value="${y}" ${window.filtroAnio==y?'selected':''}>${y}</option>`).join('')}
+                </select>
+                <button id="btnLimpiarFiltros" onclick="limpiarFiltrosExtra()"
+                    style="padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);
+                    background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);font-size:12px;
+                    cursor:pointer;white-space:nowrap;display:${window.filtroGenero||window.filtroAnio?'block':'none'}">
+                    ✕ Limpiar
+                </button>
             </div>
 
             <div id="generosExplorar"></div>
@@ -310,13 +336,13 @@ window.cambiarVista = async function(vista) {
             </div>
         `;
 
-        cargarGenerosEnContenedor('generosExplorar');
+        // Poblar géneros en el select
+        _poblarSelectGeneros();
 
-        if (tipoInicial !== 'todo') {
+        cargarGenerosEnContenedor('generosExplorar');
+        if (tipoInicial !== 'todo' || window.filtroGenero || window.filtroAnio) {
             mostrarResultadosExplorar();
         }
-
-        // Activar scroll infinito
         activarScrollInfinito();
     }
     
@@ -946,23 +972,83 @@ window.filtrarPedidos = function(filtro) {
     
     let html = '';
     filtrados.forEach(p => {
+        const isPend  = p.estado === 'pendiente';
+        const color   = isPend ? '#f59e0b' : '#10b981';
+        const iconEst = isPend ? '⏳' : '✅';
+        const labelEst = isPend ? 'Pendiente' : 'Entregado';
         html += `
-            <div class="perfil-item" style="margin-bottom: 10px; border-left: 4px solid ${p.estado === 'pendiente' ? '#f59e0b' : '#10b981'};">
-                <div style="display: flex; justify-content: space-between;">
-                    <div style="flex: 1;">
-                        <strong>🎬 ${p.titulo}</strong><br>
-                        <small>${p.tipo} • ${p.fecha}</small><br>
-                        <small>👤 ${p.usuario.nombre} (${p.usuario.telegram_id})</small><br>
-                        <small>💎 ${p.usuario.membresia}</small><br>
-                        <span class="${p.estado === 'pendiente' ? 'estado-pendiente' : 'estado-entregado'}">
-                            ${p.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Entregado'}
-                        </span>
+        <div class="pedido-card" style="
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-left: 3px solid ${color};
+            border-radius: 12px;
+            padding: 14px 14px 12px;
+            margin-bottom: 10px;
+            transition: background 0.15s;
+        ">
+            <!-- Cabecera: título + badge estado -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:700;font-size:14px;color:#f0f0f2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                        🎬 ${p.titulo}
                     </div>
-                    ${p.estado === 'pendiente' ? 
-                        `<button class="btn-comprar" onclick="marcarEntregado(${p.id})" style="width: auto; padding: 5px 10px; font-size: 12px; align-self: center;">Marcar entregado</button>` : ''}
+                    <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px">
+                        ${p.tipo} · ${p.fecha}
+                    </div>
+                </div>
+                <span style="
+                    font-size:11px;font-weight:600;white-space:nowrap;
+                    background:${color}22;color:${color};
+                    border:1px solid ${color}44;
+                    border-radius:20px;padding:3px 10px;flex-shrink:0
+                ">${iconEst} ${labelEst}</span>
+            </div>
+
+            <!-- Info usuario -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px">
+                <div style="width:28px;height:28px;border-radius:50%;background:rgba(232,176,75,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#e8b04b;flex-shrink:0">
+                    ${(p.usuario.nombre||'?')[0].toUpperCase()}
+                </div>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:12px;font-weight:600;color:#f0f0f2">${p.usuario.nombre || 'Usuario'}</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,0.35)">
+                        ID ${p.usuario.telegram_id} · 💎 ${p.usuario.membresia || 'Sin plan'}
+                    </div>
                 </div>
             </div>
-        `;
+
+            <!-- Timeline -->
+            <div style="display:flex;align-items:center;gap:0;margin-bottom:${isPend ? '12px' : '0'}">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                    <div style="width:18px;height:18px;border-radius:50%;background:#e8b04b;display:flex;align-items:center;justify-content:center">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><path d="M20 6L9 17l-5-5"/><path stroke="white" stroke-width="3" stroke-linecap="round" fill="none" d="M20 6L9 17l-5-5"/></svg>
+                    </div>
+                    <span style="font-size:9px;color:rgba(255,255,255,0.4)">Enviado</span>
+                </div>
+                <div style="flex:1;height:1px;background:${isPend ? 'rgba(255,255,255,0.1)' : '#10b981'};margin:0 4px;margin-bottom:14px"></div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                    <div style="width:18px;height:18px;border-radius:50%;background:${isPend ? 'rgba(255,255,255,0.1)' : '#10b981'};display:flex;align-items:center;justify-content:center">
+                        ${isPend
+                            ? '<div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.3)"></div>'
+                            : '<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-width="3" stroke-linecap="round" d="M20 6L9 17l-5-5"/></svg>'
+                        }
+                    </div>
+                    <span style="font-size:9px;color:${isPend ? 'rgba(255,255,255,0.25)' : '#10b981'}">Entregado</span>
+                </div>
+            </div>
+
+            ${isPend ? `
+            <button onclick="marcarEntregado(${p.id})" style="
+                width:100%;padding:8px;border-radius:8px;border:none;
+                background:rgba(16,185,129,0.15);color:#10b981;
+                font-size:12px;font-weight:600;cursor:pointer;
+                border:1px solid rgba(16,185,129,0.3);
+                transition:background 0.15s;
+            " onmouseover="this.style.background='rgba(16,185,129,0.25)'"
+               onmouseout="this.style.background='rgba(16,185,129,0.15)'">
+                ✅ Marcar como entregado
+            </button>` : ''}
+        </div>`;
     });
     lista.innerHTML = html;
 };
@@ -1042,12 +1128,22 @@ window.buscarContenido = async function(pagina = 1) {
     const response = await fetch(`${API_BASE_URL}/api/contenido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ busqueda: busquedaActual, tipo: tipoActual, limit: LIMITE, offset })
+        body: JSON.stringify({
+            busqueda: busquedaActual,
+            tipo:     tipoActual,
+            limit:    LIMITE,
+            offset,
+            genero:   window.filtroGenero || '',
+            anio:     window.filtroAnio   || '',
+        })
     });
 
     const result        = await response.json();
     const data          = result.data;
-    totalItemsBackend   = result.total || 0; 
+    // Guardar catálogo completo para poblar el select de géneros
+    if (!window._todoCatalogo) window._todoCatalogo = [];
+    window._todoCatalogo = [...window._todoCatalogo, ...(data || [])];
+    totalItemsBackend   = result.total || 0;
     totalPaginas        = Math.ceil(totalItemsBackend / LIMITE);
 
     const grid = document.getElementById('resultados');
@@ -1964,6 +2060,32 @@ if (btnDesc) {
 
 }
 
+    // ── TRAILER YouTube ──────────────────────────────────────────────────────
+    const trailerZona = document.getElementById('trailerZona');
+    const btnTrailer  = document.getElementById('btnTrailer');
+    if (trailerZona && btnTrailer) {
+        const trailerUrl = item.trailer_url || '';
+        if (trailerUrl) {
+            trailerZona.style.display = 'block';
+            btnTrailer.onclick = () => {
+                try { tg.openLink(trailerUrl); }
+                catch(e) { window.open(trailerUrl, '_blank'); }
+            };
+        } else {
+            trailerZona.style.display = 'none';
+        }
+    }
+
+    // ── PROGRESO VISTO ────────────────────────────────────────────────────────
+    // Muestra badge "Visto" si ya presionó Reproducir antes (guardado en localStorage)
+    const vistoKey  = `visto_${item.id}`;
+    const yaVisto   = localStorage.getItem(vistoKey) === '1';
+    const badgeVisto = document.getElementById('badgeVisto');
+    if (badgeVisto) {
+        badgeVisto.style.display = yaVisto ? 'flex' : 'none';
+    }
+    // El badge se activa cuando presiona Reproducir (ver handler más abajo)
+
     // Selector de temporadas (solo series/anime con temporadas en BD)
     await cargarTemporadas(item);
 
@@ -2213,6 +2335,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // ✅ Registrar en historial SOLO cuando presiona reproducir
             agregarAlHistorial(item);
+            // Marcar como visto en localStorage
+            localStorage.setItem(`visto_${item.id}`, '1');
 
             cerrarModalDetalle();
 
@@ -2530,5 +2654,59 @@ function cerrarVideo() {
     document.getElementById("video-frame").src = "";
 }
 // iniciarContadorOferta();
+// ============ FILTROS COMBINADOS ============
+
+function _poblarSelectGeneros() {
+    const sel = document.getElementById('filtroGeneroSel');
+    if (!sel) return;
+    // Recopilar géneros únicos del contenido cargado
+    const generosSet = new Set();
+    (window._todoCatalogo || []).forEach(item => {
+        if (item.genero) item.genero.split(',').forEach(g => {
+            const gtr = g.trim();
+            if (gtr) generosSet.add(gtr);
+        });
+    });
+    const sorted = [...generosSet].sort();
+    sorted.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g;
+        opt.textContent = g;
+        if (window.filtroGenero === g) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+window.aplicarFiltrosExtra = function() {
+    const genSel  = document.getElementById('filtroGeneroSel');
+    const anioSel = document.getElementById('filtroAnioSel');
+    window.filtroGenero = genSel  ? genSel.value  : '';
+    window.filtroAnio   = anioSel ? anioSel.value : '';
+    const btnLimpiar = document.getElementById('btnLimpiarFiltros');
+    if (btnLimpiar) btnLimpiar.style.display = (window.filtroGenero || window.filtroAnio) ? 'block' : 'none';
+    paginaActual = 1;
+    totalPaginas = 1;
+    const resultados = document.getElementById('resultados');
+    if (resultados) { resultados.innerHTML = ''; resultados.style.display = 'none'; }
+    mostrarResultadosExplorar();
+};
+
+window.limpiarFiltrosExtra = function() {
+    window.filtroGenero = '';
+    window.filtroAnio   = '';
+    const genSel  = document.getElementById('filtroGeneroSel');
+    const anioSel = document.getElementById('filtroAnioSel');
+    if (genSel)  genSel.value  = '';
+    if (anioSel) anioSel.value = '';
+    const btnLimpiar = document.getElementById('btnLimpiarFiltros');
+    if (btnLimpiar) btnLimpiar.style.display = 'none';
+    paginaActual = 1;
+    const resultados = document.getElementById('resultados');
+    if (resultados) { resultados.innerHTML = ''; resultados.style.display = 'none'; }
+    // Volver a mostrar géneros
+    const generosExplorar = document.getElementById('generosExplorar');
+    if (generosExplorar) cargarGenerosEnContenedor('generosExplorar');
+};
+
 // ============ INICIAR ============
 iniciar();

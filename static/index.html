@@ -132,11 +132,32 @@ window.Telegram.WebApp.ready();
       <div class="temp-grid" id="detalleTemporadasGrid"></div>
     </div>
 
-    <!-- Botón REPRODUCIR principal -->
-    <button id="btnVerAhora" class="detalle-btn-reproducir">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-      Reproducir
-    </button>
+    <!-- Badge VISTO (aparece si ya presionó Reproducir antes) -->
+    <div id="badgeVisto" style="display:none;align-items:center;gap:6px;
+        background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);
+        border-radius:20px;padding:4px 12px;width:fit-content;margin-bottom:10px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+      <span style="font-size:12px;color:#10b981;font-weight:600">Ya lo viste</span>
+    </div>
+
+    <!-- Botones principales: REPRODUCIR + TRAILER -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="btnVerAhora" class="detalle-btn-reproducir" style="flex:1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        Reproducir
+      </button>
+      <div id="trailerZona" style="display:none">
+        <button id="btnTrailer" style="
+            display:flex;align-items:center;gap:6px;padding:0 16px;
+            border-radius:12px;border:1.5px solid rgba(255,0,0,0.4);
+            background:rgba(255,0,0,0.1);color:#ff4444;
+            font-size:13px;font-weight:600;cursor:pointer;height:100%;
+            transition:background 0.15s">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff4444"><polygon points="5,3 19,12 5,21"/></svg>
+          Trailer
+        </button>
+      </div>
+    </div>
 
     <!-- Botón DESCARGAR secundario -->
     <button id="btnDescargar" class="detalle-btn-descargar" style="display:none;">

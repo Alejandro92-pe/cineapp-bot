@@ -353,13 +353,38 @@ TIPO_TMDB = {
     "anime":    "tv",
 }
 
-def tmdb_get(path, params=None):
+def tmdb_get(path, params=None, extra_params=None):
     params = params or {}
     params["api_key"] = TMDB_API_KEY
-    params["language"] = "es-MX"
+    params.setdefault("language", "es-MX")
+    if extra_params:
+        params.update(extra_params)
     r = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=10)
     r.raise_for_status()
     return r.json()
+
+def obtener_trailer_youtube(tmdb_id: int, endpoint_tipo: str) -> str:
+    """
+    Busca el trailer oficial en YouTube con fallback de idioma: MX → ES → US/EN.
+    Retorna la URL completa de YouTube o "" si no hay trailer.
+    """
+    for lang in ["es-MX", "es-ES", "en-US"]:
+        try:
+            videos = tmdb_get(f"/{endpoint_tipo}/{tmdb_id}/videos", extra_params={"language": lang})
+            resultados = videos.get("results", [])
+            # Buscar Trailer oficial en YouTube
+            for v in resultados:
+                if v.get("site") == "YouTube" and v.get("type") == "Trailer" and v.get("official"):
+                    return f"https://www.youtube.com/watch?v={v['key']}"
+            # Si no hay oficial, cualquier trailer de YouTube
+            for v in resultados:
+                if v.get("site") == "YouTube" and v.get("type") == "Trailer":
+                    return f"https://www.youtube.com/watch?v={v['key']}"
+        except Exception as e:
+            print(f"⚠️ trailer {lang}: {e}")
+            continue
+    return ""
+
 
 def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
     endpoint_tipo = TIPO_TMDB.get(tipo, "movie")
@@ -376,6 +401,9 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
     sinopsis = data.get("overview") or ""
     rating = round(data.get("vote_average", 0), 1)
 
+    # Trailer YouTube: MX → ES → EN
+    trailer_url = obtener_trailer_youtube(tmdb_id, endpoint_tipo)
+
     return {
         "titulo":    titulo,
         "tipo":      tipo,
@@ -387,6 +415,7 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
         "tmdb_id":   tmdb_id,
         "disponible": True,
         "destacado": False,
+        "trailer_url": trailer_url,
     }
 
 # ============ TEMPORADAS — IMPORTACIÓN DESDE TMDB ============
@@ -2009,9 +2038,16 @@ def api_contenido():
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
 
-    genero = data.get("genero")
+    genero = data.get("genero", "")
     if genero:
         query = query.ilike("genero", f"%{genero}%")
+
+    anio = data.get("anio", "")
+    if anio:
+        try:
+            query = query.eq("año", int(anio))
+        except (ValueError, TypeError):
+            pass
 
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
