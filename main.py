@@ -1398,20 +1398,43 @@ def marcar_entregado():
     data = request.get_json()
     if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
-    pedido_id = data.get("pedido_id")
+
+    pedido_id  = data.get("pedido_id")
+    nuevo_estado = data.get("estado", "entregado")
+
+    estados_validos = ("recibido", "en_proceso", "entregado")
+    if nuevo_estado not in estados_validos:
+        return jsonify({"error": f"Estado inválido. Usa: {', '.join(estados_validos)}"}), 400
+
     pedido_res = supabase_service.table("pedidos").select("*, usuarios!inner(*)").eq("id", pedido_id).execute()
     if not pedido_res.data:
         return jsonify({"error": "Pedido no encontrado"}), 404
     pedido = pedido_res.data[0]
-    supabase_service.table("pedidos").update({"estado": "entregado", "fecha_respuesta": datetime.now().isoformat()}).eq("id", pedido_id).execute()
+
+    update_data = {"estado": nuevo_estado}
+    if nuevo_estado == "entregado":
+        update_data["fecha_respuesta"] = datetime.now().isoformat()
+
+    supabase_service.table("pedidos").update(update_data).eq("id", pedido_id).execute()
+
+    # Mensaje al usuario por cada estado
+    titulo = pedido.get("titulo_pedido", "tu pedido")
+    mensajes = {
+        "recibido":   f"👀 *Pedido recibido*\n\nHemos recibido tu solicitud de *{titulo}*.\nEstamos revisándola, te avisamos pronto.",
+        "en_proceso": f"⚙️ *En proceso*\n\nEstamos trabajando en *{titulo}*.\nCasi listo, te notificamos cuando esté disponible.",
+        "entregado":  f"✅ *¡Ya está disponible!*\n\n*{titulo}* ya está en los canales.\nAbre la Mini App para verlo.",
+    }
     try:
-        bot.send_message(pedido["usuarios"]["telegram_id"],
-            f"✅ ¡Tu pedido ya está disponible!\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa puedes verlo en los canales.",
-            parse_mode="Markdown")
-    except:
-        pass
-    r = jsonify({"success": True})
-    r.headers.add("Access-Control-Allow-Origin","*")
+        bot.send_message(
+            pedido["usuarios"]["telegram_id"],
+            mensajes[nuevo_estado],
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        print(f"⚠️ No se pudo notificar al usuario: {e}")
+
+    r = jsonify({"success": True, "estado": nuevo_estado})
+    r.headers.add("Access-Control-Allow-Origin", "*")
     return r, 200
 
 @app.route("/mis_pedidos", methods=["POST", "OPTIONS"])

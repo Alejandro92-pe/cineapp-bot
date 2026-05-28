@@ -514,113 +514,81 @@ window.cambiarVista = async function(vista) {
         const usados = pedidosData.usados || 0;
         const restantes = limiteTotal - usados;
 
-        // Si ya no quedan pedidos
-        if (restantes <= 0) {
 
+        // ── SVG icons (definidos aquí para no contaminar scope global) ──────
+        const _SVG_FILM  = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M17 7h5M2 17h5M17 17h5"/></svg>`;
+        const _SVG_TV    = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
+        const _SVG_SEND  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
 
-// ── SVG ICONS para pedidos ────────────────────────────────────────────────────
-const SVG_FILM = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M17 7h5M2 17h5M17 17h5"/></svg>`;
-const SVG_TV   = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
-const SVG_SEND = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
-const SVG_CHECK_CIRCLE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
-const SVG_EYE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
-const SVG_GEAR = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-const SVG_BOX  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`;
-const SVG_UPLOAD = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>`;
-const SVG_CLOCK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        const limitReached = restantes <= 0;
+        const pct = Math.min(100, Math.round((usados / limiteTotal) * 100));
+        const donutColor = limitReached ? '#ef4444' : '#e8b04b';
+        const subTexto = limitReached
+            ? '<span style="color:#ef4444">L\u00edmite alcanzado</span>'
+            : '<span style="color:#10b981">' + restantes + ' disponible' + (restantes !== 1 ? 's' : '') + '</span>';
 
-    const limitReached = restantes <= 0;
-    // Build counter sub text without nested template literals
-    const subTexto = limitReached
-        ? '<span style="color:#ef4444">L\u00edmite alcanzado</span>'
-        : '<span style="color:#10b981">' + restantes + ' disponible' + (restantes!==1?'s':'') + '</span>';
-
-    contenedor.innerHTML = `
-        <!-- Contador de pedidos -->
-        <div class="pq-counter">
-            <div class="pq-counter-ring" style="--pct:${Math.round((usados/limiteTotal)*100)}">
-                <svg viewBox="0 0 36 36" class="pq-donut">
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2.5"/>
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="${usados>=limiteTotal?'#ef4444':'#e8b04b'}" stroke-width="2.5"
-                        stroke-dasharray="${Math.round((usados/limiteTotal)*100)} 100"
-                        stroke-linecap="round" transform="rotate(-90 18 18)"/>
-                </svg>
-                <div class="pq-donut-label">
-                    <span class="pq-donut-num">${usados}</span>
-                    <span class="pq-donut-den">/${limiteTotal}</span>
-                </div>
-            </div>
-            <div class="pq-counter-info">
-                <div class="pq-counter-title">Solicitudes del mes</div>
-                <div class="pq-counter-sub">${subTexto}</div>
-            </div>
-        </div>
-
-        <!-- Formulario de solicitud -->
-        <div class="pq-form ${limitReached?'pq-form--disabled':''}">
-            <div class="pq-form-title">
-                ${SVG_FILM}
-                <span>Nueva solicitud</span>
-            </div>
-
-            <!-- Input título -->
-            <div class="pq-field">
-                <label class="pq-label">Título</label>
-                <div class="pq-input-wrap">
-                    <span class="pq-input-icon">${SVG_FILM}</span>
-                    <input class="pq-input" type="text" id="tituloPedido"
-                        placeholder="Ej: Inception, Breaking Bad..."
-                        ${limitReached ? 'disabled' : ''}
-                        autocomplete="off" spellcheck="false">
-                </div>
-            </div>
-
-            <!-- Selector tipo -->
-            <div class="pq-field">
-                <label class="pq-label">Tipo de contenido</label>
-                <div class="pq-select-wrap">
-                    <span class="pq-input-icon">${SVG_TV}</span>
-                    <select class="pq-select" id="tipoPedido" ${limitReached ? 'disabled' : ''}>
-                        <option value="pelicula">Película</option>
-                        <option value="serie">Serie</option>
-                    </select>
-                    <span class="pq-select-arrow">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                    </span>
-                </div>
-            </div>
-
-            <button class="pq-btn ${limitReached?'pq-btn--disabled':''}"
-                onclick="${limitReached ? '' : 'enviarPedido()'}"
-                ${limitReached ? 'disabled' : ''}>
-                <span class="pq-btn-icon">${SVG_SEND}</span>
-                <span>${limitReached ? 'Sin solicitudes disponibles' : 'Enviar solicitud'}</span>
-            </button>
-        </div>
-
-        <div id="listaPedidos"></div>
-    `;
-
-        cargarPedidos();
-        return;
-        }
-        // Mostrar formulario de pedido
         contenedor.innerHTML = `
-            <div class="perfil-card">
-                <p>📊 Usados: ${usados}/${limiteTotal} | 🎟 Restantes: ${restantes}</p>
+            <div class="pq-counter">
+                <div class="pq-counter-ring">
+                    <svg viewBox="0 0 36 36" class="pq-donut">
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2.5"/>
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="${donutColor}" stroke-width="2.5"
+                            stroke-dasharray="${pct} 100" stroke-linecap="round" transform="rotate(-90 18 18)"/>
+                    </svg>
+                    <div class="pq-donut-label">
+                        <span class="pq-donut-num">${usados}</span>
+                        <span class="pq-donut-den">/${limiteTotal}</span>
+                    </div>
+                </div>
+                <div class="pq-counter-info">
+                    <div class="pq-counter-title">Solicitudes del mes</div>
+                    <div class="pq-counter-sub">${subTexto}</div>
+                </div>
             </div>
-            <div class="pedidos-form">
-                <h3>🎬 Pedir Película/Serie</h3>
-                <input type="text" id="tituloPedido" placeholder="Título">
-                <select id="tipoPedido">
-                    <option value="pelicula">Película</option>
-                    <option value="serie">Serie</option>
-                </select>
-                <button class="btn-pedir" onclick="enviarPedido()">Solicitar</button>
+
+            <div class="pq-form${limitReached ? ' pq-form--disabled' : ''}">
+                <div class="pq-form-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8b04b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20"/></svg>
+                    <span>Nueva solicitud</span>
+                </div>
+                <div class="pq-field">
+                    <label class="pq-label">T\u00edtulo</label>
+                    <div class="pq-input-wrap">
+                        <span class="pq-input-icon">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </span>
+                        <input class="pq-input" type="text" id="tituloPedido"
+                            placeholder="Ej: Inception, Breaking Bad..."
+                            ${limitReached ? 'disabled' : ''}
+                            autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                <div class="pq-field">
+                    <label class="pq-label">Tipo de contenido</label>
+                    <div class="pq-select-wrap">
+                        <span class="pq-input-icon">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                        </span>
+                        <select class="pq-select" id="tipoPedido" ${limitReached ? 'disabled' : ''}>
+                            <option value="pelicula">Pel\u00edcula</option>
+                            <option value="serie">Serie</option>
+                        </select>
+                        <span class="pq-select-arrow">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </span>
+                    </div>
+                </div>
+                <button class="pq-btn${limitReached ? ' pq-btn--disabled' : ''}"
+                    ${limitReached ? 'disabled' : 'onclick="enviarPedido()"'}>
+                    <span class="pq-btn-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </span>
+                    <span>${limitReached ? 'Sin solicitudes disponibles' : 'Enviar solicitud'}</span>
+                </button>
             </div>
+
             <div id="listaPedidos"></div>
         `;
-
         cargarPedidos();
     }
     
@@ -1033,11 +1001,46 @@ window.filtrarPedidos = function(filtro) {
     }
     
     let html = '';
+    // Config de los 4 estados para el admin
+    const ADMIN_ESTADOS = {
+        pendiente:  { color: '#f59e0b', label: 'Pendiente',   nivel: 0 },
+        recibido:   { color: '#3b82f6', label: 'Recibido',    nivel: 1 },
+        en_proceso: { color: '#a855f7', label: 'Procesando',  nivel: 2 },
+        entregado:  { color: '#10b981', label: 'Entregado',   nivel: 3 },
+    };
+    const ADMIN_TL = [
+        { id: 'pendiente',  label: 'Enviado',    color: '#f59e0b',
+          svg: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>' },
+        { id: 'recibido',   label: 'Recibido',   color: '#3b82f6',
+          svg: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' },
+        { id: 'en_proceso', label: 'Proceso',    color: '#a855f7',
+          svg: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>' },
+        { id: 'entregado',  label: 'Listo',      color: '#10b981',
+          svg: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' },
+    ];
+
     filtrados.forEach(p => {
-        const isPend  = p.estado === 'pendiente';
-        const color   = isPend ? '#f59e0b' : '#10b981';
-        const iconEst = isPend ? '⏳' : '✅';
-        const labelEst = isPend ? 'Pendiente' : 'Entregado';
+        const est   = ADMIN_ESTADOS[p.estado] || ADMIN_ESTADOS.pendiente;
+        const color = est.color;
+        const nivel = est.nivel;
+
+        // Timeline SVG de 4 pasos
+        const tlHtml = ADMIN_TL.map((s, i) => {
+            const done   = i <= nivel;
+            const active = i === nivel;
+            const nc = done ? s.color : 'rgba(255,255,255,0.1)';
+            return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+                <div style="width:22px;height:22px;border-radius:50%;border:1.5px solid ${nc};
+                    background:${done ? nc : 'transparent'};
+                    display:flex;align-items:center;justify-content:center;
+                    ${active ? 'box-shadow:0 0 0 3px '+s.color+'33' : ''}">
+                    <span style="color:${done?'#fff':'rgba(255,255,255,0.2)'}">${s.svg}</span>
+                </div>
+                <span style="font-size:8px;color:${active?s.color:done?'rgba(255,255,255,0.4)':'rgba(255,255,255,0.18)'};
+                    font-weight:${active?700:400};white-space:nowrap">${s.label}</span>
+            </div>${i<3?`<div style="flex:1;height:1.5px;margin-bottom:16px;background:${i<nivel?ADMIN_TL[i+1].color:'rgba(255,255,255,0.07)'}"></div>`:''}`;
+        }).join('');
+
         html += `
         <div class="pedido-card" style="
             background: rgba(255,255,255,0.04);
@@ -1046,7 +1049,6 @@ window.filtrarPedidos = function(filtro) {
             border-radius: 12px;
             padding: 14px 14px 12px;
             margin-bottom: 10px;
-            transition: background 0.15s;
         ">
             <!-- Cabecera: título + badge estado -->
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px">
@@ -1079,49 +1081,42 @@ window.filtrarPedidos = function(filtro) {
                 </div>
             </div>
 
-            <!-- Timeline -->
-            <div style="display:flex;align-items:center;gap:0;margin-bottom:${isPend ? '12px' : '0'}">
-                <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-                    <div style="width:18px;height:18px;border-radius:50%;background:#e8b04b;display:flex;align-items:center;justify-content:center">
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><path d="M20 6L9 17l-5-5"/><path stroke="white" stroke-width="3" stroke-linecap="round" fill="none" d="M20 6L9 17l-5-5"/></svg>
-                    </div>
-                    <span style="font-size:9px;color:rgba(255,255,255,0.4)">Enviado</span>
-                </div>
-                <div style="flex:1;height:1px;background:${isPend ? 'rgba(255,255,255,0.1)' : '#10b981'};margin:0 4px;margin-bottom:14px"></div>
-                <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-                    <div style="width:18px;height:18px;border-radius:50%;background:${isPend ? 'rgba(255,255,255,0.1)' : '#10b981'};display:flex;align-items:center;justify-content:center">
-                        ${isPend
-                            ? '<div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.3)"></div>'
-                            : '<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path stroke="white" stroke-width="3" stroke-linecap="round" d="M20 6L9 17l-5-5"/></svg>'
-                        }
-                    </div>
-                    <span style="font-size:9px;color:${isPend ? 'rgba(255,255,255,0.25)' : '#10b981'}">Entregado</span>
-                </div>
+            <!-- Timeline 4 pasos -->
+            <div style="display:flex;align-items:flex-start;padding:0 2px;margin-bottom:${p.estado !== 'entregado' ? '12px' : '4px'}">
+                ${tlHtml}
             </div>
 
             ${p.estado !== 'entregado' ? `
             <div style="display:flex;gap:6px;flex-wrap:wrap">
                 ${p.estado === 'pendiente' ? `
                 <button onclick="avanzarEstadoPedido(${p.id},'recibido',this)" style="
-                    flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
-                    background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)">
-                    👀 Marcar recibido
+                    flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
+                    background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);
+                    display:flex;align-items:center;justify-content:center;gap:5px">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Recibido
                 </button>` : ''}
                 ${p.estado === 'recibido' ? `
                 <button onclick="avanzarEstadoPedido(${p.id},'en_proceso',this)" style="
-                    flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
-                    background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3)">
-                    ⚙️ En proceso
+                    flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
+                    background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);
+                    display:flex;align-items:center;justify-content:center;gap:5px">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                    En proceso
                 </button>` : ''}
-                ${['recibido','en_proceso'].includes(p.estado) ? `
+                ${p.estado === 'en_proceso' ? `
                 <button onclick="avanzarEstadoPedido(${p.id},'entregado',this)" style="
-                    flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
-                    background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.3)">
-                    ✅ Entregado
+                    flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;
+                    background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.3);
+                    display:flex;align-items:center;justify-content:center;gap:5px">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Marcar entregado
                 </button>` : ''}
+                ${p.estado === 'pendiente' || p.estado === 'recibido' ? '' : ''}
             </div>` : `
-            <div style="text-align:center;font-size:11px;color:rgba(255,255,255,0.25);padding:4px 0">
-                ✅ Completado
+            <div style="text-align:center;font-size:11px;color:rgba(255,255,255,0.25);padding:4px 0;display:flex;align-items:center;justify-content:center;gap:4px">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span style="color:#10b981">Completado</span>
             </div>`}
         </div>`;
     });
