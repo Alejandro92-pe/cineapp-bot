@@ -371,12 +371,11 @@
     }
 
     .btn-comprar {
-        background: #f97316;
-    color: #ffffff;
+    background: rgba(255, 255, 255, 0.04);
+    color: #e8b04b;
     padding: 14px 18px;
     border-radius: 14px;
-    border: none;
-    font-weight: bold;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
     text-align: center;
     width: 100%;
@@ -384,7 +383,12 @@
     font-size: 15px;
     transition: all 0.3s ease;
     margin-top: 8px;
-}
+    }
+    
+    .btn-comprar:hover, .btn-comprar:active {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(232, 176, 75, 0.35);
+    }
 
     .btn-comprar.tarjeta {
         background: #000000;
