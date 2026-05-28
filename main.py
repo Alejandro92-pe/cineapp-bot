@@ -353,38 +353,13 @@ TIPO_TMDB = {
     "anime":    "tv",
 }
 
-def tmdb_get(path, params=None, extra_params=None):
+def tmdb_get(path, params=None):
     params = params or {}
     params["api_key"] = TMDB_API_KEY
-    params.setdefault("language", "es-MX")
-    if extra_params:
-        params.update(extra_params)
+    params["language"] = "es-MX"
     r = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=10)
     r.raise_for_status()
     return r.json()
-
-def obtener_trailer_youtube(tmdb_id: int, endpoint_tipo: str) -> str:
-    """
-    Busca el trailer oficial en YouTube con fallback de idioma: MX → ES → US/EN.
-    Retorna la URL completa de YouTube o "" si no hay trailer.
-    """
-    for lang in ["es-MX", "es-ES", "en-US"]:
-        try:
-            videos = tmdb_get(f"/{endpoint_tipo}/{tmdb_id}/videos", extra_params={"language": lang})
-            resultados = videos.get("results", [])
-            # Buscar Trailer oficial en YouTube
-            for v in resultados:
-                if v.get("site") == "YouTube" and v.get("type") == "Trailer" and v.get("official"):
-                    return f"https://www.youtube.com/watch?v={v['key']}"
-            # Si no hay oficial, cualquier trailer de YouTube
-            for v in resultados:
-                if v.get("site") == "YouTube" and v.get("type") == "Trailer":
-                    return f"https://www.youtube.com/watch?v={v['key']}"
-        except Exception as e:
-            print(f"⚠️ trailer {lang}: {e}")
-            continue
-    return ""
-
 
 def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
     endpoint_tipo = TIPO_TMDB.get(tipo, "movie")
@@ -401,9 +376,6 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
     sinopsis = data.get("overview") or ""
     rating = round(data.get("vote_average", 0), 1)
 
-    # Trailer YouTube: MX → ES → EN
-    trailer_url = obtener_trailer_youtube(tmdb_id, endpoint_tipo)
-
     return {
         "titulo":    titulo,
         "tipo":      tipo,
@@ -415,7 +387,6 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
         "tmdb_id":   tmdb_id,
         "disponible": True,
         "destacado": False,
-        "trailer_url": trailer_url,
     }
 
 # ============ TEMPORADAS — IMPORTACIÓN DESDE TMDB ============
@@ -1427,34 +1398,19 @@ def marcar_entregado():
     data = request.get_json()
     if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
-    pedido_id  = data.get("pedido_id")
-    new_estado = data.get("estado", "entregado")  # permite pasar "recibido", "en_proceso", "entregado"
-
-    if new_estado not in ("recibido", "en_proceso", "entregado"):
-        return jsonify({"error": "Estado inválido"}), 400
-
+    pedido_id = data.get("pedido_id")
     pedido_res = supabase_service.table("pedidos").select("*, usuarios!inner(*)").eq("id", pedido_id).execute()
     if not pedido_res.data:
         return jsonify({"error": "Pedido no encontrado"}), 404
     pedido = pedido_res.data[0]
-
-    update_data = {"estado": new_estado}
-    if new_estado == "entregado":
-        update_data["fecha_respuesta"] = datetime.now().isoformat()
-
-    supabase_service.table("pedidos").update(update_data).eq("id", pedido_id).execute()
-
-    # Notificar al usuario según el estado
-    mensajes = {
-        "recibido":   f"👀 Hemos *recibido* tu pedido\n\n🎬 *{pedido['titulo_pedido']}*\n\nEstamos procesándolo, te avisamos pronto.",
-        "en_proceso": f"⚙️ Tu pedido está *en proceso*\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa lo estamos subiendo, casi listo.",
-        "entregado":  f"✅ ¡Tu pedido ya está disponible!\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa puedes verlo en los canales.",
-    }
+    supabase_service.table("pedidos").update({"estado": "entregado", "fecha_respuesta": datetime.now().isoformat()}).eq("id", pedido_id).execute()
     try:
-        bot.send_message(pedido["usuarios"]["telegram_id"], mensajes[new_estado], parse_mode="Markdown")
+        bot.send_message(pedido["usuarios"]["telegram_id"],
+            f"✅ ¡Tu pedido ya está disponible!\n\n🎬 *{pedido['titulo_pedido']}*\n\nYa puedes verlo en los canales.",
+            parse_mode="Markdown")
     except:
         pass
-    r = jsonify({"success": True, "estado": new_estado})
+    r = jsonify({"success": True})
     r.headers.add("Access-Control-Allow-Origin","*")
     return r, 200
 
@@ -1472,9 +1428,6 @@ def mis_pedidos():
     pedidos = [{"id":p["id"],"titulo":p["titulo_pedido"],"tipo":p.get("tipo","pelicula"),
                 "estado":p["estado"],"fecha":datetime.fromisoformat(p["fecha_pedido"]).strftime("%d/%m/%Y %H:%M")}
                for p in pedidos_res.data]
-    # Incluir fecha de respuesta si existe
-    for p_dict, p_raw in zip(pedidos, pedidos_res.data):
-        p_dict["fecha_respuesta"] = p_raw.get("fecha_respuesta", None)
     usuario_res = supabase_service.table("usuarios").select("membresia_tipo,membresia_activa").eq("telegram_id",telegram_id).execute()
     r = jsonify({"pedidos": pedidos, "total": len(pedidos), "usuario": usuario_res.data[0] if usuario_res.data else None})
     r.headers.add("Access-Control-Allow-Origin","*")
@@ -2056,16 +2009,9 @@ def api_contenido():
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
 
-    genero = data.get("genero", "")
+    genero = data.get("genero")
     if genero:
         query = query.ilike("genero", f"%{genero}%")
-
-    anio = data.get("anio", "")
-    if anio:
-        try:
-            query = query.eq("año", int(anio))
-        except (ValueError, TypeError):
-            pass
 
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")

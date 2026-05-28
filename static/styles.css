@@ -3010,3 +3010,209 @@ stroke:#00ffff;
   /* Botones de acción lado a lado */
   .btn-import { font-size: 12px; padding: 9px 14px; }
 }
+
+/* ============================================================
+   PEDIDOS — DISEÑO PRO (pq-* prefix para no pisar estilos)
+   ============================================================ */
+
+/* Contador donut */
+.pq-counter {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+.pq-counter-ring {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+}
+.pq-donut { width: 56px; height: 56px; }
+.pq-donut-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    gap: 1px;
+}
+.pq-donut-num  { font-size: 14px; font-weight: 700; color: #f0f0f2; line-height: 1; }
+.pq-donut-den  { font-size: 10px; color: rgba(255,255,255,0.35); line-height: 1; margin-top: 3px; }
+.pq-counter-title { font-size: 13px; font-weight: 600; color: #f0f0f2; margin-bottom: 3px; }
+.pq-counter-sub   { font-size: 12px; }
+
+/* Formulario */
+.pq-form {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.pq-form--disabled { opacity: 0.55; }
+.pq-form-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f0f0f2;
+    margin-bottom: 14px;
+}
+.pq-form-title svg { color: #e8b04b; }
+.pq-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+.pq-field { margin-bottom: 10px; }
+.pq-input-wrap, .pq-select-wrap {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 0 12px;
+    transition: border-color .2s, background .2s;
+    gap: 8px;
+}
+.pq-input-wrap:focus-within,
+.pq-select-wrap:focus-within {
+    border-color: rgba(232,176,75,0.5);
+    background: rgba(232,176,75,0.04);
+}
+.pq-input-icon { color: rgba(255,255,255,0.3); flex-shrink: 0; display: flex; align-items: center; }
+.pq-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #f0f0f2;
+    font-size: 14px;
+    padding: 11px 0;
+    width: 100%;
+}
+.pq-input::placeholder { color: rgba(255,255,255,0.25); }
+.pq-input:disabled { cursor: not-allowed; }
+.pq-select-wrap { position: relative; }
+.pq-select {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #f0f0f2;
+    font-size: 14px;
+    padding: 11px 0;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+.pq-select:disabled { cursor: not-allowed; }
+.pq-select-arrow {
+    color: rgba(255,255,255,0.3);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.pq-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: #e8b04b;
+    color: #1a1200;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background .2s, transform .1s;
+}
+.pq-btn:hover:not(:disabled) { background: #f0bd5c; transform: translateY(-1px); }
+.pq-btn:active:not(:disabled) { transform: scale(0.98); }
+.pq-btn--disabled, .pq-btn:disabled {
+    background: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.3);
+    cursor: not-allowed;
+}
+.pq-btn-icon { display: flex; align-items: center; }
+
+/* Cards de pedidos con timeline */
+.pq-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 3px solid #e8b04b;
+    border-radius: 14px;
+    padding: 14px 14px 16px;
+    margin-bottom: 10px;
+}
+.pq-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.pq-card-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: 1px solid;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.pq-card-info { flex: 1; min-width: 0; }
+.pq-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f0f0f2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pq-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 2px;
+}
+.pq-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 20px;
+    border: 1px solid;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.pq-timeline {
+    display: flex;
+    align-items: flex-start;
+    padding: 0 4px;
+}
+.pq-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 32px 0;
+    color: rgba(255,255,255,0.2);
+    font-size: 13px;
+}

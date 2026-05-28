@@ -281,13 +281,12 @@ window.cambiarVista = async function(vista) {
     }
 
     else if (vista === 'explorar') {
+        // reset scroll state
         tipoActual = tipoActual || 'todo';
         const tipoInicial = tipoActual;
         paginaActual = 1;
         totalPaginas = 1;
         cargando = false;
-        window.filtroGenero = window.filtroGenero || '';
-        window.filtroAnio   = window.filtroAnio   || '';
 
         contenedor.innerHTML = `
             <div class="buscador">
@@ -295,14 +294,13 @@ window.cambiarVista = async function(vista) {
                 <span>🔍</span>
             </div>
 
-            <!-- Tabs de tipo -->
-            <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none">
+            <div class="tabs">
                 <div class="tab ${tipoInicial==='todo'?'activo':''}"     onclick="cambiarTipo('todo', event)">Todo</div>
                 <div class="tab ${tipoInicial==='pelicula'?'activo':''}" onclick="cambiarTipo('pelicula', event)">Películas</div>
                 <div class="tab ${tipoInicial==='serie'?'activo':''}"    onclick="cambiarTipo('serie', event)">Series</div>
                 <div class="tab ${tipoInicial==='biblico'?'activo':''}"  onclick="cambiarTipo('biblico', event)">Bíblico</div>
                 <div class="tab ${tipoInicial==='anime'?'activo':''}"    onclick="cambiarTipo('anime', event)">Anime</div>
-                <div class="tab ${tipoInicial==='Peliculas anime'?'activo':''}" onclick="cambiarTipo('Peliculas anime', event)">Pel. Anime</div>
+                <div class="tab ${tipoInicial==='Peliculas anime'?'activo':''}"    onclick="cambiarTipo('Peliculas anime', event)">Peliculas anime</div>
             </div>
 
             <!-- Filtros combinados: Género + Año -->
@@ -519,28 +517,92 @@ window.cambiarVista = async function(vista) {
         // Si ya no quedan pedidos
         if (restantes <= 0) {
 
+
+// ── SVG ICONS para pedidos ────────────────────────────────────────────────────
+const SVG_FILM = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M17 7h5M2 17h5M17 17h5"/></svg>`;
+const SVG_TV   = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
+const SVG_SEND = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
+const SVG_CHECK_CIRCLE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+const SVG_EYE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const SVG_GEAR = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+const SVG_BOX  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`;
+const SVG_UPLOAD = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>`;
+const SVG_CLOCK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+
+    const limitReached = restantes <= 0;
+    // Build counter sub text without nested template literals
+    const subTexto = limitReached
+        ? '<span style="color:#ef4444">L\u00edmite alcanzado</span>'
+        : '<span style="color:#10b981">' + restantes + ' disponible' + (restantes!==1?'s':'') + '</span>';
+
     contenedor.innerHTML = `
-        <div class="perfil-card">
-            <p>📊 Usados: ${usados}/${limiteTotal}</p>
-            <p class="text-gris">⚠️ Alcanzaste el límite de tu plan</p>
+        <!-- Contador de pedidos -->
+        <div class="pq-counter">
+            <div class="pq-counter-ring" style="--pct:${Math.round((usados/limiteTotal)*100)}">
+                <svg viewBox="0 0 36 36" class="pq-donut">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2.5"/>
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="${usados>=limiteTotal?'#ef4444':'#e8b04b'}" stroke-width="2.5"
+                        stroke-dasharray="${Math.round((usados/limiteTotal)*100)} 100"
+                        stroke-linecap="round" transform="rotate(-90 18 18)"/>
+                </svg>
+                <div class="pq-donut-label">
+                    <span class="pq-donut-num">${usados}</span>
+                    <span class="pq-donut-den">/${limiteTotal}</span>
+                </div>
+            </div>
+            <div class="pq-counter-info">
+                <div class="pq-counter-title">Solicitudes del mes</div>
+                <div class="pq-counter-sub">${subTexto}</div>
+            </div>
         </div>
 
-        <div class="pedidos-form">
-            <h3>🎬 Pedir Película/Serie</h3>
-            <input type="text" disabled placeholder="Límite alcanzado">
-            <select disabled>
-                <option>Película</option>
-            </select>
-            <button disabled class="btn-pedir disabled">
-                Límite alcanzado
+        <!-- Formulario de solicitud -->
+        <div class="pq-form ${limitReached?'pq-form--disabled':''}">
+            <div class="pq-form-title">
+                ${SVG_FILM}
+                <span>Nueva solicitud</span>
+            </div>
+
+            <!-- Input título -->
+            <div class="pq-field">
+                <label class="pq-label">Título</label>
+                <div class="pq-input-wrap">
+                    <span class="pq-input-icon">${SVG_FILM}</span>
+                    <input class="pq-input" type="text" id="tituloPedido"
+                        placeholder="Ej: Inception, Breaking Bad..."
+                        ${limitReached ? 'disabled' : ''}
+                        autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+
+            <!-- Selector tipo -->
+            <div class="pq-field">
+                <label class="pq-label">Tipo de contenido</label>
+                <div class="pq-select-wrap">
+                    <span class="pq-input-icon">${SVG_TV}</span>
+                    <select class="pq-select" id="tipoPedido" ${limitReached ? 'disabled' : ''}>
+                        <option value="pelicula">Película</option>
+                        <option value="serie">Serie</option>
+                    </select>
+                    <span class="pq-select-arrow">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </span>
+                </div>
+            </div>
+
+            <button class="pq-btn ${limitReached?'pq-btn--disabled':''}"
+                onclick="${limitReached ? '' : 'enviarPedido()'}"
+                ${limitReached ? 'disabled' : ''}>
+                <span class="pq-btn-icon">${SVG_SEND}</span>
+                <span>${limitReached ? 'Sin solicitudes disponibles' : 'Enviar solicitud'}</span>
             </button>
         </div>
 
         <div id="listaPedidos"></div>
     `;
 
-    cargarPedidos();
-    return;
+        cargarPedidos();
+        return;
         }
         // Mostrar formulario de pedido
         contenedor.innerHTML = `
@@ -628,9 +690,8 @@ window.cambiarVista = async function(vista) {
         // Cargar primera pestaña
         cambiarAdminTab('membresias');
     }
+
 };
-
-
 
 // ============ FAVORITOS ============
 function getFavoritosKey() { return `favs_${userId || 'guest'}`; }
@@ -713,7 +774,7 @@ async function renderizarPerfil(contenedor) {
   const favsHTML = favs.length === 0
     ? `<p class="perf-empty">Aún no tienes favoritos. Toca ${SVG_HEART} en cualquier tarjeta.</p>`
     : `<div class="perf-scroll-row">${favs.slice(0,10).map(f => `
-        <div class="perf-mini-card" onclick='abrirModalContenido(${JSON.stringify(f).replace(/'/g, "\'")})'>
+        <div class="perf-mini-card" onclick='abrirModalContenido(${JSON.stringify(f).replace(/'/g, "\\'")})'>
           <div class="perf-mini-img" style="${f.imagen_url ? `background-image:url('${f.imagen_url}')` : 'background:#1e1e2a'}">
             ${!f.imagen_url ? SVG_PLAY : ''}
           </div>
@@ -726,7 +787,7 @@ async function renderizarPerfil(contenedor) {
     ? `<p class="perf-empty">Todavía no has abierto nada. Aparecerá aquí cuando explores contenido.</p>`
     : `<div class="perf-scroll-row">${hist.slice(0,10).map(h => {
         const hace = tiempoRelativo(h.visto_en);
-        return `<div class="perf-mini-card" onclick='abrirModalContenido(${JSON.stringify(h).replace(/'/g, "\'")})'>
+        return `<div class="perf-mini-card" onclick='abrirModalContenido(${JSON.stringify(h).replace(/'/g, "\\'")})'>
           <div class="perf-mini-img" style="${h.imagen_url ? `background-image:url('${h.imagen_url}')` : 'background:#1e1e2a'}">
             ${!h.imagen_url ? SVG_PLAY : ''}
             <span class="perf-mini-time">${hace}</span>
@@ -1273,17 +1334,6 @@ window.irAlBot = function() {
     mostrarConfirmacionPago();
 };
 
-// Referencia global al div de confirmación de pago Yape
-// para poder eliminarlo cuando el usuario regresa
-let _divConfirmPago = null;
-
-function cerrarConfirmacionPago() {
-    if (_divConfirmPago && _divConfirmPago.parentNode) {
-        _divConfirmPago.parentNode.removeChild(_divConfirmPago);
-        _divConfirmPago = null;
-    }
-}
-
 function mostrarConfirmacionPago() {
     // Limpiar uno previo si quedó abierto
     cerrarConfirmacionPago();
@@ -1327,16 +1377,24 @@ function mostrarConfirmacionPago() {
 }
 
 function abrirBotManual() {
+
     if (!window.urlBotPago) return;
+
     const url = window.urlBotPago;
+
     try {
         if (window.Telegram?.WebApp) {
+
             Telegram.WebApp.openTelegramLink(url);
-            // NO llamar close() — el usuario puede querer volver a la miniapp
-            // El div se limpia automáticamente con el evento visibilitychange
+
+            setTimeout(() => {
+                Telegram.WebApp.close();
+            }, 300);
+
         } else {
             window.open(url, "_blank");
         }
+
     } catch (e) {
         window.location.href = url;
     }
@@ -1990,6 +2048,10 @@ function mostrarModal(titulo, mensaje, callback) {
 let contenidoSeleccionado = null;
 
 async function abrirModalContenido(item) {
+    // Resetear temporadas SIEMPRE al abrir un nuevo modal
+    // (evita que la temporada de la serie anterior siga activa)
+    _resetTemporadas();
+
     // Si el item viene del cache (favs/historial), puede no tener todos los campos
     // (descarga, fuente, tmdb_id, protagonistas...). Fetch completo por id.
     // Si el item viene de cache viejo (antes del fix del spread),
@@ -2149,7 +2211,6 @@ if (btnDesc) {
     }
 
 }
-
     // ── TRAILER YouTube ──────────────────────────────────────────────────────
     const trailerZona = document.getElementById('trailerZona');
     const btnTrailer  = document.getElementById('btnTrailer');
@@ -2172,7 +2233,6 @@ if (btnDesc) {
         badgeVisto.style.display = yaVisto ? 'flex' : 'none';
     }
     // El badge se activa cuando presiona Reproducir (ver handler más abajo)
-
     // Selector de temporadas (solo series/anime con temporadas en BD)
     await cargarTemporadas(item);
 
@@ -2266,6 +2326,12 @@ function compartirContenido() {
 let temporadasActuales = [];  // caché de temporadas de la serie abierta
 let temporadaSeleccionada = null;
 
+// Limpiar estado de temporadas al abrir un nuevo modal
+function _resetTemporadas() {
+    temporadasActuales    = [];
+    temporadaSeleccionada = null;
+}
+
 async function cargarTemporadas(item) {
     const wrap = document.getElementById('detalleTemporadasWrap');
     if (!wrap) return;
@@ -2338,28 +2404,13 @@ function seleccionarTemporada(temporada, itemBase, actualizarPoster = true, btnE
     }
 
     // El botón Reproducir ahora usará el enlace de la temporada
-const btnVer = document.getElementById('btnVerAhora');
-
-if (btnVer) {
-    const tieneEnlace =
-        temporada.enlace &&
-        temporada.enlace.trim() !== '';
-
-    btnVer.disabled = !tieneEnlace;
-    btnVer.title = tieneEnlace
-        ? ''
-        : 'Esta temporada aún no tiene enlace de reproducción';
-
-    btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
-
-    // REASIGNAR SIEMPRE EL CLICK
-    btnVer.onclick = () => {
-
-        if (!temporadaSeleccionada?.enlace) return;
-
-        window.location.href =
-            temporadaSeleccionada.enlace;
-    };
+    // (btnVerAhora listener lo lee de temporadaSeleccionada en tiempo real)
+    const btnVer = document.getElementById('btnVerAhora');
+    if (btnVer) {
+        const tieneEnlace = temporada.enlace && temporada.enlace.trim() !== '';
+        btnVer.disabled = !tieneEnlace;
+        btnVer.title = tieneEnlace ? '' : 'Esta temporada aún no tiene enlace de reproducción';
+        btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
     }
 }
 
@@ -2385,7 +2436,7 @@ async function cargarRelacionados(item) {
                 ? `<span class="d-rel-rating" style="color:${rColor}">★ ${score.toFixed(1)}</span>`
                 : '';
             return `
-            <div class="d-rel-card" onclick='abrirModalContenido(${JSON.stringify(r).replace(/'/g,"\'")})'  >
+            <div class="d-rel-card" onclick='abrirModalContenido(${JSON.stringify(r).replace(/'/g,"\\'")})'  >
                 <div class="d-rel-img" style="background-image:url('${r.imagen_url}')">
                     ${ratingBadge}
                 </div>
@@ -2437,35 +2488,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // ✅ Registrar en historial SOLO cuando presiona reproducir
             agregarAlHistorial(item);
-            // Marcar como visto en localStorage
             localStorage.setItem(`visto_${item.id}`, '1');
 
-            // ── NO cerrar el modal antes de navegar ──
-            // Si se cierra ANTES de openTelegramLink/openLink, cuando el usuario
-            // vuelva a la miniapp ya no verá el modal. Se cierra solo si es Vimeus.
+            // Capturar enlace ANTES de cerrar el modal
+            // (cerrarModalDetalle pone contenidoSeleccionado = null)
+            const linkTemporada = (temporadaSeleccionada && temporadaSeleccionada.enlace)
+                ? temporadaSeleccionada.enlace.trim()
+                : null;
+            const linkCanal = item.enlace_canal || null;
+            const esVimeus  = item.fuente === 'vimeus' && item.tmdb_id;
 
-            // Si tiene temporada seleccionada con enlace → usar ese enlace
-            if (temporadaSeleccionada && temporadaSeleccionada.enlace) {
-                const link = temporadaSeleccionada.enlace.trim();
-                try {
-                    // Usar openLink siempre (no openTelegramLink) para que
-                    // Telegram abra el navegador externo sin cerrar la WebApp
-                    tg.openLink(link);
-                } catch(e) { window.open(link, '_blank'); }
-                return;
-            }
-
-            // Modo normal (sin temporadas)
-            if ((!item.fuente || item.fuente === 'canal') && item.enlace_canal) {
-                try {
-                    tg.openLink(item.enlace_canal);
-                } catch(e) { window.open(item.enlace_canal, '_blank'); }
-                return;
-            }
-            if (item.fuente === 'vimeus' && item.tmdb_id) {
+            // Cerrar modal SOLO para Vimeus (abre reproductor interno)
+            // Para links externos NO cerrar — el usuario vuelve al modal
+            if (esVimeus) {
+                cerrarModalDetalle();
                 abrirReproductorVimeus(item);
                 return;
             }
+
+            // Link de temporada
+            if (linkTemporada) {
+                try { tg.openLink(linkTemporada); }
+                catch(e) { window.open(linkTemporada, '_blank'); }
+                return;
+            }
+
+            // Link de canal normal
+            if (linkCanal) {
+                try { tg.openLink(linkCanal); }
+                catch(e) { window.open(linkCanal, '_blank'); }
+                return;
+            }
+
             console.warn('Item sin fuente ni enlace:', item);
         });
     }
@@ -2867,6 +2921,5 @@ window.limpiarFiltrosExtra = function() {
     const generosExplorar = document.getElementById('generosExplorar');
     if (generosExplorar) cargarGenerosEnContenedor('generosExplorar');
 };
-
 // ============ INICIAR ============
 iniciar();
