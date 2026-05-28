@@ -1077,7 +1077,7 @@ window.avanzarEstadoPedido = async function(pedidoId, nuevoEstado, btn) {
         const resp = await fetch(`${API_BASE_URL}/marcar_entregado`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pedido_id: pedidoId, estado: nuevoEstado, admin_id: Number(adminId) })
+            body: JSON.stringify({ pedido_id: pedidoId, estado: nuevoEstado, admin_id: Number(ADMIN_ID) })
         });
         const data = await resp.json();
         if (resp.ok && data.success) {
@@ -1087,8 +1087,13 @@ window.avanzarEstadoPedido = async function(pedidoId, nuevoEstado, btn) {
             if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
         }
     } catch(e) {
-        alert('❌ Error de conexión');
-        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    console.error(e);
+    alert('❌ Error: ' + e.message);
+
+    if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
     }
 };
 
@@ -1517,83 +1522,73 @@ async function cargarPedidos() {
             return;
         }
 
-        const pasos = [
-            { id: 'pendiente',   icon: '📤', label: 'Enviado'    },
-            { id: 'recibido',    icon: '👀', label: 'Recibido'   },
-            { id: 'en_proceso',  icon: '⚙️', label: 'En proceso' },
-            { id: 'entregado',   icon: '✅', label: 'Listo'      },
+        // Pasos del timeline con SVG puro
+        const TL_PASOS = [
+            { id: 'pendiente',  label: 'Enviado',    color: '#e8b04b',
+              svg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>` },
+            { id: 'recibido',   label: 'Recibido',   color: '#3b82f6',
+              svg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>` },
+            { id: 'en_proceso', label: 'Procesando', color: '#a855f7',
+              svg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>` },
+            { id: 'entregado',  label: 'Disponible', color: '#10b981',
+              svg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` },
         ];
-        const ordenEstado = { pendiente: 0, recibido: 1, en_proceso: 2, entregado: 3 };
-        const colores = {
-            pendiente:  '#f59e0b',
-            recibido:   '#3b82f6',
-            en_proceso: '#a855f7',
-            entregado:  '#10b981',
-        };
+        const TL_ORDEN = { pendiente: 0, recibido: 1, en_proceso: 2, entregado: 3 };
 
-        let html = '';
+        let html = result.pedidos.length === 0
+            ? '<div class="pq-empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20"/></svg><p>Sin solicitudes aún</p></div>'
+            : '';
+
         result.pedidos.forEach(p => {
-            const nivelActual = ordenEstado[p.estado] ?? 0;
-            const color = colores[p.estado] || '#f59e0b';
+            const nivel = TL_ORDEN[p.estado] ?? 0;
+            const paso  = TL_PASOS[nivel];
+            const color = paso.color;
 
-            // Construir los 4 pasos del timeline
-            const stepsHtml = pasos.map((paso, idx) => {
-                const hecho    = idx <= nivelActual;
-                const esActual = idx === nivelActual;
-                const c = hecho ? colores[paso.id] : 'rgba(255,255,255,0.12)';
+            // Construir nodos del timeline
+            const nodesHtml = TL_PASOS.map((s, i) => {
+                const done    = i <= nivel;
+                const active  = i === nivel;
+                const lineColor = (i < nivel) ? TL_PASOS[i+1]?.color || s.color : 'rgba(255,255,255,0.08)';
+                const nodeStyle = done
+                    ? `background:${s.color};border-color:${s.color};${active?'box-shadow:0 0 0 3px '+s.color+'33':''}`
+                    : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1)';
+                const labelColor = active ? s.color : done ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)';
                 return `
-                <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
-                    <div style="
-                        width:32px;height:32px;border-radius:50%;
-                        background:${hecho ? c : 'rgba(255,255,255,0.06)'};
-                        border:2px solid ${c};
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0">
+                    <div style="width:30px;height:30px;border-radius:50%;border:2px solid;
                         display:flex;align-items:center;justify-content:center;
-                        font-size:${esActual ? '16px' : '13px'};
-                        transition:all 0.3s;
-                        ${esActual ? 'box-shadow:0 0 10px '+c+'66' : ''}
-                    ">${hecho ? paso.icon : '<span style="color:rgba(255,255,255,0.2);font-size:10px">●</span>'}</div>
-                    <span style="font-size:9px;font-weight:${esActual?'700':'400'};
-                        color:${esActual ? c : 'rgba(255,255,255,0.3)'};
-                        text-align:center;line-height:1.2">${paso.label}</span>
+                        flex-shrink:0;transition:all .3s;${nodeStyle}">
+                        <span style="color:${done?'#fff':'rgba(255,255,255,0.2)'}">${s.svg}</span>
+                    </div>
+                    <span style="font-size:9px;font-weight:${active?700:400};color:${labelColor};
+                        text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden;
+                        text-overflow:ellipsis;max-width:56px">${s.label}</span>
                 </div>
-                ${idx < pasos.length - 1 ? `
-                <div style="flex:1;height:2px;margin-bottom:18px;
-                    background:${idx < nivelActual ? colores[pasos[idx+1].id] : 'rgba(255,255,255,0.08)'};
-                    border-radius:2px;transition:background 0.3s">
-                </div>` : ''}`;
+                ${i < TL_PASOS.length-1 ? `
+                <div style="flex:1;height:2px;margin-bottom:18px;border-radius:2px;
+                    background:${i<nivel ? TL_PASOS[i+1].color : 'rgba(255,255,255,0.07)'}"></div>` : ''}`;
             }).join('');
 
             html += `
-            <div style="
-                background:rgba(255,255,255,0.04);
-                border:1px solid rgba(255,255,255,0.08);
-                border-left:3px solid ${color};
-                border-radius:14px;
-                padding:14px 14px 16px;
-                margin-bottom:12px;
-            ">
-                <!-- Título y fecha -->
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-                    <div style="flex:1;min-width:0">
-                        <div style="font-weight:700;font-size:14px;color:#f0f0f2;
-                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                            🎬 ${p.titulo}
-                        </div>
-                        <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px">
-                            ${p.tipo} · Pedido el ${p.fecha}
+            <div class="pq-card" style="border-left-color:${color}">
+                <div class="pq-card-header">
+                    <div class="pq-card-icon" style="background:${color}18;border-color:${color}33">
+                        <span style="color:${color}">${p.tipo==='serie' ? SVG_TV : SVG_FILM}</span>
+                    </div>
+                    <div class="pq-card-info">
+                        <div class="pq-card-title">${p.titulo}</div>
+                        <div class="pq-card-meta">
+                            <span style="color:rgba(255,255,255,0.3)">${SVG_CLOCK}</span>
+                            ${p.fecha}
                         </div>
                     </div>
-                    <span style="
-                        font-size:10px;font-weight:700;white-space:nowrap;
-                        background:${color}22;color:${color};
-                        border:1px solid ${color}44;
-                        border-radius:20px;padding:3px 9px;margin-left:8px;flex-shrink:0
-                    ">${pasos[nivelActual].icon} ${pasos[nivelActual].label}</span>
+                    <div class="pq-badge" style="background:${color}18;color:${color};border-color:${color}33">
+                        <span>${paso.svg}</span>
+                        <span>${paso.label}</span>
+                    </div>
                 </div>
-
-                <!-- Timeline de 4 pasos -->
-                <div style="display:flex;align-items:flex-start;gap:0;padding:0 4px">
-                    ${stepsHtml}
+                <div class="pq-timeline">
+                    ${nodesHtml}
                 </div>
             </div>`;
         });
@@ -2343,13 +2338,28 @@ function seleccionarTemporada(temporada, itemBase, actualizarPoster = true, btnE
     }
 
     // El botón Reproducir ahora usará el enlace de la temporada
-    // (btnVerAhora listener lo lee de temporadaSeleccionada en tiempo real)
-    const btnVer = document.getElementById('btnVerAhora');
-    if (btnVer) {
-        const tieneEnlace = temporada.enlace && temporada.enlace.trim() !== '';
-        btnVer.disabled = !tieneEnlace;
-        btnVer.title = tieneEnlace ? '' : 'Esta temporada aún no tiene enlace de reproducción';
-        btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
+const btnVer = document.getElementById('btnVerAhora');
+
+if (btnVer) {
+    const tieneEnlace =
+        temporada.enlace &&
+        temporada.enlace.trim() !== '';
+
+    btnVer.disabled = !tieneEnlace;
+    btnVer.title = tieneEnlace
+        ? ''
+        : 'Esta temporada aún no tiene enlace de reproducción';
+
+    btnVer.style.opacity = tieneEnlace ? '1' : '0.5';
+
+    // REASIGNAR SIEMPRE EL CLICK
+    btnVer.onclick = () => {
+
+        if (!temporadaSeleccionada?.enlace) return;
+
+        window.location.href =
+            temporadaSeleccionada.enlace;
+    };
     }
 }
 
