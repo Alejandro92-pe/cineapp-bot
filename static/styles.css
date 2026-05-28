@@ -3220,3 +3220,43 @@ stroke:#00ffff;
     color: rgba(255,255,255,0.2);
     font-size: 13px;
 }
+.btn-tutorial{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+}
+
+.btn-icon{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:0;
+}
+
+.btn-icon svg{
+    width:30px;
+    height:22px;
+    display:block;
+    color: #e8b04b;
+}
+.tutorial-title{
+    display:flex;
+    align-items:center;
+    justify-content:center; /* opcional */
+    gap:8px;
+}
+
+.tutorial-icon{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:0;
+}
+
+.tutorial-icon svg{
+    width:22px;
+    height:22px;
+    display:block;
+    color: #e8b04b;
+}

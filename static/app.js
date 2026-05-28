@@ -18,6 +18,33 @@ stroke-linecap="round" stroke-linejoin="round">
 </svg>
 `;
 
+const SVG_PHONE = `
+<svg width="26" height="22" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" stroke-width="2"
+stroke-linecap="round" stroke-linejoin="round">
+  <rect x="7" y="2" width="10" height="20" rx="2"/>
+  <line x1="12" y1="18" x2="12.01" y2="18"/>
+</svg>
+`;
+
+const SVG_CARD = `
+<svg width="22" height="22" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" stroke-width="2"
+stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2" y="5" width="20" height="14" rx="2"/>
+  <line x1="2" y1="10" x2="22" y2="10"/>
+</svg>
+`;
+
+const SVG_VIDEO = `
+<svg width="22" height="22" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" stroke-width="2"
+stroke-linecap="round" stroke-linejoin="round">
+  <polygon points="23 7 16 12 23 17 23 7"/>
+  <rect x="1" y="5" width="15" height="14" rx="2"/>
+</svg>
+`;
+
 // Si estamos en navegador (no en Telegram) y somos admin, redirigir al panel admin
 (function checkBrowserAdmin() {
   const isInTelegram = !!(tg.initDataUnsafe?.user?.id);
@@ -330,10 +357,24 @@ window.cambiarVista = async function(vista) {
       </div>
 
       <div class="tutorial-pago">
-        <h3>🎥 Tutorial de cómo pagar con:</h3>
+        <h3 class="tutorial-title">
+        <span class="tutorial-icon">
+        ${SVG_VIDEO}
+         </span>
+
+         <span>
+         Tutorial de cómo pagar con:
+         </span>
+         </h3>
         <div class="tutorial-botones">
-          <button onclick="verTutorialYape()">📱 Yape / Plin</button>
-          <button onclick="verTutorialTarjeta()">💳 Tarjeta</button>
+          <button onclick="verTutorialYape()" class="btn-tutorial">
+          <span class="btn-icon">${SVG_PHONE}</span>
+          <span>Yape / Plin</span>
+          </button>
+          <button onclick="verTutorialTarjeta()" class="btn-tutorial">
+          <span class="btn-icon">${SVG_CARD}</span>
+          <span>Tarjeta</span>
+          </button>
         </div>
       </div>
 
@@ -1474,7 +1515,7 @@ async function cargarPedidos() {
               <span style="color:${color}">${p.tipo==='serie' ? SVG_TV : SVG_FILM}</span>
             </div>
             <div class="pq-card-info">
-              <div class="pq-card-title">${p.titulo}</div>
+              <div class="pq-card-title">${p.titulo || p.titulo_pedido || 'Sin título'}</div>
               <div class="pq-card-meta">
                 <span style="color:rgba(255,255,255,0.3)">${SVG_CLOCK}</span>
                 ${p.fecha}
