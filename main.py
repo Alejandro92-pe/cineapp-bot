@@ -447,7 +447,7 @@ def _resetear_notifs(usuario_id: int):
     try:
         supabase_service.table("usuarios").update({
             "notificacion_3dias_enviada":  False,   # ← nombre real en Supabase
-            "notificacion_3hora":          False,   # ← nombre real en Supabase
+            "notificacion_3hora_enviada":  False,   # ← nombre real en Supabase
             "notificacion_vencida_enviada": False,  # ← nombre real en Supabase
         }).eq("id", usuario_id).execute()
         print(f"✅ Flags de notificación reseteados para usuario {usuario_id}")
@@ -1686,7 +1686,6 @@ def cron_verificar_vencimientos():
         verificar_vencimientos()
         return "OK", 200
     except Exception as e:
-        print(f"❌ Error en cron vencimientos: {e}")
         return "Error", 500
 
 # ============================================================
@@ -1757,7 +1756,7 @@ def verificar_vencimientos():
                 )
             )
             # FIX: marcar en Supabase con el nombre correcto de columna
-            _marcar_notif(u["id"], "notificacion_3hora")
+            _marcar_notif(u["id"], "notificacion_3horas_enviada")
             print(f"✅ Notif 3h enviada a {u['telegram_id']}")
         except Exception as e:
             print(f"⚠️ Error notif 3h a {u['telegram_id']}: {e}")
