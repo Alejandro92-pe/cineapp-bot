@@ -447,7 +447,7 @@ def _resetear_notifs(usuario_id: int):
     try:
         supabase_service.table("usuarios").update({
             "notificacion_3dias_enviada":  False,   # ← nombre real en Supabase
-            "notificacion_3hora_enviada":  False,   # ← nombre real en Supabase
+            "notificacion_3horas_enviada":  False,   # ← nombre real en Supabase
             "notificacion_vencida_enviada": False,  # ← nombre real en Supabase
         }).eq("id", usuario_id).execute()
         print(f"✅ Flags de notificación reseteados para usuario {usuario_id}")
