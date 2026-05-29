@@ -1737,7 +1737,7 @@ def verificar_vencimientos():
     # FIX: filtrar solo usuarios que AÚN NO recibieron esta notificación
     proximos_3h = supabase_service.table("usuarios").select("*") \
         .eq("membresia_activa", True) \
-        .eq("notificacion_3hora", False) \
+        .eq("notificacion_3horas_enviada", False) \
         .gte("fecha_vencimiento", hoy) \
         .lte("fecha_vencimiento", en_3h) \
         .execute()
