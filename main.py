@@ -36,30 +36,26 @@ def check_admin(data):
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Username cacheado para no llamar get_me() cada vez
 BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")
 
-# Zona horaria de Lima (UTC-5) — usada para calcular "hoy" correctamente
+# Zona horaria de Lima (UTC-5)
 LIMA_TZ = timezone(timedelta(hours=-5))
 
 # ============ IDs DE CANALES ============
 GRUPO_SOPORTE_ID   = -1003805629374
-# Canales VIP (membresías)
 CANAL_PELICULAS_ID = -1003890553566
 CANAL_SERIES_ID    = -1003879512007
 GRUPO_CONTENIDO_ID = -1002991571573
-CANAL_ANIME_ID     = int(os.getenv("CANAL_ANIME_ID", "0"))  # agrega CANAL_ANIME_ID en Render con el ID negativo del canal
-# Canales de difusión pública (cron publica aquí para atraer miembros)
+CANAL_ANIME_ID     = int(os.getenv("CANAL_ANIME_ID", "0"))
 CANAL_PUBLICO_ID   = "@mejoresanimesenlatino"
 CANAL_PRIVADO_ID   = -1002503337168
 
-# Canales VIP donde se hace ban/unban al vencer/renovar
 CANALES_VIP = [CANAL_PELICULAS_ID, CANAL_SERIES_ID, GRUPO_CONTENIDO_ID] + ([CANAL_ANIME_ID] if CANAL_ANIME_ID else [])
 
 def desbanear_usuario(user_id: int):
     """
-    Elimina al usuario de la lista de expulsados en los 3 canales VIP.
-    Necesario antes de enviar los enlaces de acceso cuando renueva.
+    Elimina al usuario de la lista de expulsados en todos los canales VIP.
+    SIEMPRE debe llamarse antes de enviar enlaces de acceso.
     Si el usuario no estaba baneado, unban_chat_member lo ignora silenciosamente.
     """
     errores = []
@@ -82,26 +78,12 @@ BMC_LINKS   = {
     "diamond":  "https://buymeacoffee.com/quehay/e/510552",
 }
 
-# PayPal REST API — Variables de Render:
-# PAYPAL_CLIENT_ID          = AXxx...
-# PAYPAL_CLIENT_SECRET      = EKxx...
-# PAYPAL_WEBHOOK_ID         = WH-xxx... (del dashboard de PayPal → Webhooks)
-# PAYPAL_MODE               = live  (o sandbox para pruebas)
-#
-# Plan IDs de SUSCRIPCIÓN (crear en PayPal → Catalog → Products → Plans):
-# PAYPAL_PLAN_ID_COPPER     = P-xxx
-# PAYPAL_PLAN_ID_SILVER     = P-xxx
-# PAYPAL_PLAN_ID_GOLD       = P-xxx
-# PAYPAL_PLAN_ID_PLATINUM   = P-xxx
-# PAYPAL_PLAN_ID_DIAMOND    = P-xxx
-# PAYPAL_WEBHOOK_ID_SUB     = WH-xxx (webhook para suscripciones, puede ser el mismo)
 PAYPAL_CLIENT_ID     = os.getenv("PAYPAL_CLIENT_ID", "")
 PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "")
 PAYPAL_WEBHOOK_ID    = os.getenv("PAYPAL_WEBHOOK_ID", "")
 PAYPAL_MODE          = os.getenv("PAYPAL_MODE", "live")
 PAYPAL_BASE          = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
 
-# Precios en USD por plan (con descuento 50%) — para pagos únicos
 PAYPAL_PRECIOS = {
     "copper":   "3.00",
     "silver":   "4.50",
@@ -110,9 +92,6 @@ PAYPAL_PRECIOS = {
     "diamond":  "46.99",
 }
 
-# Plan IDs de suscripción mensual recurrente de PayPal
-# Créalos en: https://www.paypal.com/billing/plans
-# Catálogo → Productos → crear producto → crear plan MONTHLY
 PAYPAL_PLAN_IDS = {
     "copper":   os.getenv("PAYPAL_PLAN_ID_COPPER",   ""),
     "silver":   os.getenv("PAYPAL_PLAN_ID_SILVER",   ""),
@@ -121,18 +100,13 @@ PAYPAL_PLAN_IDS = {
     "diamond":  os.getenv("PAYPAL_PLAN_ID_DIAMOND",  ""),
 }
 
-# ============================================================
-# PAYPAL REST API HELPERS
-# ============================================================
 _paypal_token_cache = {"token": None, "expires_at": 0}
 
 def paypal_get_token() -> str:
-    """Obtiene access token de PayPal con caché para no pedir uno en cada llamada."""
     import time as _time
     now = _time.time()
     if _paypal_token_cache["token"] and now < _paypal_token_cache["expires_at"] - 60:
         return _paypal_token_cache["token"]
-
     resp = requests.post(
         f"{PAYPAL_BASE}/v1/oauth2/token",
         auth=(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
@@ -146,30 +120,18 @@ def paypal_get_token() -> str:
     return _paypal_token_cache["token"]
 
 def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
-    """
-    Crea una orden de pago único en PayPal.
-    
-    IMPORTANTE: No incluir 'payment_source.paypal.email_address' porque
-    causa PAYEE_ACCOUNT_RESTRICTED si la cuenta tiene restricciones de WooCommerce.
-    Se usa el merchant por defecto de la app (CLIENT_ID/SECRET).
-    """
     precio = PAYPAL_PRECIOS.get(plan)
     if not precio:
         raise ValueError(f"Plan desconocido: {plan}")
-
     token = paypal_get_token()
     render_url = os.getenv("RENDER_EXTERNAL_URL", "https://cineapp-bot.onrender.com")
-
     body = {
         "intent": "CAPTURE",
         "purchase_units": [{
             "reference_id": f"{telegram_id}_{plan}",
             "custom_id":    f"{telegram_id}|{plan}",
             "description":  f"QuehayApp VIP — Plan {plan.upper()}",
-            "amount": {
-                "currency_code": "USD",
-                "value":         precio,
-            }
+            "amount": {"currency_code": "USD", "value": precio}
         }],
         "application_context": {
             "brand_name":          "QuehayApp VIP",
@@ -181,29 +143,18 @@ def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
             "cancel_url": f"{render_url}/paypal/cancel",
         }
     }
-
     resp = requests.post(
         f"{PAYPAL_BASE}/v2/checkout/orders",
         json=body,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type":  "application/json",
-            "Prefer":        "return=representation",
-        },
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Prefer": "return=representation"},
         timeout=15
     )
     resp.raise_for_status()
     orden = resp.json()
-
-    # Extraer el link de aprobación (el usuario va a esta URL para pagar)
-    approve_link = next(
-        (l["href"] for l in orden.get("links", []) if l["rel"] == "payer-action"),
-        None
-    )
+    approve_link = next((l["href"] for l in orden.get("links", []) if l["rel"] == "payer-action"), None)
     return {"order_id": orden["id"], "approve_url": approve_link}
 
 def paypal_capturar_orden(order_id: str) -> dict:
-    """Captura el pago de una orden ya aprobada por el usuario."""
     token = paypal_get_token()
     resp = requests.post(
         f"{PAYPAL_BASE}/v2/checkout/orders/{order_id}/capture",
@@ -214,14 +165,9 @@ def paypal_capturar_orden(order_id: str) -> dict:
     return resp.json()
 
 def paypal_verificar_webhook(headers: dict, body_bytes: bytes) -> bool:
-    """
-    Verifica la firma del webhook de PayPal para evitar fraudes.
-    https://developer.paypal.com/api/rest/webhooks/rest/
-    """
     if not PAYPAL_WEBHOOK_ID:
         print("⚠️ PAYPAL_WEBHOOK_ID no configurado — omitiendo verificación")
-        return True  # solo en desarrollo
-
+        return True
     token = paypal_get_token()
     verification_body = {
         "transmission_id":   headers.get("PAYPAL-TRANSMISSION-ID", ""),
@@ -240,75 +186,42 @@ def paypal_verificar_webhook(headers: dict, body_bytes: bytes) -> bool:
     )
     if resp.ok:
         result = resp.json().get("verification_status")
-        print(f"DEBUG PayPal webhook verification: {result}")
         return result == "SUCCESS"
-    print(f"⚠️ Error verificando webhook PayPal: {resp.text}")
     return False
 
-# ============================================================
-# PAYPAL SUBSCRIPTIONS API
-# ============================================================
-
 def paypal_crear_suscripcion(plan: str, telegram_id: int, email: str = "") -> dict:
-    """
-    Crea una suscripción RECURRENTE mensual con PayPal Subscriptions API.
-    Requiere que ya existan los plan_id en las env vars PAYPAL_PLAN_ID_*.
-
-    Diferencia clave vs pago único:
-    - Pago único (CAPTURE): el usuario paga una vez.
-    - Suscripción: PayPal cobra automáticamente cada mes hasta que se cancele.
-
-    Retorna: { "subscription_id": "I-xxx", "approve_url": "https://..." }
-    """
     plan_id = PAYPAL_PLAN_IDS.get(plan, "")
     if not plan_id:
         raise ValueError(
             f"No hay PAYPAL_PLAN_ID configurado para el plan '{plan}'. "
             f"Agrega la variable PAYPAL_PLAN_ID_{plan.upper()} en Render."
         )
-
     token = paypal_get_token()
     render_url = os.getenv("RENDER_EXTERNAL_URL", "https://cineapp-bot.onrender.com")
-
     body = {
-        "plan_id": plan_id,
-        "custom_id": f"{telegram_id}|{plan}",   # recuperado en el webhook
+        "plan_id":   plan_id,
+        "custom_id": f"{telegram_id}|{plan}",
         "application_context": {
-            "brand_name":    "QH Membership",
-            "locale":        "en-US",
+            "brand_name":          "QH Membership",
+            "locale":              "en-US",
             "shipping_preference": "NO_SHIPPING",
-            "user_action":   "SUBSCRIBE_NOW",
+            "user_action":         "SUBSCRIBE_NOW",
             "return_url": f"{render_url}/paypal/success",
             "cancel_url": f"{render_url}/paypal/cancel",
         }
     }
-
     resp = requests.post(
         f"{PAYPAL_BASE}/v1/billing/subscriptions",
         json=body,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type":  "application/json",
-            "Prefer":        "return=representation",
-        },
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Prefer": "return=representation"},
         timeout=15
     )
     resp.raise_for_status()
     sub = resp.json()
-
-    approve_link = next(
-        (l["href"] for l in sub.get("links", []) if l["rel"] == "approve"),
-        None
-    )
-    return {
-        "subscription_id": sub.get("id"),
-        "approve_url":     approve_link,
-        "status":          sub.get("status")
-    }
-
+    approve_link = next((l["href"] for l in sub.get("links", []) if l["rel"] == "approve"), None)
+    return {"subscription_id": sub.get("id"), "approve_url": approve_link, "status": sub.get("status")}
 
 def paypal_cancelar_suscripcion(subscription_id: str, motivo: str = "Cancelado por el usuario") -> bool:
-    """Cancela una suscripción activa en PayPal."""
     try:
         token = paypal_get_token()
         resp  = requests.post(
@@ -322,9 +235,7 @@ def paypal_cancelar_suscripcion(subscription_id: str, motivo: str = "Cancelado p
         print(f"⚠️ Error cancelando suscripción {subscription_id}: {e}")
         return False
 
-
 def paypal_obtener_suscripcion(subscription_id: str) -> dict:
-    """Obtiene detalles de una suscripción PayPal."""
     token = paypal_get_token()
     resp  = requests.get(
         f"{PAYPAL_BASE}/v1/billing/subscriptions/{subscription_id}",
@@ -334,12 +245,9 @@ def paypal_obtener_suscripcion(subscription_id: str) -> dict:
     resp.raise_for_status()
     return resp.json()
 
-# Gmail SMTP — usa App Password de Google Account
-# Google Account → Seguridad → Contraseñas de aplicación
 GMAIL_USER      = os.getenv("GMAIL_USER", "")
 GMAIL_PASSWORD  = os.getenv("GMAIL_PASSWORD", "")
 GMAIL_FROM_NAME = "QuehayApp VIP"
-
 
 user_states = {}
 
@@ -364,10 +272,8 @@ def tmdb_get(path, params=None):
 def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
     endpoint_tipo = TIPO_TMDB.get(tipo, "movie")
     data = tmdb_get(f"/{endpoint_tipo}/{tmdb_id}")
-
     titulo = data.get("title") or data.get("name") or "Sin título"
     fecha_raw = data.get("release_date") or data.get("first_air_date") or ""
-    # ← SIEMPRE "año" con ñ para coincidir con la columna en Supabase
     año = int(fecha_raw[:4]) if fecha_raw and len(fecha_raw) >= 4 else None
     generos_raw = data.get("genres", [])
     genero = ", ".join(g["name"] for g in generos_raw) if generos_raw else ""
@@ -375,12 +281,11 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
     imagen_url = f"{TMDB_IMG}{poster_path}" if poster_path else ""
     sinopsis = data.get("overview") or ""
     rating = round(data.get("vote_average", 0), 1)
-
     return {
         "titulo":    titulo,
         "tipo":      tipo,
         "genero":    genero,
-        "año":       año,       # ← con ñ
+        "año":       año,
         "imagen_url": imagen_url,
         "sinopsis":  sinopsis,
         "rating":    rating,
@@ -388,8 +293,6 @@ def importar_desde_tmdb(tmdb_id: int, tipo: str) -> dict:
         "disponible": True,
         "destacado": False,
     }
-
-# ============ TEMPORADAS — IMPORTACIÓN DESDE TMDB ============
 
 def importar_temporadas_desde_tmdb(tmdb_id: int, contenido_id: int) -> dict:
     data = tmdb_get(f"/tv/{tmdb_id}")
@@ -414,7 +317,6 @@ def importar_temporadas_desde_tmdb(tmdb_id: int, contenido_id: int) -> dict:
             "enlace":       None,
         }).execute()
         insertadas.append(num)
-    print(f"Temporadas {contenido_id}: insertadas={insertadas}")
     return {"insertadas": len(insertadas), "omitidas": len(omitidas), "numeros": insertadas}
 
 # ============ ENVÍO A CANALES ============
@@ -433,7 +335,7 @@ def construir_caption(item: dict) -> str:
     estrellas = generar_estrellas(float(rating))
     rating_str = f"{rating:.1f}/10" if rating else "N/D"
     generos  = item.get("genero") or "Sin género"
-    año      = item.get("año") or "—"   # ← con ñ
+    año      = item.get("año") or "—"
     titulo   = item.get("titulo") or "Sin título"
     sinopsis = item.get("sinopsis") or ""
     if len(sinopsis) > 200:
@@ -450,10 +352,6 @@ def construir_caption(item: dict) -> str:
     )
 
 def construir_botones_canal(item: dict) -> InlineKeyboardMarkup:
-    """
-    En canales SOLO se puede usar url=, NO web_app= (Telegram lo rechaza).
-    Usamos deep-links al bot.
-    """
     markup = InlineKeyboardMarkup(row_width=2)
     btn_miniapp = InlineKeyboardButton(
         "🎬 Ver en Mini App",
@@ -467,23 +365,11 @@ def construir_botones_canal(item: dict) -> InlineKeyboardMarkup:
     return markup
 
 def _enviar_a_un_canal(canal_id, caption, markup, imagen):
-    """Envía a un canal específico. Retorna True/False con log detallado."""
     try:
         if imagen:
-            bot.send_photo(
-                chat_id=canal_id,
-                photo=imagen,
-                caption=caption,
-                parse_mode="Markdown",
-                reply_markup=markup
-            )
+            bot.send_photo(chat_id=canal_id, photo=imagen, caption=caption, parse_mode="Markdown", reply_markup=markup)
         else:
-            bot.send_message(
-                chat_id=canal_id,
-                text=caption,
-                parse_mode="Markdown",
-                reply_markup=markup
-            )
+            bot.send_message(chat_id=canal_id, text=caption, parse_mode="Markdown", reply_markup=markup)
         print(f"✅ Enviado a {canal_id}")
         return True
     except Exception as e:
@@ -491,7 +377,6 @@ def _enviar_a_un_canal(canal_id, caption, markup, imagen):
         return False
 
 def enviar_contenido_al_canal(item: dict):
-    """Envía a AMBOS canales de difusión. Retorna True si al menos uno funcionó."""
     caption = construir_caption(item)
     markup  = construir_botones_canal(item)
     imagen  = item.get("imagen_url", "")
@@ -502,58 +387,28 @@ def enviar_contenido_al_canal(item: dict):
 # ============ PROGRAMADOR AUTOMÁTICO 3x DÍA ============
 
 def obtener_siguiente_contenido_a_publicar():
-    """
-    Devuelve el próximo ítem disponible a publicar.
-    
-    Lógica anti-repetición TOTAL:
-    - Nunca repite un contenido que ya fue publicado alguna vez.
-    - Cuando se agotan todos (se publicó todo el catálogo), reinicia
-      el ciclo borrando el historial y empieza desde el más reciente.
-    - Dentro del mismo día Lima (UTC-5) nunca publica el mismo contenido
-      dos veces (protección extra para el cron 3x día).
-    """
     ahora_lima = datetime.now(LIMA_TZ)
     print(f"DEBUG cron: ahora Lima={ahora_lima.strftime('%Y-%m-%d %H:%M')}")
-
-    # 1. Todos los IDs ya publicados en la historia completa
-    todos_publicados = supabase_service.table("publicaciones_canal") \
-        .select("contenido_id") \
-        .execute()
+    todos_publicados = supabase_service.table("publicaciones_canal").select("contenido_id").execute()
     ids_historicos = list({p["contenido_id"] for p in todos_publicados.data})
     print(f"DEBUG cron: publicados históricos: {len(ids_historicos)} ítems")
-
-    # 2. Cuántos contenidos hay en total disponibles
-    total_res = supabase_service.table("contenido") \
-        .select("id", count="exact") \
-        .eq("disponible", True) \
-        .execute()
+    total_res = supabase_service.table("contenido").select("id", count="exact").eq("disponible", True).execute()
     total_disponibles = total_res.count or 0
-
-    # 3. Si ya se publicó todo el catálogo → reiniciar historial
     if len(ids_historicos) >= total_disponibles and total_disponibles > 0:
         print(f"🔄 Catálogo completo publicado ({total_disponibles} ítems). Reiniciando ciclo...")
         supabase_service.table("publicaciones_canal").delete().neq("id", 0).execute()
         ids_historicos = []
-
-    # 4. Buscar el siguiente no publicado aún
-    query = supabase_service.table("contenido") \
-        .select("*") \
-        .eq("disponible", True)
-
+    query = supabase_service.table("contenido").select("*").eq("disponible", True)
     for excluido_id in ids_historicos:
         query = query.neq("id", excluido_id)
-
     resultado = query.order("año", desc=True).order("id", desc=True).limit(1).execute()
-    
     if resultado.data:
         print(f"DEBUG cron: siguiente a publicar: {resultado.data[0]['titulo']} (id={resultado.data[0]['id']})")
     else:
         print("DEBUG cron: sin contenido disponible")
-    
     return resultado.data[0] if resultado.data else None
 
 def registrar_publicacion(contenido_id: int):
-    """Guarda en BD que este contenido fue publicado (con timestamp UTC)."""
     try:
         supabase_service.table("publicaciones_canal").insert({
             "contenido_id": contenido_id,
@@ -563,26 +418,41 @@ def registrar_publicacion(contenido_id: int):
     except Exception as e:
         print(f"⚠️ Error registrando publicación: {e}")
 
+# ============================================================
+# FIX NOTIFICACIONES — nombres de columna corregidos
+# Las columnas reales en Supabase son:
+#   notificacion_3dias_enviada (boolean)
+#   notificacion_3hora         (boolean)
+#   notificacion_vencida_enviada (boolean)
+# ============================================================
+
 def _marcar_notif(usuario_id: int, campo: str):
-    """Marca que la notificación fue enviada guardando el timestamp."""
+    """
+    Marca una notificación como enviada (True) en la tabla usuarios.
+    FIX: nombres de columna corregidos para que coincidan con Supabase.
+    """
     try:
         supabase_service.table("usuarios").update({
-            campo: datetime.now(timezone.utc).isoformat()
+            campo: True   # ← boolean True, no timestamp
         }).eq("id", usuario_id).execute()
+        print(f"✅ Notificación '{campo}' marcada para usuario {usuario_id}")
     except Exception as e:
-        print(f"⚠️ Error marcando notificación {campo}: {e}")
+        print(f"⚠️ Error marcando notificación {campo} para usuario {usuario_id}: {e}")
 
 def _resetear_notifs(usuario_id: int):
-    """Al renovar/activar membresía, limpia los flags para el nuevo período."""
+    """
+    Al renovar/activar membresía resetea los flags a False para el nuevo período.
+    FIX: nombres de columna corregidos para que coincidan con Supabase.
+    """
     try:
         supabase_service.table("usuarios").update({
-            "notif_3dias_en":   None,
-            "notif_3h_en":      None,
-            "notif_vencida_en": None,
+            "notificacion_3dias_enviada":  False,   # ← nombre real en Supabase
+            "notificacion_3hora":          False,   # ← nombre real en Supabase
+            "notificacion_vencida_enviada": False,  # ← nombre real en Supabase
         }).eq("id", usuario_id).execute()
         print(f"✅ Flags de notificación reseteados para usuario {usuario_id}")
     except Exception as e:
-        print(f"⚠️ Error reseteando flags: {e}")
+        print(f"⚠️ Error reseteando flags para usuario {usuario_id}: {e}")
 
 # ============ MENÚ PRINCIPAL ============
 
@@ -822,7 +692,6 @@ def soporte_archivos(message):
 
 # ============ RESPUESTA DESDE GRUPO SOPORTE ============
 
-# Mapa: forward_msg_id → telegram_id del usuario (para privacidad)
 _fwd_map = {}
 
 def _guardar_fwd(fwd_msg_id, user_id):
@@ -833,13 +702,10 @@ def _guardar_fwd(fwd_msg_id, user_id):
 def _uid_desde_reply(message):
     origen = message.reply_to_message
     if not origen: return None
-    # 1. forward_from disponible (sin privacidad)
     if origen.forward_from:
         return origen.forward_from.id
-    # 2. Buscamos en nuestro mapa por message_id del forward
     uid = _fwd_map.get(origen.message_id)
     if uid: return uid
-    # 3. Buscar ID en el texto/caption del mensaje forwarded (ej: vouchers "Usuario: 12345")
     texto = origen.caption or origen.text or ""
     m = re.search(r'Usuario[:\s]+(\d{5,})', texto)
     if m: return int(m.group(1))
@@ -850,7 +716,6 @@ def _uid_desde_reply(message):
     func=lambda m: m.chat.id == GRUPO_SOPORTE_ID and m.reply_to_message is not None
 )
 def responder_desde_grupo(message):
-    """Tú escribes en el grupo de soporte → el bot le manda tu respuesta al usuario."""
     try:
         uid = _uid_desde_reply(message)
         if not uid:
@@ -875,7 +740,6 @@ def responder_desde_grupo(message):
         bot.reply_to(message, f"✅ Enviado al usuario {uid}.")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {e}")
-
 
 # ============ TEXTO LIBRE ============
 
@@ -1032,9 +896,10 @@ def activar_usuario(user_id, membresia, chat_id_admin):
         }, on_conflict='telegram_id').execute()
 
         usuario_id = supabase_service.table('usuarios').select('id').eq('telegram_id', user_id).execute().data[0]['id']
-        # ✅ CRÍTICO: Resetear flags de notificación para el nuevo período
+
+        # ✅ Resetear flags de notificación para el nuevo período
         _resetear_notifs(usuario_id)
-        
+
         supabase_service.table('membresias_activas').update({"estado": "inactiva"}) \
             .eq('usuario_id', usuario_id).eq('estado', 'activa').execute()
         supabase_service.table('membresias_activas').insert({
@@ -1045,13 +910,15 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             "monto": plan_data['precio_soles'], "pedidos_extra": pedidos_extra
         }).execute()
 
+        # ✅ FIX: SIEMPRE desbanear antes de enviar enlaces,
+        # sin importar si tiene_activa es True o False.
+        # Si el usuario renovó tarde (ya fue baneado por vencimiento),
+        # el unban es necesario para que el enlace de invitación funcione.
+        # Si nunca fue baneado, unban_chat_member lo ignora sin errores.
+        desbanear_usuario(user_id)
+
         if not tiene_activa:
             try:
-                # ✅ SIEMPRE desbanear primero — si renovó después de vencer,
-                # el usuario estará en la lista de expulsados y los enlaces no funcionarán
-                # sin el unban. Si nunca fue baneado, unban lo ignora sin error.
-                desbanear_usuario(user_id)
-
                 exp = int(time.time()) + 604800  # 7 días
                 inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{user_id}_pelis",  member_limit=1, expire_date=exp)
                 inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{user_id}_series", member_limit=1, expire_date=exp)
@@ -1060,9 +927,8 @@ def activar_usuario(user_id, membresia, chat_id_admin):
                 markup.add(
                     InlineKeyboardButton("🎬 Canal de Películas", url=inv_pelis.invite_link),
                     InlineKeyboardButton("📺 Canal de Series",    url=inv_series.invite_link),
-                    InlineKeyboardButton("📘 Grupo Bíblico Vip",      url=inv_grupo.invite_link),
+                    InlineKeyboardButton("📘 Grupo Bíblico Vip",  url=inv_grupo.invite_link),
                 )
-                # 4to canal (anime) — solo si está configurado
                 if CANAL_ANIME_ID:
                     try:
                         inv_anime = bot.create_chat_invite_link(CANAL_ANIME_ID, name=f"U{user_id}_anime", member_limit=1, expire_date=exp)
@@ -1080,7 +946,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
             except Exception as e:
                 bot.send_message(chat_id_admin, f"⚠️ Membresía activada pero error con enlaces: {e}")
         else:
-            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} mejoró a {membresia} (ya está en canales, sin nuevos enlaces)")
+            bot.send_message(chat_id_admin, f"✅ Usuario {user_id} mejoró a {membresia} (ya está en canales, se hizo unban preventivo)")
 
         total_pedidos = limite_pedidos_nuevo + pedidos_extra
         if es_mejora:
@@ -1179,7 +1045,7 @@ def generar_enlaces(message):
         bot.reply_to(message, "❌ Usa: /generar_enlaces USER_ID"); return
     try:
         uid = int(partes[1])
-        desbanear_usuario(uid)  # eliminar de expulsados si aplica antes de crear enlaces
+        desbanear_usuario(uid)
         exp_ts = int(time.time()) + 604800
         inv_pelis  = bot.create_chat_invite_link(CANAL_PELICULAS_ID, name=f"U{uid}_pelis",  member_limit=1, expire_date=exp_ts)
         inv_series = bot.create_chat_invite_link(CANAL_SERIES_ID,    name=f"U{uid}_series", member_limit=1, expire_date=exp_ts)
@@ -1223,9 +1089,6 @@ def get_id(message):
 
 @bot.message_handler(commands=['reply'])
 def reply_directo(message):
-    """Fallback para cuando Telegram bloquea forward_from por privacidad.
-    Úsalo en el grupo de soporte: /reply 5824989040 Tu respuesta aquí
-    """
     if message.chat.id != GRUPO_SOPORTE_ID and message.from_user.id != ADMIN_ID:
         return
     partes = message.text.split(None, 2)
@@ -1243,7 +1106,6 @@ def reply_directo(message):
 
 @bot.message_handler(commands=['publicar'])
 def publicar_manual(message):
-    """Publica manualmente en los canales de difusión: /publicar ID_CONTENIDO"""
     if message.from_user.id != ADMIN_ID:
         return
     partes = message.text.split()
@@ -1251,12 +1113,10 @@ def publicar_manual(message):
         bot.reply_to(message, "❌ Usa: /publicar ID_CONTENIDO"); return
     try:
         cid = int(partes[1])
-        print(f"🔧 /publicar solicitado para contenido_id={cid}")
         res = supabase_service.table("contenido").select("*").eq("id", cid).execute()
         if not res.data:
             bot.reply_to(message, f"❌ Contenido {cid} no encontrado"); return
         item = res.data[0]
-        print(f"🔧 Publicando: {item['titulo']} | imagen: {item.get('imagen_url','(sin imagen)')[:60]}")
         bot.reply_to(message, f"⏳ Publicando '{item['titulo']}' en los canales...")
         ok = enviar_contenido_al_canal(item)
         if ok:
@@ -1266,13 +1126,11 @@ def publicar_manual(message):
             bot.reply_to(message,
                 f"❌ Error al publicar.\n"
                 f"Verifica que el bot @{BOT_USERNAME} sea admin en:\n"
-                f"• {CANAL_PUBLICO_ID}\n"
-                f"• {CANAL_PRIVADO_ID}"
+                f"• {CANAL_PUBLICO_ID}\n• {CANAL_PRIVADO_ID}"
             )
     except ValueError:
         bot.reply_to(message, "❌ El ID debe ser un número. Ej: /publicar 428")
     except Exception as e:
-        print(f"❌ Excepción en /publicar: {e}")
         bot.reply_to(message, f"❌ Error inesperado: {e}")
 
 # ============ FLASK APP ============
@@ -1281,7 +1139,6 @@ from marketing import marketing_bp, init_marketing, enviar_email as _enviar_emai
 app = Flask(__name__)
 CORS(app)
 
-# Registrar módulo de marketing
 app.register_blueprint(marketing_bp)
 init_marketing(supabase_service, bot, ADMIN_ID, BOT_USERNAME)
 
@@ -1423,7 +1280,7 @@ def marcar_entregado():
     if not check_admin(data):
         return jsonify({"error": "No autorizado"}), 403
 
-    pedido_id  = data.get("pedido_id")
+    pedido_id    = data.get("pedido_id")
     nuevo_estado = data.get("estado", "entregado")
 
     estados_validos = ("recibido", "en_proceso", "entregado")
@@ -1441,7 +1298,6 @@ def marcar_entregado():
 
     supabase_service.table("pedidos").update(update_data).eq("id", pedido_id).execute()
 
-    # Mensaje al usuario por cada estado
     titulo = pedido.get("titulo_pedido", "tu pedido")
     mensajes = {
         "recibido":   f"👀 *Pedido recibido*\n\nHemos recibido tu solicitud de *{titulo}*.\nEstamos revisándola, te avisamos pronto.",
@@ -1484,7 +1340,6 @@ def mis_pedidos():
 def api_importar_tmdb():
     try:
         data = request.get_json(force=True, silent=True) or {}
-        print(f"DEBUG importar_tmdb recibido: {data}")
         try:
             admin_id = int(data.get("admin_id", 0))
         except (ValueError, TypeError):
@@ -1494,7 +1349,6 @@ def api_importar_tmdb():
         except (ValueError, TypeError):
             tmdb_id = 0
         tipo = str(data.get("tipo", "pelicula")).lower().strip()
-        print(f"DEBUG parsed: admin_id={admin_id}, ADMIN_ID={ADMIN_ID}, tmdb_id={tmdb_id}, tipo={tipo}")
         if admin_id != ADMIN_ID:
             return jsonify({"error": f"No autorizado (got {admin_id}, expected {ADMIN_ID})"}), 403
         if not tmdb_id:
@@ -1510,19 +1364,14 @@ def api_importar_tmdb():
         resultado = supabase_service.table("contenido").insert(contenido).execute()
         nuevo_id  = resultado.data[0]["id"] if resultado.data else None
         return jsonify({
-            "success": True,
-            "id": nuevo_id,
-            "titulo": contenido["titulo"],
-            "tipo": contenido["tipo"],
-            "año": contenido["año"],
-            "genero": contenido["genero"],
-            "rating": contenido["rating"],
-            "imagen_url": contenido["imagen_url"],
+            "success": True, "id": nuevo_id,
+            "titulo": contenido["titulo"], "tipo": contenido["tipo"],
+            "año": contenido["año"], "genero": contenido["genero"],
+            "rating": contenido["rating"], "imagen_url": contenido["imagen_url"],
         }), 200
     except requests.HTTPError as e:
         return jsonify({"error": f"TMDB error: {e.response.status_code}"}), 400
     except Exception as e:
-        print("❌ Error importar_tmdb:", e)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/admin/contenido", methods=["POST"])
@@ -1541,10 +1390,6 @@ def api_admin_contenido():
 
 @app.route("/api/admin/publicar", methods=["POST"])
 def api_admin_publicar():
-    """
-    Publica manualmente un contenido desde el panel web admin.
-    Body: { "admin_id": 123, "contenido_id": 428 }
-    """
     try:
         data = request.get_json(force=True, silent=True) or {}
         if not check_admin(data):
@@ -1556,24 +1401,17 @@ def api_admin_publicar():
         if not res.data:
             return jsonify({"error": f"Contenido {contenido_id} no encontrado"}), 404
         item = res.data[0]
-        print(f"🔧 Publicación manual via API: {item['titulo']} (id={contenido_id})")
         ok = enviar_contenido_al_canal(item)
         if ok:
             registrar_publicacion(contenido_id)
             return jsonify({"success": True, "titulo": item["titulo"]}), 200
         else:
-            return jsonify({"error": "No se pudo enviar a ningún canal. Verifica que el bot sea admin."}), 500
+            return jsonify({"error": "No se pudo enviar a ningún canal."}), 500
     except Exception as e:
-        print(f"❌ Error api_admin_publicar: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/admin/importar_temporadas", methods=["POST"])
 def api_importar_temporadas():
-    """
-    Importa temporadas desde TMDB para una serie/anime ya existente.
-    Body: { admin_id, contenido_id }
-    El contenido debe tener tmdb_id guardado.
-    """
     try:
         data = request.get_json(force=True, silent=True) or {}
         if not check_admin(data):
@@ -1581,42 +1419,33 @@ def api_importar_temporadas():
         contenido_id = int(data.get("contenido_id", 0))
         if not contenido_id:
             return jsonify({"error": "contenido_id requerido"}), 400
-
         contenido_res = supabase_service.table("contenido").select("*").eq("id", contenido_id).execute()
         if not contenido_res.data:
             return jsonify({"error": "Contenido no encontrado"}), 404
         contenido = contenido_res.data[0]
-
         if contenido.get("tipo") not in ("serie", "anime"):
             return jsonify({"error": "Solo se pueden importar temporadas de series o anime"}), 400
-
         tmdb_id = contenido.get("tmdb_id")
         if not tmdb_id:
-            return jsonify({"error": "Este contenido no tiene tmdb_id. Reimportalo desde TMDB."}), 400
-
+            return jsonify({"error": "Este contenido no tiene tmdb_id."}), 400
         resultado = importar_temporadas_desde_tmdb(int(tmdb_id), contenido_id)
         return jsonify({"success": True, **resultado}), 200
     except requests.HTTPError as e:
         return jsonify({"error": f"TMDB error {e.response.status_code}"}), 400
     except Exception as e:
-        print(f"❌ importar_temporadas: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/temporadas/<int:contenido_id>", methods=["GET"])
 def api_get_temporadas(contenido_id):
-    """Devuelve todas las temporadas de un contenido. Público."""
     try:
-        res = supabase_service.table("temporadas")             .select("*").eq("contenido_id", contenido_id)             .order("numero").execute()
+        res = supabase_service.table("temporadas") \
+            .select("*").eq("contenido_id", contenido_id).order("numero").execute()
         return jsonify({"temporadas": res.data}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/admin/temporadas/enlace", methods=["POST"])
 def api_actualizar_enlace_temporada():
-    """
-    Actualiza el enlace de reproducción de una temporada específica.
-    Body: { admin_id, temporada_id, enlace }
-    """
     try:
         data = request.get_json(force=True, silent=True) or {}
         if not check_admin(data):
@@ -1625,14 +1454,13 @@ def api_actualizar_enlace_temporada():
         enlace       = data.get("enlace", "").strip()
         if not temporada_id:
             return jsonify({"error": "temporada_id requerido"}), 400
-        supabase_service.table("temporadas")             .update({"enlace": enlace or None})             .eq("id", temporada_id).execute()
+        supabase_service.table("temporadas").update({"enlace": enlace or None}).eq("id", temporada_id).execute()
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/admin/temporadas/delete", methods=["POST"])
 def api_eliminar_temporada():
-    """Elimina una temporada. Body: { admin_id, temporada_id }"""
     try:
         data = request.get_json(force=True, silent=True) or {}
         if not check_admin(data):
@@ -1645,34 +1473,18 @@ def api_eliminar_temporada():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-
 # ============================================================
-# WEBHOOK — PAYPAL REST (PAGOS ÚNICOS + SUSCRIPCIONES)
+# WEBHOOK PAYPAL
 # ============================================================
-
 
 @app.route("/webhook/paypal", methods=["POST"])
 def webhook_paypal():
-    """
-    Recibe eventos de PayPal REST API.
-    Configurar en developer.paypal.com → Apps → Webhooks:
-      URL:    https://cineapp-bot.onrender.com/webhook/paypal
-      Eventos:
-        - PAYMENT.CAPTURE.COMPLETED       (pago único)
-        - PAYMENT.CAPTURE.DENIED
-        - BILLING.SUBSCRIPTION.ACTIVATED  (suscripción nueva)
-        - BILLING.SUBSCRIPTION.RENEWED    (renovación mensual)
-        - BILLING.SUBSCRIPTION.CANCELLED  (cancelación)
-        - BILLING.SUBSCRIPTION.SUSPENDED  (suspendida por fallo de cobro)
-    """
     try:
         body_bytes = request.get_data()
         data       = request.get_json(force=True, silent=True) or {}
         event_type = data.get("event_type", "")
         print(f"DEBUG PayPal webhook event: {event_type}")
 
-        # ESTE BLOQUE NUEVO
         if event_type == "BILLING.SUBSCRIPTION.CREATED":
             print("ℹ️ Suscripción creada")
             return jsonify({"success": True}), 200
@@ -1680,130 +1492,91 @@ def webhook_paypal():
         if not paypal_verificar_webhook(request.headers, body_bytes):
             return jsonify({"error": "Verificación fallida"}), 400
 
-        # ── PAGO ÚNICO ──────────────────────────────────────────
         if event_type == "PAYMENT.CAPTURE.COMPLETED":
             resource    = data.get("resource", {})
             custom_id   = resource.get("custom_id", "")
             payer_email = (resource.get("payer", {}) or {}).get("email_address", "")
             amount      = resource.get("amount", {}).get("value", "0")
-
             if not custom_id:
                 units     = resource.get("purchase_units", [{}])
                 custom_id = units[0].get("custom_id", "") if units else ""
-
             partes = custom_id.split("|")
             if len(partes) < 2:
-                print(f"⚠️ custom_id malformado: {custom_id}")
                 return jsonify({"error": "custom_id inválido"}), 400
-
             telegram_id = int(partes[0])
             plan        = partes[1].lower()
-            print(f"✅ PayPal pago único: {telegram_id} → {plan} (${amount})")
-
             if payer_email:
-                supabase_service.table("usuarios").update({"email": payer_email}) \
-                    .eq("telegram_id", telegram_id).execute()
-
+                supabase_service.table("usuarios").update({"email": payer_email}).eq("telegram_id", telegram_id).execute()
             supabase_service.table("pagos_manuales").insert({
-                "usuario_id":           telegram_id,
-                "membresia_comprada":   plan,
-                "monto":                float(amount),
-                "metodo":               "paypal",
-                "estado":               "aprobado",
-                "activado":             False,
-                "email":                payer_email or None,
-                "fecha_pago":           datetime.now().isoformat(),
-                "recordatorio_enviado": True,
+                "usuario_id": telegram_id, "membresia_comprada": plan,
+                "monto": float(amount), "metodo": "paypal",
+                "estado": "aprobado", "activado": False,
+                "email": payer_email or None,
+                "fecha_pago": datetime.now().isoformat(), "recordatorio_enviado": True,
             }).execute()
-
             ok = activar_usuario(telegram_id, plan, ADMIN_ID)
             if ok:
-                supabase_service.table("pagos_manuales") \
-                    .update({"activado": True}) \
+                supabase_service.table("pagos_manuales").update({"activado": True}) \
                     .eq("usuario_id", telegram_id).eq("metodo", "paypal") \
                     .eq("estado", "aprobado").eq("activado", False).execute()
                 if payer_email:
-                    nr = supabase_service.table("usuarios").select("nombre") \
-                        .eq("telegram_id", telegram_id).execute()
+                    nr = supabase_service.table("usuarios").select("nombre").eq("telegram_id", telegram_id).execute()
                     nombre = nr.data[0]["nombre"] if nr.data else "VIP"
                     _enviar_email_mkt(payer_email, "🎉 ¡Membresía activada!", _html_bienvenida_mkt(nombre, plan, BOT_USERNAME))
 
-        # ── SUSCRIPCIÓN ACTIVADA O RENOVADA ────────────────────
         elif event_type in ("BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.RENEWED"):
-            resource       = data.get("resource", {})
+            resource        = data.get("resource", {})
             subscription_id = resource.get("id", "")
-            custom_id      = resource.get("custom_id", "")
-            payer_email    = (resource.get("subscriber", {}) or {}).get("email_address", "")
-
+            custom_id       = resource.get("custom_id", "")
+            payer_email     = (resource.get("subscriber", {}) or {}).get("email_address", "")
             partes = custom_id.split("|") if custom_id else []
             if len(partes) < 2:
-                # Intentar obtener datos del subscriber
-                print(f"⚠️ Suscripción sin custom_id: {subscription_id}")
                 return jsonify({"received": True}), 200
-
             telegram_id = int(partes[0])
             plan        = partes[1].lower()
             amount_str  = PAYPAL_PRECIOS.get(plan, "0")
-            print(f"✅ PayPal suscripción {event_type}: {telegram_id} → {plan} (sub_id={subscription_id})")
-
             if payer_email:
                 supabase_service.table("usuarios").update({
-                    "email": payer_email,
-                    "paypal_subscription_id": subscription_id
+                    "email": payer_email, "paypal_subscription_id": subscription_id
                 }).eq("telegram_id", telegram_id).execute()
-
             supabase_service.table("pagos_manuales").insert({
-                "usuario_id":           telegram_id,
-                "membresia_comprada":   plan,
-                "monto":                float(amount_str),
-                "metodo":               "paypal_subscription",
-                "estado":               "aprobado",
-                "activado":             False,
-                "email":                payer_email or None,
-                "fecha_pago":           datetime.now().isoformat(),
-                "recordatorio_enviado": True,
+                "usuario_id": telegram_id, "membresia_comprada": plan,
+                "monto": float(amount_str), "metodo": "paypal_subscription",
+                "estado": "aprobado", "activado": False,
+                "email": payer_email or None,
+                "fecha_pago": datetime.now().isoformat(), "recordatorio_enviado": True,
             }).execute()
-
             ok = activar_usuario(telegram_id, plan, ADMIN_ID)
             if ok:
-                supabase_service.table("pagos_manuales") \
-                    .update({"activado": True}) \
+                supabase_service.table("pagos_manuales").update({"activado": True}) \
                     .eq("usuario_id", telegram_id).eq("metodo", "paypal_subscription") \
                     .eq("estado", "aprobado").eq("activado", False).execute()
                 if payer_email:
-                    nr = supabase_service.table("usuarios").select("nombre") \
-                        .eq("telegram_id", telegram_id).execute()
+                    nr = supabase_service.table("usuarios").select("nombre").eq("telegram_id", telegram_id).execute()
                     nombre = nr.data[0]["nombre"] if nr.data else "VIP"
                     _enviar_email_mkt(payer_email, "🎉 ¡Suscripción activada!", _html_bienvenida_mkt(nombre, plan, BOT_USERNAME))
-
                 tipo_msg = "renovada" if event_type == "BILLING.SUBSCRIPTION.RENEWED" else "activada"
                 try:
-                    bot.send_message(
-                        telegram_id,
+                    bot.send_message(telegram_id,
                         f"🔄 *¡Suscripción {tipo_msg}!*\n\n"
                         f"💎 Plan: *{plan.upper()}*\n"
-                        "📅 Tu membresía se renova automáticamente cada mes.\n\n"
+                        "📅 Tu membresía se renueva automáticamente cada mes.\n\n"
                         "Para cancelar en cualquier momento escribe /cancelar\\_suscripcion",
                         parse_mode="Markdown"
                     )
                 except Exception as e:
                     print(f"⚠️ No se pudo notificar a {telegram_id}: {e}")
 
-        # ── SUSCRIPCIÓN CANCELADA O SUSPENDIDA ─────────────────
         elif event_type in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.SUSPENDED"):
-            resource       = data.get("resource", {})
+            resource        = data.get("resource", {})
             subscription_id = resource.get("id", "")
-            custom_id      = resource.get("custom_id", "")
-
+            custom_id       = resource.get("custom_id", "")
             partes = custom_id.split("|") if custom_id else []
             if len(partes) >= 1:
                 try:
                     telegram_id = int(partes[0])
-                    # Desactivar membresía al vencer el período actual
-                    # (no se desactiva de inmediato — el usuario ya pagó hasta fin de período)
                     try:
-                        bot.send_message(
-                            telegram_id,
+                        bot.send_message(telegram_id,
                             "⚠️ *Suscripción cancelada*\n\n"
                             "Tu suscripción fue cancelada. Seguirás teniendo acceso hasta que venza tu período actual.\n\n"
                             "Puedes renovar cuando quieras desde la Mini App.",
@@ -1811,7 +1584,6 @@ def webhook_paypal():
                         )
                     except:
                         pass
-                    print(f"ℹ️ Suscripción {subscription_id} cancelada para {telegram_id}")
                 except Exception as e:
                     print(f"⚠️ Error procesando cancelación: {e}")
 
@@ -1823,7 +1595,6 @@ def webhook_paypal():
 
 @app.route("/paypal/success", methods=["GET"])
 def paypal_success():
-    """PayPal redirige aquí tras pago exitoso. El webhook ya activó la membresía."""
     return f"""<html><head><meta charset="utf-8">
     <meta http-equiv="refresh" content="3;url=https://t.me/{BOT_USERNAME}">
     <style>body{{font-family:Arial;background:#0d0d0f;color:#f0f0f2;display:flex;
@@ -1836,7 +1607,6 @@ def paypal_success():
 
 @app.route("/paypal/cancel", methods=["GET"])
 def paypal_cancel():
-    """PayPal redirige aquí si el usuario cancela."""
     return f"""<html><head><meta charset="utf-8">
     <meta http-equiv="refresh" content="3;url=https://t.me/{BOT_USERNAME}">
     <style>body{{font-family:Arial;background:#0d0d0f;color:#f0f0f2;display:flex;
@@ -1847,119 +1617,65 @@ def paypal_cancel():
     <p style="color:#666">No se realizó ningún cargo. Regresando al bot...</p>
     </div></body></html>""", 200
 
-# ============================================================
-# ENDPOINT — CREAR SUSCRIPCIÓN PAYPAL (RECURRENTE MENSUAL)
-# ============================================================
 @app.route("/api/admin/marketing/crear_pago_paypal", methods=["POST"])
 def api_crear_pago_paypal():
-    """
-    Crea una SUSCRIPCIÓN recurrente mensual via PayPal Subscriptions API.
-    Requiere configurar en Render los PAYPAL_PLAN_ID_* para cada plan.
-
-    Flujo:
-      1. Frontend llama aquí con { telegram_id, plan, email, modo }
-      2. Si modo == "suscripcion" → crea suscripción recurrente mensual
-      3. Si modo == "unico"       → crea orden de pago único (comportamiento anterior)
-      4. Devuelve { url } para redirigir al usuario a PayPal
-
-    Body: { telegram_id, plan, email, modo: "suscripcion"|"unico" }
-    """
     try:
         data        = request.get_json(force=True, silent=True) or {}
         telegram_id = data.get("telegram_id")
         plan        = data.get("plan", "").lower()
         email       = data.get("email", "")
-        modo        = data.get("modo", "unico")   # "suscripcion" o "unico"
-
+        modo        = data.get("modo", "unico")
         if not telegram_id or not plan:
             return jsonify({"error": "telegram_id y plan requeridos"}), 400
         if not PAYPAL_CLIENT_ID or not PAYPAL_CLIENT_SECRET:
             return jsonify({"error": "PayPal no configurado en el servidor"}), 500
-
         if email:
-            supabase_service.table("usuarios").update({"email": email}) \
-                .eq("telegram_id", telegram_id).execute()
-
+            supabase_service.table("usuarios").update({"email": email}).eq("telegram_id", telegram_id).execute()
         if modo == "suscripcion":
-            # ── Suscripción recurrente mensual ──────────────────
             plan_id = PAYPAL_PLAN_IDS.get(plan, "")
             if not plan_id:
                 return jsonify({
                     "error": f"Suscripción no configurada para el plan '{plan}'. "
                              f"Agrega PAYPAL_PLAN_ID_{plan.upper()} en Render."
                 }), 400
-
             sub = paypal_crear_suscripcion(plan, int(telegram_id), email)
-
             supabase_service.table("pagos_manuales").insert({
-                "usuario_id":           telegram_id,
-                "membresia_comprada":   plan,
-                "monto":                float(PAYPAL_PRECIOS.get(plan, 0)),
-                "metodo":               "paypal_subscription",
-                "estado":               "pendiente_webhook",
-                "activado":             False,
-                "email":                email or None,
-                "fecha_pago":           datetime.now().isoformat(),
-                "recordatorio_enviado": False,
+                "usuario_id": telegram_id, "membresia_comprada": plan,
+                "monto": float(PAYPAL_PRECIOS.get(plan, 0)),
+                "metodo": "paypal_subscription", "estado": "pendiente_webhook",
+                "activado": False, "email": email or None,
+                "fecha_pago": datetime.now().isoformat(), "recordatorio_enviado": False,
             }).execute()
-
-            print(f"✅ Suscripción PayPal creada: {sub['subscription_id']} para {telegram_id}|{plan}")
-            return jsonify({
-                "success": True,
-                "url":             sub["approve_url"],
-                "subscription_id": sub["subscription_id"],
-                "tipo":            "suscripcion"
-            }), 200
-
+            return jsonify({"success": True, "url": sub["approve_url"], "subscription_id": sub["subscription_id"], "tipo": "suscripcion"}), 200
         else:
-            # ── Pago único (comportamiento original) ───────────
             orden = paypal_crear_orden(plan, int(telegram_id), email)
-
             supabase_service.table("pagos_manuales").insert({
-                "usuario_id":           telegram_id,
-                "membresia_comprada":   plan,
-                "monto":                float(PAYPAL_PRECIOS.get(plan, 0)),
-                "metodo":               "paypal",
-                "estado":               "pendiente_webhook",
-                "activado":             False,
-                "email":                email or None,
-                "fecha_pago":           datetime.now().isoformat(),
-                "recordatorio_enviado": False,
+                "usuario_id": telegram_id, "membresia_comprada": plan,
+                "monto": float(PAYPAL_PRECIOS.get(plan, 0)),
+                "metodo": "paypal", "estado": "pendiente_webhook",
+                "activado": False, "email": email or None,
+                "fecha_pago": datetime.now().isoformat(), "recordatorio_enviado": False,
             }).execute()
-
-            print(f"✅ Orden PayPal creada: {orden['order_id']} para {telegram_id}|{plan}")
-            return jsonify({
-                "success":  True,
-                "url":      orden["approve_url"],
-                "order_id": orden["order_id"],
-                "tipo":     "unico"
-            }), 200
-
+            return jsonify({"success": True, "url": orden["approve_url"], "order_id": orden["order_id"], "tipo": "unico"}), 200
     except requests.HTTPError as e:
-        print(f"❌ PayPal API error: {e.response.text}")
         return jsonify({"error": f"PayPal API error {e.response.status_code}"}), 400
     except Exception as e:
         print(f"❌ crear_pago_paypal: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/cron/publicar_contenido", methods=["GET"])
 def cron_publicar_contenido():
     try:
         item = obtener_siguiente_contenido_a_publicar()
         if not item:
-            print("ℹ️ No hay contenido disponible para publicar hoy")
             return jsonify({"message": "Sin contenido disponible"}), 200
         ok = enviar_contenido_al_canal(item)
         if ok:
             registrar_publicacion(item["id"])
-            print(f"✅ Publicado automáticamente: {item['titulo']}")
             return jsonify({"success": True, "titulo": item["titulo"]}), 200
         else:
-            print(f"❌ No se pudo enviar a ningún canal: {item['titulo']}")
-            return jsonify({"error": "No se pudo enviar a ningún canal. Verifica que el bot sea admin en ambos canales."}), 500
+            return jsonify({"error": "No se pudo enviar a ningún canal."}), 500
     except Exception as e:
-        import traceback
         tb = traceback.format_exc()
         print(f"❌ Error en cron publicar: {e}\n{tb}")
         return jsonify({"error": str(e), "traceback": tb}), 500
@@ -1970,45 +1686,127 @@ def cron_verificar_vencimientos():
         verificar_vencimientos()
         return "OK", 200
     except Exception as e:
+        print(f"❌ Error en cron vencimientos: {e}")
         return "Error", 500
 
+# ============================================================
+# FIX COMPLETO: verificar_vencimientos
+# Bugs corregidos:
+# 1. Ahora filtra por notificacion_3dias_enviada=False antes de enviar
+#    → evita reenvíos cada 10 min cuando el cron pasa repetidamente
+# 2. Llama a _marcar_notif() después de enviar cada tipo de notificación
+#    → marca el flag en Supabase para que no se reenvíe
+# 3. Nombres de columnas corregidos (notificacion_3dias_enviada, notificacion_3hora, notificacion_vencida_enviada)
+# 4. Ban al vencer + desbanear al renovar ya funciona correctamente
+# ============================================================
 def verificar_vencimientos():
-    ahora = datetime.now()
-    hoy   = ahora.isoformat()
-    en_3_dias = (ahora + timedelta(days=3)).isoformat()
-    proximos = supabase_service.table("usuarios").select("*") \
-        .eq("membresia_activa", True).gte("fecha_vencimiento", hoy).lte("fecha_vencimiento", en_3_dias).execute()
-    for u in proximos.data:
+    ahora    = datetime.now()
+    hoy      = ahora.isoformat()
+    en_3dias = (ahora + timedelta(days=3)).isoformat()
+    en_3h    = (ahora + timedelta(hours=3)).isoformat()
+
+    # ── NOTIFICACIÓN 3 DÍAS ────────────────────────────────────────────────
+    # FIX: filtrar solo usuarios que AÚN NO recibieron esta notificación
+    proximos_3dias = supabase_service.table("usuarios").select("*") \
+        .eq("membresia_activa", True) \
+        .eq("notificacion_3dias_enviada", False) \
+        .gte("fecha_vencimiento", hoy) \
+        .lte("fecha_vencimiento", en_3dias) \
+        .execute()
+
+    for u in proximos_3dias.data:
         try:
             vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
-            bot.send_message(u["telegram_id"], f"⏳ *Tu membresía vence en 3 días* ({vence}).\nRenueva para no perder el acceso.", parse_mode="Markdown")
-        except:
-            pass
-    en_3h = (ahora + timedelta(hours=3)).isoformat()
-    muy_proximos = supabase_service.table("usuarios").select("*") \
-        .eq("membresia_activa", True).gte("fecha_vencimiento", hoy).lte("fecha_vencimiento", en_3h).execute()
-    for u in muy_proximos.data:
+            bot.send_message(
+                u["telegram_id"],
+                f"⏳ *Tu membresía vence en 3 días* ({vence}).\n"
+                "Renueva para no perder el acceso.\n\n"
+                "👇 Presiona para renovar:",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💎 Renovar membresía",
+                        web_app=telebot.types.WebAppInfo(url=f"{MINIAPP_URL}?seccion=membresias"))
+                )
+            )
+            # FIX: marcar en Supabase con el nombre correcto de columna
+            _marcar_notif(u["id"], "notificacion_3dias_enviada")
+            print(f"✅ Notif 3días enviada a {u['telegram_id']}")
+        except Exception as e:
+            print(f"⚠️ Error notif 3días a {u['telegram_id']}: {e}")
+
+    # ── NOTIFICACIÓN 3 HORAS ───────────────────────────────────────────────
+    # FIX: filtrar solo usuarios que AÚN NO recibieron esta notificación
+    proximos_3h = supabase_service.table("usuarios").select("*") \
+        .eq("membresia_activa", True) \
+        .eq("notificacion_3hora", False) \
+        .gte("fecha_vencimiento", hoy) \
+        .lte("fecha_vencimiento", en_3h) \
+        .execute()
+
+    for u in proximos_3h.data:
         try:
             vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
-            bot.send_message(u["telegram_id"], f"⚠️ *¡Tu membresía vence en 3 horas!* ({vence}).\nRenueva para mantener el acceso.", parse_mode="Markdown")
-        except:
-            pass
+            bot.send_message(
+                u["telegram_id"],
+                f"⚠️ *¡Tu membresía vence en 3 horas!* ({vence}).\n"
+                "Renueva ahora para mantener el acceso sin interrupciones.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💎 Renovar ahora",
+                        web_app=telebot.types.WebAppInfo(url=f"{MINIAPP_URL}?seccion=membresias"))
+                )
+            )
+            # FIX: marcar en Supabase con el nombre correcto de columna
+            _marcar_notif(u["id"], "notificacion_3hora")
+            print(f"✅ Notif 3h enviada a {u['telegram_id']}")
+        except Exception as e:
+            print(f"⚠️ Error notif 3h a {u['telegram_id']}: {e}")
+
+    # ── VENCIMIENTOS (ban + notificación) ─────────────────────────────────
     vencidos = supabase_service.table("usuarios").select("*") \
-        .eq("membresia_activa", True).lt("fecha_vencimiento", hoy).execute()
+        .eq("membresia_activa", True) \
+        .lt("fecha_vencimiento", hoy) \
+        .execute()
+
     for u in vencidos.data:
-        supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
-        supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado","activa").execute()
-        for canal in CANALES_VIP:
-            try:
-                bot.ban_chat_member(chat_id=canal, user_id=u["telegram_id"])
-                print(f"🔨 Baneado {u['telegram_id']} de {canal}")
-            except Exception as e:
-                print(f"⚠️ Ban fallido {u['telegram_id']} en {canal}: {e}")
         try:
-            bot.send_message(u["telegram_id"], "❌ Tu membresía ha vencido. Renueva para seguir disfrutando.")
-        except:
-            pass
-    
+            # Desactivar membresía en BD
+            supabase_service.table("usuarios").update({"membresia_activa": False}) \
+                .eq("id", u["id"]).execute()
+            supabase_service.table("membresias_activas").update({"estado": "inactiva"}) \
+                .eq("usuario_id", u["id"]).eq("estado", "activa").execute()
+
+            # Banear de todos los canales VIP
+            for canal in CANALES_VIP:
+                try:
+                    bot.ban_chat_member(chat_id=canal, user_id=u["telegram_id"])
+                    print(f"🔨 Baneado {u['telegram_id']} de {canal}")
+                except Exception as e_ban:
+                    print(f"⚠️ Ban fallido {u['telegram_id']} en {canal}: {e_ban}")
+
+            # Notificar al usuario solo si no se notificó antes
+            if not u.get("notificacion_vencida_enviada", False):
+                try:
+                    bot.send_message(
+                        u["telegram_id"],
+                        "❌ *Tu membresía ha vencido.*\n\n"
+                        "Tu acceso a los canales ha sido suspendido.\n"
+                        "Renueva para volver a disfrutar del contenido.",
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup().add(
+                            InlineKeyboardButton("💎 Renovar membresía",
+                                web_app=telebot.types.WebAppInfo(url=f"{MINIAPP_URL}?seccion=membresias"))
+                        )
+                    )
+                    # FIX: marcar notificación de vencimiento enviada
+                    _marcar_notif(u["id"], "notificacion_vencida_enviada")
+                    print(f"✅ Notif vencida enviada a {u['telegram_id']}")
+                except Exception as e_msg:
+                    print(f"⚠️ No se pudo notificar vencimiento a {u['telegram_id']}: {e_msg}")
+
+        except Exception as e:
+            print(f"⚠️ Error procesando vencimiento de {u.get('telegram_id')}: {e}")
+
 
 @app.route("/api/usuario", methods=["POST"])
 def api_usuario():
@@ -2040,36 +1838,23 @@ def api_planes():
 
 @app.route("/api/contenido", methods=["POST"])
 def api_contenido():
-    data = request.get_json()
-
+    data     = request.get_json()
     busqueda = data.get("busqueda","")
-    tipo  = data.get("tipo","todo")
-    limit = int(data.get("limit",20))
-    offset = int(data.get("offset",0))
-
-    query = supabase_service.table("contenido") \
-        .select("*", count="exact") \
-        .eq("disponible", True)
-
+    tipo     = data.get("tipo","todo")
+    limit    = int(data.get("limit",20))
+    offset   = int(data.get("offset",0))
+    query = supabase_service.table("contenido").select("*", count="exact").eq("disponible", True)
     if tipo != "todo":
         query = query.eq("tipo", tipo)
-
     if busqueda:
         query = query.ilike("titulo", f"%{busqueda}%")
-
     genero = data.get("genero")
     if genero:
         query = query.ilike("genero", f"%{genero}%")
-
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
-
     resultados = query.order("id", desc=True).range(offset, offset+limit-1).execute()
-
-    return jsonify({
-        "data": resultados.data,
-        "total": resultados.count
-    })
+    return jsonify({"data": resultados.data, "total": resultados.count})
 
 @app.route("/api/admin/pagos", methods=["POST"])
 def api_admin_pagos():
@@ -2103,7 +1888,7 @@ def api_mis_pedidos():
 @app.route("/api/config/vimeus_key", methods=["GET"])
 def get_vimeus_key():
     view_key = os.getenv("VIMEUS_VIEW_KEY")
-    return jsonify({"view_key": view_key}) if view_key else jsonify({"error": "No configurada"}), 404
+    return jsonify({"view_key": view_key}) if view_key else (jsonify({"error": "No configurada"}), 404)
 
 @app.route("/api/tendencias", methods=["GET"])
 def api_tendencias():
