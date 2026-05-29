@@ -563,6 +563,27 @@ def registrar_publicacion(contenido_id: int):
     except Exception as e:
         print(f"⚠️ Error registrando publicación: {e}")
 
+def _marcar_notif(usuario_id: int, campo: str):
+    """Marca que la notificación fue enviada guardando el timestamp."""
+    try:
+        supabase_service.table("usuarios").update({
+            campo: datetime.now(timezone.utc).isoformat()
+        }).eq("id", usuario_id).execute()
+    except Exception as e:
+        print(f"⚠️ Error marcando notificación {campo}: {e}")
+
+def _resetear_notifs(usuario_id: int):
+    """Al renovar/activar membresía, limpia los flags para el nuevo período."""
+    try:
+        supabase_service.table("usuarios").update({
+            "notif_3dias_en":   None,
+            "notif_3h_en":      None,
+            "notif_vencida_en": None,
+        }).eq("id", usuario_id).execute()
+        print(f"✅ Flags de notificación reseteados para usuario {usuario_id}")
+    except Exception as e:
+        print(f"⚠️ Error reseteando flags: {e}")
+
 # ============ MENÚ PRINCIPAL ============
 
 def menu_principal(chat_id, user_name=""):
@@ -1945,135 +1966,49 @@ def cron_publicar_contenido():
 
 @app.route("/cron/verificar_vencimientos", methods=["GET"])
 def cron_verificar_vencimientos():
-    """
-    Puede correr cada 10 minutos sin spam gracias al sistema de flags.
-    Cada usuario recibe máximo 1 notificación de cada tipo por período.
-    """
     try:
         verificar_vencimientos()
-        return jsonify({"success": True, "message": "Verificación completada"}), 200
+        return "OK", 200
     except Exception as e:
-        tb = traceback.format_exc()
-        print(f"❌ cron vencimientos: {e}\n{tb}")
-        return jsonify({"error": str(e)}), 500
-    
-def _marcar_notif(usuario_id: int, campo: str):
-    """Marca que la notificación fue enviada guardando el timestamp."""
-    try:
-        supabase_service.table("usuarios").update({
-            campo: datetime.now(timezone.utc).isoformat()
-        }).eq("id", usuario_id).execute()
-    except Exception as e:
-        print(f"⚠️ Error marcando notificación {campo}: {e}")
-
-def _resetear_notifs(usuario_id: int):
-    """Al renovar/activar membresía, limpia los flags para el nuevo período."""
-    try:
-        supabase_service.table("usuarios").update({
-            "notif_3dias_en":   None,
-            "notif_3h_en":      None,
-            "notif_vencida_en": None,
-        }).eq("id", usuario_id).execute()
-        print(f"✅ Flags de notificación reseteados para usuario {usuario_id}")
-    except Exception as e:
-        print(f"⚠️ Error reseteando flags: {e}")
+        return "Error", 500
 
 def verificar_vencimientos():
-    """
-    Sistema anti-spam:
-    - Cada usuario recibe MÁXIMO 1 notificación de cada tipo por período.
-    - Al renovar, los flags se resetean automáticamente → nuevo período OK.
-    - Funciona aunque el cron corra cada 10 minutos sin generar spam.
-    """
-    ahora = datetime.now(timezone.utc)
+    ahora = datetime.now()
     hoy   = ahora.isoformat()
-
-    # ── 1. NOTIFICACIÓN 3 DÍAS ──────────────────────────────────────
     en_3_dias = (ahora + timedelta(days=3)).isoformat()
-    candidatos_3d = supabase_service.table("usuarios").select("*") \
-        .eq("membresia_activa", True) \
-        .gte("fecha_vencimiento", hoy) \
-        .lte("fecha_vencimiento", en_3_dias) \
-        .is_("notif_3dias_en", "null") \
-        .execute()
-
-    print(f"DEBUG notif: {len(candidatos_3d.data)} usuarios para alerta 3 días")
-    for u in candidatos_3d.data:
+    proximos = supabase_service.table("usuarios").select("*") \
+        .eq("membresia_activa", True).gte("fecha_vencimiento", hoy).lte("fecha_vencimiento", en_3_dias).execute()
+    for u in proximos.data:
         try:
-            vence = datetime.fromisoformat(u["fecha_vencimiento"].replace("Z","")).strftime("%d/%m/%Y")
-            bot.send_message(
-                u["telegram_id"],
-                f"⏳ *Tu membresía vence en 3 días* ({vence}).\n"
-                f"Renueva para no perder el acceso a los canales y la MiniApp.\n\n"
-                f"👉 /start → Ver Planes",
-                parse_mode="Markdown"
-            )
-            _marcar_notif(u["id"], "notif_3dias_en")
-            print(f"✅ Notif 3 días enviada → {u['telegram_id']}")
-        except Exception as e:
-            print(f"⚠️ Error notif 3 días a {u.get('telegram_id')}: {e}")
-
-    # ── 2. NOTIFICACIÓN 3 HORAS ─────────────────────────────────────
+            vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
+            bot.send_message(u["telegram_id"], f"⏳ *Tu membresía vence en 3 días* ({vence}).\nRenueva para no perder el acceso.", parse_mode="Markdown")
+        except:
+            pass
     en_3h = (ahora + timedelta(hours=3)).isoformat()
-    candidatos_3h = supabase_service.table("usuarios").select("*") \
-        .eq("membresia_activa", True) \
-        .gte("fecha_vencimiento", hoy) \
-        .lte("fecha_vencimiento", en_3h) \
-        .is_("notif_3h_en", "null") \
-        .execute()
-
-    print(f"DEBUG notif: {len(candidatos_3h.data)} usuarios para alerta 3 horas")
-    for u in candidatos_3h.data:
+    muy_proximos = supabase_service.table("usuarios").select("*") \
+        .eq("membresia_activa", True).gte("fecha_vencimiento", hoy).lte("fecha_vencimiento", en_3h).execute()
+    for u in muy_proximos.data:
         try:
-            vence = datetime.fromisoformat(u["fecha_vencimiento"].replace("Z","")).strftime("%d/%m/%Y %H:%M")
-            bot.send_message(
-                u["telegram_id"],
-                f"⚠️ *¡Tu membresía vence en menos de 3 horas!* ({vence}).\n"
-                f"Renueva ahora para mantener el acceso sin interrupciones.",
-                parse_mode="Markdown"
-            )
-            _marcar_notif(u["id"], "notif_3h_en")
-            print(f"✅ Notif 3h enviada → {u['telegram_id']}")
-        except Exception as e:
-            print(f"⚠️ Error notif 3h a {u.get('telegram_id')}: {e}")
-
-    # ── 3. MEMBRESÍAS VENCIDAS ───────────────────────────────────────
+            vence = datetime.fromisoformat(u["fecha_vencimiento"]).strftime("%d/%m/%Y %H:%M")
+            bot.send_message(u["telegram_id"], f"⚠️ *¡Tu membresía vence en 3 horas!* ({vence}).\nRenueva para mantener el acceso.", parse_mode="Markdown")
+        except:
+            pass
     vencidos = supabase_service.table("usuarios").select("*") \
-        .eq("membresia_activa", True) \
-        .lt("fecha_vencimiento", hoy) \
-        .execute()
-
-    print(f"DEBUG notif: {len(vencidos.data)} usuarios vencidos a procesar")
+        .eq("membresia_activa", True).lt("fecha_vencimiento", hoy).execute()
     for u in vencidos.data:
-        # Desactivar membresía
-        supabase_service.table("usuarios") \
-            .update({"membresia_activa": False}) \
-            .eq("id", u["id"]).execute()
-        supabase_service.table("membresias_activas") \
-            .update({"estado": "inactiva"}) \
-            .eq("usuario_id", u["id"]).eq("estado", "activa").execute()
-
-        # Expulsar de canales VIP
-        for canal in [CANAL_PELICULAS_ID, CANAL_SERIES_ID, GRUPO_CONTENIDO_ID, CANAL_ANIME_ID]:
+        supabase_service.table("usuarios").update({"membresia_activa": False}).eq("id", u["id"]).execute()
+        supabase_service.table("membresias_activas").update({"estado": "inactiva"}).eq("usuario_id", u["id"]).eq("estado","activa").execute()
+        for canal in CANALES_VIP:
             try:
                 bot.ban_chat_member(chat_id=canal, user_id=u["telegram_id"])
-            except Exception:
-                pass
-
-        # Enviar mensaje solo si no se envió ya (columna notif_vencida_en)
-        if not u.get("notif_vencida_en"):
-            try:
-                bot.send_message(
-                    u["telegram_id"],
-                    "❌ *Tu membresía ha vencido.*\n\n"
-                    "Renueva para seguir disfrutando del contenido exclusivo.\n"
-                    "👉 /start → Ver Planes",
-                    parse_mode="Markdown"
-                )
-                _marcar_notif(u["id"], "notif_vencida_en")
-                print(f"✅ Notif vencimiento enviada → {u['telegram_id']}")
+                print(f"🔨 Baneado {u['telegram_id']} de {canal}")
             except Exception as e:
-                print(f"⚠️ Error notif vencida a {u.get('telegram_id')}: {e}")
+                print(f"⚠️ Ban fallido {u['telegram_id']} en {canal}: {e}")
+        try:
+            bot.send_message(u["telegram_id"], "❌ Tu membresía ha vencido. Renueva para seguir disfrutando.")
+        except:
+            pass
+    
 
 @app.route("/api/usuario", methods=["POST"])
 def api_usuario():
