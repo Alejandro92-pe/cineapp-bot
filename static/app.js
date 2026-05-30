@@ -2257,14 +2257,12 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       if (linkTemporada) {
-        try { tg.openLink(linkTemporada); }
-        catch(e) { window.open(linkTemporada, '_blank'); }
+        abrirLinkContenido(linkTemporada);
         return;
       }
 
       if (linkCanal) {
-        try { tg.openLink(linkCanal); }
-        catch(e) { window.open(linkCanal, '_blank'); }
+        abrirLinkContenido(linkCanal);
         return;
       }
 
@@ -2558,6 +2556,36 @@ window.limpiarFiltrosExtra = function() {
   const generosExplorar = document.getElementById('generosExplorar');
   if (generosExplorar) cargarGenerosEnContenedor('generosExplorar');
 };
+
+// ============ HELPER: ABRIR LINKS DE TELEGRAM ============
+function abrirLinkContenido(enlace) {
+    if (!enlace) return;
+
+    const esTelegram = enlace.includes('t.me/') || enlace.includes('telegram.me/');
+
+    if (esTelegram) {
+        // Guardar en sessionStorage ANTES de abrir, por si la miniapp
+        // se suspende/reinicia al volver del grupo
+        try {
+            sessionStorage.setItem('_ultimo_enlace', enlace);
+            sessionStorage.setItem('_ultimo_enlace_ts', Date.now().toString());
+        } catch(e) {}
+
+        try {
+            // openTelegramLink es el método correcto para grupos/canales:
+            // no cierra la miniapp en la mayoría de plataformas
+            tg.openTelegramLink(enlace);
+        } catch(e) {
+            // fallback por si openTelegramLink no está disponible
+            try { tg.openLink(enlace); }
+            catch(e2) { window.open(enlace, '_blank'); }
+        }
+    } else {
+        // Links externos (vimeo, drive, etc.) — openLink es correcto
+        try { tg.openLink(enlace); }
+        catch(e) { window.open(enlace, '_blank'); }
+    }
+}
 
 // ============ INICIAR ============
 iniciar();
