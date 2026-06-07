@@ -44,6 +44,49 @@ stroke-linecap="round" stroke-linejoin="round">
   <rect x="1" y="5" width="15" height="14" rx="2"/>
 </svg>
 `;
+const ICON_CAMERA = `
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+stroke="#c9c9c9" stroke-width="2"
+stroke-linecap="round" stroke-linejoin="round">
+  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+  <circle cx="12" cy="13" r="4"/>
+</svg>
+`;
+const ICON_BOT = `
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+stroke="#2c2c2c" stroke-width="2"
+stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="8" width="18" height="12" rx="2"/>
+  <path d="M12 2v4"/>
+  <path d="M8 2h8"/>
+  <circle cx="9" cy="14" r="1"/>
+  <circle cx="15" cy="14" r="1"/>
+  <path d="M8 17h8"/>
+</svg>
+`;
+const ICON_CHECK = `
+<svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+stroke="#22c55e" stroke-width="2.5"
+stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 6L9 17l-5-5"/>
+</svg>
+`;
+
+const ICON_WARNING = `
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+stroke="#f59e0b" stroke-width="2"
+stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+  <line x1="12" y1="9" x2="12" y2="13"/>
+  <line x1="12" y1="17" x2="12.01" y2="17"/>
+</svg>
+`;
+
+const ICON_PLAY = `
+<svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+  <polygon points="5,3 19,12 5,21"/>
+</svg>
+`;
 
 // Si estamos en navegador (no en Telegram) y somos admin, redirigir al panel admin
 (function checkBrowserAdmin() {
@@ -71,6 +114,7 @@ const LIMITE = 20;
 let busquedaActual = "";
 let totalPaginas = 1;
 let cargando = false;
+let itemPendienteVimeus = null;
 
 const LIMITE_INICIAL = 20;
 const LIMITE_SCROLL = 5;
@@ -1232,6 +1276,17 @@ function irAMembresias() {
 
 // ============ PAGOS ============
 let planPagoActual = null;
+let _divConfirmPago = null;
+
+function cerrarConfirmacionPago() {
+  const modal = document.getElementById("divConfirmPago");
+
+  if (modal) {
+    modal.remove();
+  }
+
+  _divConfirmPago = null;
+}
 
 window.pagarPeru = function(plan, precio) {
   planPagoActual = { plan, precio };
@@ -1259,14 +1314,20 @@ function mostrarConfirmacionPago() {
       background:rgba(0,0,0,0.92);display:flex;align-items:center;
       justify-content:center;z-index:99999;color:white;text-align:center;
       padding:24px;box-sizing:border-box">
-      <div style="max-width:320px;width:100%">
-        <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <div style="max-width:320px;width:100%;background: black;padding: 20px;border: 1px solid #2a2a38;border-radius: 10px">
+        <div style="font-size:48px;margin-bottom:12px">${ICON_CHECK}</div>
         <h2 style="font-size:18px;margin:0 0 8px;font-weight:700">Pago enviado por confirmar</h2>
         <p style="color:rgba(255,255,255,0.6);font-size:14px;margin:0 0 24px;line-height:1.5">
-          Ahora ve al bot y envía el voucher 📸
+        <span style="display:inline-flex;align-items:center;gap:6px">
+        <span>Ahora ve al bot y envía el voucher</span>
+        ${ICON_CAMERA}
+        </span>
         </p>
         <button onclick="abrirBotManual()" class="btn-ir-bot" style="width:100%;margin-bottom:10px">
-          🤖 Ir al bot
+        <span style="display:flex;align-items:center;justify-content:center;gap:8px">
+        ${ICON_BOT}
+        <span>Ir al bot</span>
+        </span>
         </button>
         <button onclick="cerrarConfirmacionPago()"
           style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);
@@ -2251,7 +2312,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const esVimeus      = item.fuente === 'vimeus' && item.tmdb_id;
 
       if (esVimeus) {
-        cerrarModalDetalle();
         abrirReproductorVimeus(item);
         return;
       }
@@ -2339,58 +2399,101 @@ async function abrirReproductorDirecto(item) {
   iniciarDeteccionFullscreen();
 }
 
+// ===== FUNCIONES DE FULLSCREEN PARA DESKTOP =====
 function iniciarDeteccionFullscreen() {
-  document.addEventListener('fullscreenchange', manejarFullscreen);
-  document.addEventListener('webkitfullscreenchange', manejarFullscreen);
-  window.addEventListener('message', manejarMensajeVimeus);
+    console.log("🖥️ Iniciando detección de fullscreen");
+    
+    // Escuchar cambios en el fullscreen del navegador
+    document.addEventListener('fullscreenchange', manejarFullscreen);
+    document.addEventListener('webkitfullscreenchange', manejarFullscreen);
+    
+    // Escuchar mensajes de Vimeus
+    window.addEventListener('message', manejarMensajeVimeus);
 }
 
 function manejarFullscreen() {
-  if (document.fullscreenElement || document.webkitFullscreenElement) {
-    activarFullscreenTelegram();
-  } else {
-    desactivarFullscreenTelegram();
-  }
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+        console.log("🖥️ Vimeus activó fullscreen");
+        activarFullscreenTelegram();
+    } else {
+        console.log("🖥️ Vimeus salió de fullscreen");
+        desactivarFullscreenTelegram();
+    }
 }
 
 function manejarMensajeVimeus(e) {
-  if (!e.data) return;
-  const data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
-  if (data.includes('fullscreen') || data.includes('expand')) activarFullscreenTelegram();
+    if (!e.data) return;
+    
+    const data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+    
+    if (data.includes('fullscreen') || data.includes('expand')) {
+        console.log("📨 Vimeus envió señal de fullscreen");
+        activarFullscreenTelegram();
+    }
 }
 
 function activarFullscreenTelegram() {
-  if (!tg) return;
-  if (typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
-  if (screen.orientation && typeof screen.orientation.lock === 'function')
-    screen.orientation.lock('landscape').catch(() => {});
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+    
+    console.log("📱 Activando fullscreen en Telegram");
+    
+    if (typeof tg.requestFullscreen === 'function') {
+        tg.requestFullscreen();
+    }
+    
+    if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        screen.orientation.lock('landscape').catch(() => {});
+    }
 }
 
 function desactivarFullscreenTelegram() {
-  if (!tg) return;
-  if (typeof tg.exitFullscreen === 'function') tg.exitFullscreen();
-  if (screen.orientation && typeof screen.orientation.unlock === 'function')
-    screen.orientation.unlock();
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+    
+    console.log("📱 Desactivando fullscreen en Telegram");
+    
+    if (typeof tg.exitFullscreen === 'function') {
+        tg.exitFullscreen();
+    }
+    
+    if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+        screen.orientation.unlock();
+    }
 }
 
+// ===== FUNCIÓN PARA CERRAR EL REPRODUCTOR =====
 function cerrarReproductor() {
-  const iframe = document.getElementById('iframeReproductor');
-  if (document.fullscreenElement) document.exitFullscreen();
-  desactivarFullscreenTelegram();
-  document.removeEventListener('fullscreenchange', manejarFullscreen);
-  document.removeEventListener('webkitfullscreenchange', manejarFullscreen);
-  window.removeEventListener('message', manejarMensajeVimeus);
-  if (iframe) iframe.src = '';
-  document.getElementById('modalReproductor').style.display = 'none';
-  document.body.style.overflow = '';
+    console.log("🔚 Cerrando reproductor");
+    
+    const iframe = document.getElementById('iframeReproductor');
+    
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    
+    desactivarFullscreenTelegram();
+    
+    // Limpiar listeners
+    document.removeEventListener('fullscreenchange', manejarFullscreen);
+    document.removeEventListener('webkitfullscreenchange', manejarFullscreen);
+    window.removeEventListener('message', manejarMensajeVimeus);
+    
+    if (iframe) iframe.src = '';
+    document.getElementById('modalReproductor').style.display = 'none';
+    document.body.style.overflow = '';
 }
 
+// Cerrar con Escape
 document.addEventListener('keydown', function(event) {
-  if (event.key === 'Escape') {
-    const modal = document.getElementById('modalReproductor');
-    if (modal && modal.style.display === 'flex') cerrarReproductor();
-  }
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('modalReproductor');
+        if (modal && modal.style.display === 'flex') {
+            cerrarReproductor();
+        }
+    }
 });
+
 
 // ============ CONTADOR DE OFERTA ============
 function iniciarContadorOferta() {
