@@ -25,6 +25,10 @@ ADMIN_ID = next(iter(ADMIN_IDS), 0)
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")
 
+# Contraseña del panel de administración (static/admin.html).
+# Se valida en el backend, no debe estar escrita en el HTML/JS.
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 # APIs Externas
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 VIMEUS_VIEW_KEY = os.getenv("VIMEUS_VIEW_KEY", "")

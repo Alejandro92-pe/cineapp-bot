@@ -48,6 +48,10 @@ def is_admin(user_id):
     except (ValueError, TypeError):
         return False
 
+# Contraseña del panel admin (static/admin.html), validada en backend.
+# Config esto en Render como variable de entorno ADMIN_PASSWORD.
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -1164,6 +1168,23 @@ def serve_miniapp():
 @app.route("/admin")
 def serve_admin():
     return send_from_directory("static", "admin.html")
+
+@app.route("/api/admin/login", methods=["POST"])
+def api_admin_login():
+    """Login del panel de administración. Valida ID + contraseña en backend."""
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        admin_id = int(data.get("admin_id", 0))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "ID inválido"}), 400
+    password = str(data.get("password", ""))
+
+    if not ADMIN_PASSWORD:
+        return jsonify({"success": False, "error": "ADMIN_PASSWORD no configurado en el servidor"}), 500
+    if admin_id not in ADMIN_IDS or password != ADMIN_PASSWORD:
+        return jsonify({"success": False, "error": "ID o contraseña incorrectos"}), 401
+
+    return jsonify({"success": True}), 200
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():

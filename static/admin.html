@@ -817,30 +817,54 @@ Accede a todo el catálogo por solo S/11 este fin de semana.
 
 <script>
 const API = '';  // mismo origen, vacío = relativo
-const ADMIN_PASS = 'quehay2024admin';  // ← Cambia esto a tu contraseña real
 let adminId = null;
 let catalogoOffset = 0;
 let catalogoTipo = 'todo';
 let tipoSeleccionado = 'pelicula';
 
 // ── LOGIN ──
+// La contraseña YA NO vive aquí. Se valida en el backend (variable de
+// entorno ADMIN_PASSWORD en Render) vía POST /api/admin/login.
 
-function intentarLogin() {
+async function intentarLogin() {
   const rawId = document.getElementById('inp-admin-id').value.trim();
   const id = parseInt(rawId, 10);
   const pass = document.getElementById('inp-admin-pass').value;
   const errEl = document.getElementById('login-error');
+  const btn = document.querySelector('.btn-login');
 
-  if (!id || isNaN(id) || pass !== ADMIN_PASS) {
+  if (!id || isNaN(id) || !pass) {
+    errEl.textContent = 'Completa tu ID y contraseña';
     errEl.style.display = 'block';
     return;
   }
 
   errEl.style.display = 'none';
-  adminId = id;  // siempre number
-  sessionStorage.setItem('admin_id', String(id));
-  console.log('Login ok, adminId =', adminId, typeof adminId);
-  mostrarApp();
+  if (btn) { btn.disabled = true; btn.textContent = 'Entrando...'; }
+
+  try {
+    const res = await fetch(`${API}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admin_id: id, password: pass })
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.success) {
+      errEl.textContent = data.error || 'ID o contraseña incorrectos';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    adminId = id;  // siempre number
+    sessionStorage.setItem('admin_id', String(id));
+    mostrarApp();
+  } catch (e) {
+    errEl.textContent = 'No se pudo conectar con el servidor';
+    errEl.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Entrar al panel'; }
+  }
 }
 
 function cerrarSesion() {
