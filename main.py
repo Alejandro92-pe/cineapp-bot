@@ -20,7 +20,15 @@ import threading
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+
+# ADMIN_ID ahora acepta uno o varios IDs separados por coma, ej:
+# ADMIN_ID=123456789,987654321
+_admin_id_raw = os.getenv("ADMIN_ID", "0")
+ADMIN_IDS = {int(x.strip()) for x in _admin_id_raw.split(",") if x.strip()}
+# Se mantiene ADMIN_ID (un solo valor) para el código que lo usa como
+# "admin principal" al registrar quién hizo una activación, etc.
+ADMIN_ID = next(iter(ADMIN_IDS), 0)
+
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
@@ -29,7 +37,14 @@ supabase_service = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 def check_admin(data):
     """Verifica admin_id tolerando int y string."""
     try:
-        return int(data.get("admin_id", 0)) == ADMIN_ID
+        return int(data.get("admin_id", 0)) in ADMIN_IDS
+    except (ValueError, TypeError):
+        return False
+
+def is_admin(user_id):
+    """Verifica si un user_id de Telegram es alguno de los admins."""
+    try:
+        return int(user_id) in ADMIN_IDS
     except (ValueError, TypeError):
         return False
 
@@ -976,7 +991,7 @@ def activar_usuario(user_id, membresia, chat_id_admin):
 
 @bot.message_handler(commands=['activar'])
 def activar(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     partes = message.text.split()
     if len(partes) < 3:
@@ -988,7 +1003,7 @@ def activar(message):
 
 @bot.message_handler(commands=['auto_activar'])
 def auto_activar(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     partes = message.text.split()
     if len(partes) < 3:
@@ -1000,7 +1015,7 @@ def auto_activar(message):
 
 @bot.message_handler(commands=['activos'])
 def listar_activos(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     usuarios = supabase_service.table('usuarios').select('telegram_id,nombre,membresia_tipo,fecha_vencimiento') \
         .eq('membresia_activa', True).execute()
@@ -1015,7 +1030,7 @@ def listar_activos(message):
 
 @bot.message_handler(commands=['desactivar'])
 def desactivar(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     partes = message.text.split()
     if len(partes) < 2:
@@ -1038,7 +1053,7 @@ def desactivar(message):
 
 @bot.message_handler(commands=['generar_enlaces'])
 def generar_enlaces(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     partes = message.text.split()
     if len(partes) < 2:
@@ -1073,7 +1088,7 @@ def generar_enlaces(message):
 
 @bot.message_handler(commands=['reactivar'])
 def reactivar(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     partes = message.text.split()
     if len(partes) < 3:
@@ -1089,7 +1104,7 @@ def get_id(message):
 
 @bot.message_handler(commands=['reply'])
 def reply_directo(message):
-    if message.chat.id != GRUPO_SOPORTE_ID and message.from_user.id != ADMIN_ID:
+    if message.chat.id != GRUPO_SOPORTE_ID and not is_admin(message.from_user.id):
         return
     partes = message.text.split(None, 2)
     if len(partes) < 3:
@@ -1106,7 +1121,7 @@ def reply_directo(message):
 
 @bot.message_handler(commands=['publicar'])
 def publicar_manual(message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         return
     partes = message.text.split()
     if len(partes) < 2:
@@ -1140,7 +1155,7 @@ app = Flask(__name__)
 CORS(app)
 
 app.register_blueprint(marketing_bp)
-init_marketing(supabase_service, bot, ADMIN_ID, BOT_USERNAME)
+init_marketing(supabase_service, bot, ADMIN_IDS, BOT_USERNAME)
 
 @app.route("/")
 def serve_miniapp():
@@ -1238,8 +1253,12 @@ def crear_pedido():
             "fecha_pedido": datetime.now().isoformat()
         }).execute()
         restantes = limite_total - (usados + 1)
-        bot.send_message(ADMIN_ID,
-            f"📥 NUEVO PEDIDO\n👤 Usuario: {telegram_id}\n🎬 Título: {titulo}\n📦 Plan: {plan['nombre']}\n📊 Restantes: {restantes}")
+        for _admin in ADMIN_IDS:
+            try:
+                bot.send_message(_admin,
+                    f"📥 NUEVO PEDIDO\n👤 Usuario: {telegram_id}\n🎬 Título: {titulo}\n📦 Plan: {plan['nombre']}\n📊 Restantes: {restantes}")
+            except Exception as e_admin:
+                print(f"⚠️ No se pudo notificar al admin {_admin}: {e_admin}")
         bot.send_message(telegram_id,
             f"✅ Pedido enviado correctamente.\n📦 Te quedan {restantes} pedidos disponibles.")
         return jsonify({"success": True}), 200
@@ -1349,8 +1368,8 @@ def api_importar_tmdb():
         except (ValueError, TypeError):
             tmdb_id = 0
         tipo = str(data.get("tipo", "pelicula")).lower().strip()
-        if admin_id != ADMIN_ID:
-            return jsonify({"error": f"No autorizado (got {admin_id}, expected {ADMIN_ID})"}), 403
+        if admin_id not in ADMIN_IDS:
+            return jsonify({"error": f"No autorizado (got {admin_id}, expected one of {list(ADMIN_IDS)})"}), 403
         if not tmdb_id:
             return jsonify({"error": "tmdb_id requerido o invalido"}), 400
         if tipo not in ("pelicula", "serie", "anime"):

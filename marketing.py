@@ -22,7 +22,7 @@ from flask import Blueprint, request, jsonify
 # ── Inyectado desde main.py via init_marketing() ──────────────────────────────
 _supabase     = None
 _bot          = None
-_ADMIN_ID     = None
+_ADMIN_IDS    = set()
 _BOT_USERNAME = None
 
 GMAIL_USER      = os.getenv("GMAIL_USER", "")
@@ -32,14 +32,20 @@ GMAIL_FROM_NAME = "QuehayApp VIP"
 marketing_bp = Blueprint("marketing", __name__)
 
 
-def init_marketing(supabase_client, bot_instance, admin_id: int, bot_username: str):
-    """Llamar desde main.py justo después de crear la app Flask."""
-    global _supabase, _bot, _ADMIN_ID, _BOT_USERNAME
+def init_marketing(supabase_client, bot_instance, admin_ids, bot_username: str):
+    """Llamar desde main.py justo después de crear la app Flask.
+
+    admin_ids puede ser un solo int o un iterable de ints (varios admins).
+    """
+    global _supabase, _bot, _ADMIN_IDS, _BOT_USERNAME
     _supabase     = supabase_client
     _bot          = bot_instance
-    _ADMIN_ID     = int(admin_id)
+    if isinstance(admin_ids, (set, list, tuple)):
+        _ADMIN_IDS = {int(a) for a in admin_ids}
+    else:
+        _ADMIN_IDS = {int(admin_ids)}
     _BOT_USERNAME = bot_username
-    print(f"✅ marketing.py inicializado — ADMIN_ID={admin_id}, BOT={bot_username}")
+    print(f"✅ marketing.py inicializado — ADMIN_IDS={_ADMIN_IDS}, BOT={bot_username}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -223,7 +229,7 @@ def recordatorio_pagos_pendientes():
 
 def _check_admin(data: dict) -> bool:
     try:
-        return int(data.get("admin_id", 0)) == int(_ADMIN_ID)
+        return int(data.get("admin_id", 0)) in _ADMIN_IDS
     except (ValueError, TypeError):
         return False
 
@@ -231,9 +237,9 @@ def _check_admin(data: dict) -> bool:
 @marketing_bp.route("/api/admin/marketing/usuarios_sin_pago", methods=["POST"])
 def api_usuarios_sin_pago():
     data = request.get_json(force=True, silent=True) or {}
-    print(f"DEBUG /usuarios_sin_pago — admin_id recibido: {data.get('admin_id')} | esperado: {_ADMIN_ID}")
+    print(f"DEBUG /usuarios_sin_pago — admin_id recibido: {data.get('admin_id')} | esperados: {_ADMIN_IDS}")
     if not _check_admin(data):
-        return jsonify({"error": "No autorizado", "recibido": data.get("admin_id"), "esperado": str(_ADMIN_ID)}), 403
+        return jsonify({"error": "No autorizado", "recibido": data.get("admin_id"), "esperados": list(_ADMIN_IDS)}), 403
     try:
         usuarios = obtener_usuarios_sin_pago()
         return jsonify({"usuarios": usuarios, "total": len(usuarios)}), 200

@@ -1,7 +1,7 @@
 """
 Funciones helper y utilidades
 """
-from config import ADMIN_ID, TMDB_API_KEY, TMDB_BASE
+from config import ADMIN_IDS, TMDB_API_KEY, TMDB_BASE
 import requests
 
 
@@ -11,7 +11,7 @@ def check_admin(data):
     Tolera int y string
     """
     try:
-        return int(data.get("admin_id", 0)) == ADMIN_ID
+        return int(data.get("admin_id", 0)) in ADMIN_IDS
     except (ValueError, TypeError):
         return False
 

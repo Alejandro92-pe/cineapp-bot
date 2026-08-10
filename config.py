@@ -13,7 +13,16 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 # Telegram
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
+
+# ADMIN_ID ahora acepta uno o varios IDs separados por coma, ej:
+# ADMIN_ID=123456789,987654321
+_admin_id_raw = os.getenv("ADMIN_ID", "0")
+ADMIN_IDS = {int(x.strip()) for x in _admin_id_raw.split(",") if x.strip()}
+# Se mantiene ADMIN_ID (un solo valor) por compatibilidad con el código
+# existente que lo usa como "admin principal" (ej: a quién se le atribuye
+# una activación). Es el primero de la lista.
+ADMIN_ID = next(iter(ADMIN_IDS), 0)
+
 BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")
 
 # APIs Externas

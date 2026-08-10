@@ -6,7 +6,7 @@ from datetime import datetime
 from supabase import create_client
 from services.notifications import verificar_vencimientos
 from services.membership import activar_usuario
-from config import SUPABASE_SERVICE_KEY, SUPABASE_URL, ADMIN_ID
+from config import SUPABASE_SERVICE_KEY, SUPABASE_URL, ADMIN_ID, ADMIN_IDS
 
 # Blueprint para rutas de cron
 cron_bp = Blueprint('cron', __name__)
@@ -73,7 +73,7 @@ def renovar_membresia():
         data = request.get_json()
         
         # Validar admin
-        if int(data.get("admin_id", 0)) != ADMIN_ID:
+        if int(data.get("admin_id", 0)) not in ADMIN_IDS:
             return jsonify({"error": "No autorizado"}), 403
         
         usuario_id = data.get("usuario_id")
@@ -124,7 +124,7 @@ def ver_estado_notificaciones():
     try:
         data = request.get_json()
         
-        if int(data.get("admin_id", 0)) != ADMIN_ID:
+        if int(data.get("admin_id", 0)) not in ADMIN_IDS:
             return jsonify({"error": "No autorizado"}), 403
         
         usuario_id = data.get("usuario_id")
@@ -172,7 +172,7 @@ def resetear_flags_manual():
     try:
         data = request.get_json()
         
-        if int(data.get("admin_id", 0)) != ADMIN_ID:
+        if int(data.get("admin_id", 0)) not in ADMIN_IDS:
             return jsonify({"error": "No autorizado"}), 403
         
         usuario_id = data.get("usuario_id")
