@@ -1,13 +1,18 @@
 // ============ CONFIGURACION ============
 const API_BASE_URL = "https://cineapp-bot.onrender.com";
-const TELEGRAM_BOT_USERNAME = "Popcornqh_admin_bot";    
-const ADMIN_ID = 5824989040;
+const TELEGRAM_BOT_USERNAME = "Popcornqh_admin_bot";
+// Agrega aquí el ID de Telegram de cada admin, separados por comas.
+const ADMIN_IDS = [5824989040, 7233740331, 5913015573];
 
 const tg = window.Telegram.WebApp;
 tg.expand();
 
 const userId = tg.initDataUnsafe?.user?.id;
 const userLang = tg.initDataUnsafe?.user?.language_code || 'es';
+
+function esAdmin() {
+  return ADMIN_IDS.includes(Number(userId));
+}
 
 const ICON_LOCK = `
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -275,7 +280,7 @@ function configurarFooter() {
   items.forEach(item => {
     if (item.dataset.vista === 'pedidos') {
       const span = item.querySelector('span');
-      if (userId == ADMIN_ID) {
+      if (esAdmin()) {
         span.innerText = 'Admin';
         item.dataset.destino = 'admin';
       } else {
@@ -463,7 +468,7 @@ window.cambiarVista = async function(vista) {
   }
 
   else if (vista === 'pedidos') {
-    if (userId == ADMIN_ID) {
+    if (esAdmin()) {
       cambiarVista('admin');
       return;
     }
@@ -643,7 +648,7 @@ window.cambiarVista = async function(vista) {
   }
 
   else if (vista === 'admin') {
-    if (userId != ADMIN_ID) {
+    if (!esAdmin()) {
       contenedor.innerHTML = '<div class="text-center p-20 text-gris">⛔ Acceso no autorizado</div>';
       return;
     }
@@ -1114,7 +1119,7 @@ window.avanzarEstadoPedido = async function(pedidoId, nuevoEstado, btn) {
     const resp = await fetch(`${API_BASE_URL}/marcar_entregado`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pedido_id: pedidoId, estado: nuevoEstado, admin_id: Number(ADMIN_ID) })
+      body: JSON.stringify({ pedido_id: pedidoId, estado: nuevoEstado, admin_id: Number(userId) })
     });
     const data = await resp.json();
     if (resp.ok && data.success) {
