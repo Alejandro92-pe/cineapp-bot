@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900">
+<defs><linearGradient id="sky" x2=".7" y2="1"><stop stop-color="#20294e"/><stop offset="1" stop-color="#080f19"/></linearGradient><radialGradient id="glow"><stop stop-color="#a8c8ed" stop-opacity=".65"/><stop offset="1" stop-color="#a8c8ed" stop-opacity="0"/></radialGradient></defs>
+<rect width="600" height="900" fill="url(#sky)"/><circle cx="370" cy="270" r="280" fill="url(#glow)"/><circle cx="370" cy="270" r="95" fill="#a8c8ed" opacity=".8"/>
+<path d="M0 610 190 330 330 550 450 420 600 620V900H0Z" fill="#20294e"/><path d="M0 760 140 540 300 700 440 570 600 720V900H0Z" fill="#0a1422"/>
+<path d="m0 810 260-90 340 90v90H0Z" fill="#07101b"/><path d="m295 900 100-170h10L320 900" fill="#a8c8ed" opacity=".4"/>
+<text x="42" y="72" font-family="sans-serif" letter-spacing="7" font-size="14" fill="#a8c8ed">QUEHAY · DEMO</text>
+<text x="42" y="805" font-family="sans-serif" font-weight="700" font-size="43" fill="#ecf2fb">LUZ DEL NORTE</text><text x="44" y="842" font-family="sans-serif" letter-spacing="5" font-size="11" fill="#a8c8ed">UNA HISTORIA DE PRUEBA</text></svg>

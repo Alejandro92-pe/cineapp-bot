@@ -170,6 +170,9 @@
   }
   .tabs::-webkit-scrollbar { display: none; }
   .tab {
+    background: transparent;
+    border: 0;
+    font-family: inherit;
     font-size: 13px;
     color: var(--muted);
     padding: 0.7rem 1rem;
@@ -631,6 +634,12 @@
   }
   .temp-save-btn:hover { border-color: var(--accent); color: var(--accent); }
 </style>
+<link rel="stylesheet" href="/static/admin/vimeus.css">
+<script src="/static/admin/vimeus.js" defer></script>
+<link rel="stylesheet" href="/static/admin/payments.css">
+<script src="/static/admin/payments.js" defer></script>
+<link rel="stylesheet" href="/static/admin/okru.css">
+<script src="/static/admin/okru.js" defer></script>
 </head>
 <body>
 
@@ -669,69 +678,37 @@
   </div>
 
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('importar')">📥 Importar TMDB</div>
+    <div class="tab active" onclick="switchTab('importar')">📥 Importar contenido</div>
     <div class="tab" onclick="switchTab('catalogo')">🎞 Catálogo</div>
     <div class="tab" onclick="switchTab('pagos')">💰 Pagos</div>
     <div class="tab" onclick="switchTab('pedidos')">📦 Pedidos</div>
     <div class="tab" onclick="switchTab('usuarios')">👥 Usuarios</div>
     <div class="tab" onclick="switchTab('marketing')">📣 Marketing</div>
+    <button class="tab" type="button" onclick="switchTab('okru')">Reproductores · OK.ru</button>
   </div>
 
   <!-- IMPORTAR TMDB -->
+  <div class="panel" id="panel-okru"></div>
   <div class="panel active" id="panel-importar">
-    <div class="importer-card">
-      <h2>Importar desde TMDB</h2>
-      <p class="sub">Ingresa el ID de TMDB de la película, serie o anime que quieres agregar al catálogo.</p>
-      <div class="import-row">
-        <div class="import-field">
-          <label>ID de TMDB</label>
-          <input type="number" id="tmdb-id-input" placeholder="ej: 550" onkeydown="if(event.key==='Enter') importarTMDB()">
-        </div>
-        <div class="import-field">
-          <label>Tipo de contenido</label>
-          <div class="tipo-selector" id="tipo-selector">
-            <button class="tipo-btn selected" data-tipo="pelicula" onclick="seleccionarTipo(this)">🎬 Película</button>
-            <button class="tipo-btn" data-tipo="serie" onclick="seleccionarTipo(this)">📺 Serie</button>
-            <button class="tipo-btn" data-tipo="anime" onclick="seleccionarTipo(this)">⛩️ Anime</button>
-          </div>
-        </div>
-        <button class="btn-import" id="btn-importar" onclick="importarTMDB()">
-          Importar
-        </button>
-      </div>
-
-      <div class="import-status" id="import-status"></div>
-
-      <div class="preview-card" id="preview-card">
-        <img class="preview-poster" id="prev-poster" src="" alt="">
-        <div class="preview-info">
-          <div class="preview-titulo" id="prev-titulo"></div>
-          <div class="preview-meta" id="prev-meta"></div>
-          <div class="preview-rating" id="prev-rating"></div>
-          <div class="preview-generos" id="prev-generos"></div>
-          <!-- Botón temporadas — solo aparece para series/anime -->
-          <button id="btn-importar-temps" class="btn-import-temps" onclick="importarTemporadas()" style="display:none;margin-top:8px">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/></svg>
-            Importar temporadas
-          </button>
-          <div id="temps-status" style="font-size:11px;margin-top:5px;color:#7dd7a5;display:none"></div>
-          <div id="temps-list" style="margin-top:8px;display:none"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Importación en batch -->
-    <div class="importer-card">
-      <h2>Importar varios IDs (batch)</h2>
-      <p class="sub">Pega varios IDs de TMDB separados por coma, uno por línea, o así: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;">550,pelicula | 1396,serie | 21,anime</code></p>
-      <textarea class="batch-textarea" id="batch-input" placeholder="Formato: tmdb_id,tipo&#10;550,pelicula&#10;1396,serie&#10;21,anime"></textarea>
-      <div style="display:flex;gap:0.5rem;margin-top:0.65rem;">
-        <button class="btn-import" id="btn-batch" onclick="importarBatch()" style="background:var(--surface2);border:0.5px solid var(--border2);color:var(--text);">
-          Importar batch
-        </button>
-      </div>
-      <div class="batch-row" id="batch-results"></div>
-    </div>
+    <section class="vimeus-panel" aria-labelledby="vimeus-heading">
+      <span class="eyebrow">Biblioteca · Importación</span>
+      <h2 id="vimeus-heading">Tu catálogo, en un solo lugar.</h2>
+      <p>Elige qué quieres añadir. Las series y animes incluyen los capítulos disponibles en Vimeus; los bíblicos usan la información de TMDB para que después añadas sus vídeos. Tus descargas se conservan.</p>
+      <form id="vimeus-import" class="vimeus-form">
+        <label>Tipo<select id="vimeus-kind"><option value="pelicula">Película</option><option value="serie">Serie</option><option value="anime">Anime (serie)</option><option value="biblico_pelicula">Bíblico · Película</option><option value="biblico_serie">Bíblico · Serie</option></select></label>
+        <label>ID de TMDB<input id="vimeus-id" type="number" min="1" max="2147483647" step="1" required placeholder="Ej. 550"></label>
+        <button id="vimeus-submit" type="submit">Importar / actualizar</button>
+      </form>
+      <div id="import-target-wrap" hidden><label>Actualizar un bíblico existente<select id="import-target"><option value="">Crear ficha o buscar coincidencia por TMDB</option></select></label><p>Selecciona su ficha para conservar los enlaces y evitar duplicados.</p></div>
+      <p id="import-help">TMDB aporta la ficha de la película. La reproducción depende de su disponibilidad en Vimeus.</p>
+      <div id="vimeus-status" class="vimeus-status" role="status" aria-live="polite"></div>
+      <details class="catalog-queue"><summary>Importación automática</summary>
+        <p>Incorpora nuevos títulos por lotes, con pausas entre consultas. Las descargas manuales se conservan.</p>
+        <p id="catalog-queue-status" role="status">Consulta el avance de las importaciones.</p>
+        <button type="button" id="catalog-queue-refresh">Consultar avance</button>
+        <button type="button" id="catalog-queue-toggle" hidden>Pausar</button>
+      </details>
+    </section>
   </div>
 
   <!-- CATÁLOGO -->
@@ -741,6 +718,7 @@
       <button class="filtro-btn" onclick="filtrarCatalogo('pelicula', this)">Películas</button>
       <button class="filtro-btn" onclick="filtrarCatalogo('serie', this)">Series</button>
       <button class="filtro-btn" onclick="filtrarCatalogo('anime', this)">Anime</button>
+      <button class="filtro-btn" onclick="filtrarCatalogo('biblico', this)">Bíblicos</button>
     </div>
     <div class="content-grid" id="catalogo-grid"></div>
     <button class="load-more" id="btn-mas-catalogo" onclick="cargarMasCatalogo()" style="display:none">Cargar más</button>
@@ -815,6 +793,8 @@ Accede a todo el catálogo por solo S/11 este fin de semana.
   </div>
 </div>
 
+<script src="/static/escape.js"></script>
+<script src="/static/session.js"></script>
 <script>
 const API = '';  // mismo origen, vacío = relativo
 let adminId = null;
@@ -857,7 +837,7 @@ async function intentarLogin() {
     }
 
     adminId = id;  // siempre number
-    sessionStorage.setItem('admin_id', String(id));
+    document.getElementById('inp-admin-pass').value = '';
     mostrarApp();
   } catch (e) {
     errEl.textContent = 'No se pudo conectar con el servidor';
@@ -867,8 +847,9 @@ async function intentarLogin() {
   }
 }
 
-function cerrarSesion() {
-  sessionStorage.removeItem('admin_id');
+async function cerrarSesion() {
+  const response = await fetch('/api/auth/logout', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  if (!response.ok) { alert('No se pudo cerrar la sesión. Intenta de nuevo.'); return; }
   adminId = null;
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('admin-app').style.display = 'none';
@@ -885,183 +866,32 @@ document.getElementById('inp-admin-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') intentarLogin();
 });
 
-// Autorestaurar sesión
-const savedId = sessionStorage.getItem('admin_id');
-if (savedId) {
-  const parsedId = parseInt(savedId, 10);
-  if (!isNaN(parsedId) && parsedId > 0) {
-    adminId = parsedId;
-    console.log('Sesion restaurada, adminId =', adminId, typeof adminId);
+// Restaurar únicamente una sesión verificada por el servidor.
+sessionStorage.removeItem('admin_id');
+AccountSession.ready.then(() => {
+
+  if (AccountSession.state.is_admin) {
+    adminId = AccountSession.state.user.telegram_id;
     mostrarApp();
   }
-}
+});
 
 // ── TABS ──
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    const tabs = ['importar','catalogo','pagos','pedidos','usuarios','marketing'];
+    const tabs = ['importar','catalogo','pagos','pedidos','usuarios','marketing','okru'];
     t.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
 
   if (tab === 'pagos') cargarPagos();
+  else if (tab === 'okru') OKAdmin.mount(document.getElementById('panel-okru'));
   else if (tab === 'pedidos') cargarPedidos();
   else if (tab === 'usuarios') cargarUsuarios();
   else if (tab === 'marketing') cargarMarketing();
   else if (tab === 'catalogo') { catalogoOffset = 0; cargarCatalogo(); }
-}
-
-// ── IMPORTADOR TMDB ──
-
-function seleccionarTipo(btn) {
-  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  tipoSeleccionado = btn.dataset.tipo;
-}
-
-async function importarTMDB() {
-  const tmdbId = parseInt(document.getElementById('tmdb-id-input').value.trim(), 10);
-  if (!tmdbId || isNaN(tmdbId)) { mostrarEstado('Ingresa un ID de TMDB válido', 'error'); return; }
-
-  const payload = {
-    admin_id: Number(adminId),   // forzar number
-    tmdb_id:  Number(tmdbId),    // forzar number
-    tipo:     String(tipoSeleccionado).toLowerCase()
-  };
-  console.log('Payload importar:', JSON.stringify(payload));
-
-  const btn = document.getElementById('btn-importar');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Importando...';
-  document.getElementById('preview-card').classList.remove('visible');
-  mostrarEstado('Consultando TMDB y guardando...', 'loading');
-
-  try {
-    const resp = await fetch(`${API}/api/admin/importar_tmdb`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json();
-
-    if (resp.ok && data.success) {
-      mostrarEstado(`✓ Importado: "${data.titulo}" (ID interno: ${data.id})`, 'success');
-      mostrarPreview(data);
-      document.getElementById('tmdb-id-input').value = '';
-
-      // Mostrar botón de temporadas solo si es serie o anime
-      _ultimoContenidoId = data.id;
-      const btnTemps = document.getElementById('btn-importar-temps');
-      const tempsStatus = document.getElementById('temps-status');
-      const tempsList = document.getElementById('temps-list');
-      if (btnTemps) {
-        const esSerie = ['serie','anime'].includes(data.tipo);
-        btnTemps.style.display = esSerie ? 'inline-flex' : 'none';
-        if (tempsStatus) tempsStatus.style.display = 'none';
-        if (tempsList) { tempsList.style.display = 'none'; tempsList.innerHTML = ''; }
-      }
-    } else if (resp.status === 409) {
-      mostrarEstado(`Ya existe en el catálogo: "${data.error}" (ID: ${data.id})`, 'error');
-    } else {
-      mostrarEstado(`Error: ${data.error || 'desconocido'}`, 'error');
-    }
-  } catch(e) {
-    mostrarEstado('Error de red: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Importar';
-  }
-}
-
-function mostrarEstado(msg, tipo) {
-  const el = document.getElementById('import-status');
-  el.className = 'import-status ' + tipo;
-  el.textContent = msg;
-}
-
-function mostrarPreview(data) {
-  const card = document.getElementById('preview-card');
-  document.getElementById('prev-poster').src = data.imagen_url || '';
-  document.getElementById('prev-titulo').textContent = data.titulo;
-  document.getElementById('prev-meta').textContent = `${data.tipo} · ${data.ano || '—'}`;
-  document.getElementById('prev-rating').textContent = `★ ${data.rating || '0'}/10`;
-  const gen = document.getElementById('prev-generos');
-  gen.innerHTML = '';
-  (data.genero || '').split(',').forEach(g => {
-    if (g.trim()) gen.innerHTML += `<span class="genero-tag">${g.trim()}</span>`;
-  });
-  card.classList.add('visible');
-}
-
-// ── BATCH ──
-
-async function importarBatch() {
-  const raw = document.getElementById('batch-input').value.trim();
-  if (!raw) return;
-
-  const lines = raw.split(/[\n,]+/).map(l => l.trim()).filter(Boolean);
-  const items = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const parts = lines[i].split(/[|,\s]+/).map(p => p.trim()).filter(Boolean);
-    const id = parseInt(parts[0]);
-    const tipo = parts[1] || 'pelicula';
-    if (!isNaN(id)) items.push({ id, tipo });
-  }
-
-  if (!items.length) return;
-
-  const resultsEl = document.getElementById('batch-results');
-  resultsEl.innerHTML = '';
-  const btn = document.getElementById('btn-batch');
-  btn.disabled = true;
-
-  for (const item of items) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'batch-item';
-    rowEl.innerHTML = `
-      <span class="b-titulo">ID ${item.id}</span>
-      <span class="b-tipo">${item.tipo}</span>
-      <span class="b-status pending">Importando…</span>
-    `;
-    resultsEl.appendChild(rowEl);
-    const statusEl = rowEl.querySelector('.b-status');
-
-    try {
-      const batchPayload = {
-        admin_id: Number(adminId),
-        tmdb_id:  Number(item.id),
-        tipo:     String(item.tipo).toLowerCase()
-      };
-      const resp = await fetch(`${API}/api/admin/importar_tmdb`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batchPayload)
-      });
-      const data = await resp.json();
-      if (resp.ok && data.success) {
-        rowEl.querySelector('.b-titulo').textContent = data.titulo;
-        statusEl.className = 'b-status ok';
-        statusEl.textContent = '✓ OK';
-      } else if (resp.status === 409) {
-        rowEl.querySelector('.b-titulo').textContent = `ID ${item.id}`;
-        statusEl.className = 'b-status dup';
-        statusEl.textContent = 'Duplicado';
-      } else {
-        statusEl.className = 'b-status err';
-        statusEl.textContent = 'Error';
-      }
-    } catch {
-      statusEl.className = 'b-status err';
-      statusEl.textContent = 'Error red';
-    }
-
-    await new Promise(r => setTimeout(r, 300));
-  }
-
-  btn.disabled = false;
 }
 
 // ── CATÁLOGO ──
@@ -1091,13 +921,13 @@ async function cargarCatalogo(append = false) {
     const div = document.createElement('div');
     div.className = 'content-item';
     div.innerHTML = `
-      <img src="${item.imagen_url || ''}" alt="${item.titulo}" onerror="this.style.background='var(--surface)'">
+      <img src="${safeImageUrl(item.imagen_url || '')}" alt="${escapeHtml(item.titulo)}" onerror="this.style.background='var(--surface)'">
       <div class="item-overlay">
-        <div class="item-titulo">${item.titulo}</div>
+        <div class="item-titulo">${escapeHtml(item.titulo)}</div>
         <div class="item-tipo">${item.tipo} · ${item.año || item.ano || '—'}</div>
       </div>
       ${item.tmdb_id ? '<span class="item-badge">TMDB</span>' : ''}
-      <button class="btn-pub-item" onclick="publicarItem(${item.id}, '${item.titulo.replace(/'/g,"\'")}', this)" title="Publicar en canales">▶</button>
+      <button class="btn-pub-item" onclick="publicarItem(${Number(item.id)}, ${jsonAttr(item.titulo)}, this)" title="Publicar en canales">▶</button>
     `;
     grid.appendChild(div);
   });
@@ -1119,7 +949,11 @@ function filtrarCatalogo(tipo, btn) {
 // ── PAGOS ──
 
 async function cargarPagos() {
-  const container = document.getElementById('pagos-list');
+  return PaymentAdmin.mount(document.getElementById('pagos-list'));
+}
+
+async function cargarPagosAnteriores() {
+  const container = document.getElementById('legacy-pagos-list');
   container.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const resp = await fetch(`${API}/api/admin/pagos`, {
     method: 'POST',
@@ -1183,10 +1017,10 @@ async function cargarPedidos() {
     const div = document.createElement('div');
     div.className = 'pago-card';
     div.innerHTML = `
-      <div class="pago-avatar" style="background:var(--surface2);color:var(--muted)">${(p.usuario?.nombre||'?')[0].toUpperCase()}</div>
+      <div class="pago-avatar" style="background:var(--surface2);color:var(--muted)">${escapeHtml((p.usuario?.nombre||'?')[0].toUpperCase())}</div>
       <div class="pago-info">
-        <div class="pago-user">${p.titulo}</div>
-        <div class="pago-meta">${p.usuario?.nombre || '?'} · ${p.tipo} · ${p.fecha}</div>
+        <div class="pago-user">${escapeHtml(p.titulo)}</div>
+        <div class="pago-meta">${escapeHtml(p.usuario?.nombre || '?')} · ${p.tipo} · ${p.fecha}</div>
       </div>
       ${p.estado === 'pendiente' ? `<button class="btn-aprobar" onclick="marcarEntregado(${p.id}, this)">Entregar</button>` : '<span style="font-size:11px;color:var(--muted)">Entregado</span>'}
     `;
@@ -1226,7 +1060,7 @@ async function publicarItem(contenidoId, titulo, btn) {
       btn.textContent = '✗';
       btn.style.background = 'rgba(226,80,74,0.9)';
       alert(`Error publicando "${titulo}":
-${data.error}`);
+${escapeHtml(data.error)}`);
       setTimeout(() => { btn.textContent = '▶'; btn.style.background = ''; btn.disabled = false; }, 2000);
     }
   } catch(e) {
@@ -1234,82 +1068,6 @@ ${data.error}`);
     btn.disabled = false;
     alert('Error de red: ' + e.message);
   }
-}
-
-// ── TEMPORADAS ──
-
-let _ultimoContenidoId = null;  // id del último contenido importado
-
-async function importarTemporadas() {
-  if (!_ultimoContenidoId) return;
-  const btn = document.getElementById('btn-importar-temps');
-  const statusEl = document.getElementById('temps-status');
-  btn.disabled = true;
-  btn.textContent = 'Importando...';
-
-  try {
-    const resp = await fetch(`${API}/api/admin/importar_temporadas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_id: Number(adminId), contenido_id: Number(_ultimoContenidoId) })
-    });
-    const data = await resp.json();
-    if (resp.ok && data.success) {
-      statusEl.style.display = 'block';
-      statusEl.style.color = '#7dd7a5';
-      statusEl.textContent = `✓ ${data.insertadas} temporadas importadas`;
-      if (data.omitidas > 0) statusEl.textContent += ` (${data.omitidas} ya existían)`;
-      cargarListaTemporadas(_ultimoContenidoId);
-    } else {
-      statusEl.style.display = 'block';
-      statusEl.style.color = '#f08080';
-      statusEl.textContent = `✗ ${data.error || 'Error'}`;
-    }
-  } catch(e) {
-    statusEl.style.display = 'block';
-    statusEl.style.color = '#f08080';
-    statusEl.textContent = '✗ Error de red';
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/></svg> Reimportar temporadas';
-  }
-}
-
-async function cargarListaTemporadas(contenidoId) {
-  const listEl = document.getElementById('temps-list');
-  if (!listEl) return;
-  try {
-    const resp = await fetch(`${API}/api/temporadas/${contenidoId}`);
-    const data = await resp.json();
-    const temps = data.temporadas || [];
-    if (!temps.length) { listEl.style.display = 'none'; return; }
-    listEl.style.display = 'block';
-    listEl.innerHTML = temps.map(t => `
-      <div class="temp-row">
-        <span style="min-width:24px;font-weight:600">T${t.numero}</span>
-        <input type="text" placeholder="Enlace de reproducción…" value="${t.enlace || ''}"
-          id="enlace_${t.id}" onkeydown="if(event.key==='Enter') guardarEnlaceTemp(${t.id}, this)">
-        <button class="temp-save-btn" onclick="guardarEnlaceTemp(${t.id}, document.getElementById('enlace_${t.id}'))">
-          Guardar
-        </button>
-      </div>`).join('');
-  } catch(e) { console.error('Error cargando temporadas admin:', e); }
-}
-
-async function guardarEnlaceTemp(tempId, inputEl) {
-  const enlace = inputEl.value.trim();
-  try {
-    const resp = await fetch(`${API}/api/admin/temporadas/enlace`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_id: Number(adminId), temporada_id: tempId, enlace })
-    });
-    const data = await resp.json();
-    if (resp.ok && data.success) {
-      inputEl.style.borderColor = '#4caf7d';
-      setTimeout(() => inputEl.style.borderColor = '', 1500);
-    }
-  } catch(e) { console.error('Error guardando enlace:', e); }
 }
 
 // ── MARKETING ──
@@ -1374,26 +1132,26 @@ function renderMktUsuarios() {
   }
   list.innerHTML = usuarios.map(u => {
     const ini = (u.nombre || '?')[0].toUpperCase();
-    const tieneEmail = u.email ? `<span style="font-size:10px;color:#7dd7a5">✉ ${u.email}</span>` : '';
+    const tieneEmail = u.email ? `<span style="font-size:10px;color:#7dd7a5">✉ ${escapeHtml(u.email)}</span>` : '';
     const tienePago = u.ultimo_pago ? `<span style="font-size:10px;color:#f1c40f">⚡ Inició ${u.ultimo_pago.membresia_comprada?.toUpperCase()}</span>` : '';
     const emailBtn = u.email
       ? `<button class="btn-aprobar" style="font-size:11px;padding:5px 8px;background:rgba(234,100,50,0.18);border-color:rgba(234,100,50,0.4)"
-           title="Enviar email a ${u.email}"
-           onclick="enviarEmailIndividual(${u.telegram_id}, '${(u.email||'').replace(/'/g,'')}', '${(u.nombre||'').replace(/'/g,'')}', this)">
+           title="Enviar email a ${escapeHtml(u.email)}"
+           onclick="enviarEmailIndividual(${u.telegram_id}, ${jsonAttr(u.email||'')}, ${jsonAttr(u.nombre||'')}, this)">
            ✉
          </button>`
       : '';
     return `<div class="user-row">
       <div class="user-avatar">${ini}</div>
       <div class="user-info">
-        <div class="user-nombre">${u.nombre || 'Sin nombre'}</div>
+        <div class="user-nombre">${escapeHtml(u.nombre || 'Sin nombre')}</div>
         <div class="user-id" style="display:flex;gap:6px;flex-wrap:wrap">
           <span>${u.telegram_id}</span>${tieneEmail}${tienePago}
         </div>
       </div>
       <div style="display:flex;gap:4px">
         <button class="btn-aprobar" style="font-size:11px;padding:5px 10px"
-          onclick="enviarIndividual(${u.telegram_id}, '${(u.nombre||'').replace(/'/g,'')}', this)">
+          onclick="enviarIndividual(${u.telegram_id}, ${jsonAttr(u.nombre||'')}, this)">
           📨
         </button>
         ${emailBtn}
@@ -1434,7 +1192,7 @@ async function enviarMasivo(target) {
       statusEl.textContent = `✓ Enviado a ${data.enviados} usuarios${data.errores ? ` (${data.errores} errores)` : ''}`;
     } else {
       statusEl.className = 'import-status error';
-      statusEl.textContent = `Error: ${data.error || 'desconocido'}`;
+      statusEl.textContent = `Error: ${escapeHtml(data.error || 'desconocido')}`;
     }
   } catch(e) {
     statusEl.className = 'import-status error';
@@ -1503,7 +1261,7 @@ async function enviarEmailMasivo(target) {
         (data.sin_email ? ` · ${data.sin_email} sin email` : '');
     } else {
       statusEl.className = 'import-status error';
-      statusEl.textContent = `Error: ${data.error || 'desconocido'}`;
+      statusEl.textContent = `Error: ${escapeHtml(data.error || 'desconocido')}`;
     }
   } catch(e) {
     statusEl.className = 'import-status error';
@@ -1572,7 +1330,7 @@ async function cargarUsuarios() {
     div.innerHTML = `
       <div class="user-avatar">${ini}</div>
       <div class="user-info">
-        <div class="user-nombre">${u.nombre || 'Sin nombre'}</div>
+        <div class="user-nombre">${escapeHtml(u.nombre || 'Sin nombre')}</div>
         <div class="user-id">${u.telegram_id}</div>
       </div>
       <span class="mem-badge ${u.membresia_activa ? 'activa' : 'inactiva'}">${u.membresia_tipo || 'Ninguno'}</span>

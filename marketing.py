@@ -1,5 +1,5 @@
 """
-marketing.py — Módulo de Marketing para QuehayApp VIP
+marketing.py — Módulo de Marketing para QueHay
 Se conecta a main.py via init_marketing() y Blueprint.
 
 Endpoints:
@@ -18,26 +18,29 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, request, jsonify
+from security import admin_authenticated
 
 # ── Inyectado desde main.py via init_marketing() ──────────────────────────────
 _supabase     = None
 _bot          = None
 _ADMIN_IDS    = set()
 _BOT_USERNAME = None
+_active_access = None
 
 GMAIL_USER      = os.getenv("GMAIL_USER", "")
 GMAIL_PASSWORD  = os.getenv("GMAIL_PASSWORD", "")
-GMAIL_FROM_NAME = "QuehayApp VIP"
+GMAIL_FROM_NAME = "QueHay"
 
 marketing_bp = Blueprint("marketing", __name__)
 
 
-def init_marketing(supabase_client, bot_instance, admin_ids, bot_username: str):
+def init_marketing(supabase_client, bot_instance, admin_ids, bot_username: str, active_access=None):
     """Llamar desde main.py justo después de crear la app Flask.
 
     admin_ids puede ser un solo int o un iterable de ints (varios admins).
     """
-    global _supabase, _bot, _ADMIN_IDS, _BOT_USERNAME
+    global _supabase, _bot, _ADMIN_IDS, _BOT_USERNAME, _active_access
+    _active_access = active_access
     _supabase     = supabase_client
     _bot          = bot_instance
     if isinstance(admin_ids, (set, list, tuple)):
@@ -45,7 +48,7 @@ def init_marketing(supabase_client, bot_instance, admin_ids, bot_username: str):
     else:
         _ADMIN_IDS = {int(admin_ids)}
     _BOT_USERNAME = bot_username
-    print(f"✅ marketing.py inicializado — ADMIN_IDS={_ADMIN_IDS}, BOT={bot_username}")
+    print("Marketing inicializado; valores de configuración ocultos.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -121,12 +124,12 @@ def _html_mensaje_marketing(nombre: str, mensaje: str, bot_username: str) -> str
         "<div style='text-align:center;margin:20px 0'>"
         f"<a href='https://t.me/{bot_username}?start=planes' "
         "style='background:#e8b04b;color:#1a1200;font-weight:700;padding:12px 28px;"
-        "border-radius:8px;text-decoration:none;display:inline-block;margin:5px'>💎 Ver planes VIP</a>"
+        "border-radius:8px;text-decoration:none;display:inline-block;margin:5px'>🎟 Acceso mensual</a>"
         f"<a href='https://t.me/{bot_username}?start=miniapp' "
         "style='background:#333;color:#fff;font-weight:700;padding:12px 28px;"
         "border-radius:8px;text-decoration:none;display:inline-block;margin:5px'>🎬 Ver catálogo</a>"
         "</div>"
-        "<p style='color:#555;font-size:11px;text-align:center'>QuehayApp VIP</p>"
+        "<p style='color:#555;font-size:11px;text-align:center'>QueHay</p>"
         "</div></body></html>"
     )
 
@@ -149,7 +152,8 @@ def obtener_usuarios_sin_pago() -> list:
     print(f"DEBUG marketing: total usuarios en tabla = {len(todos)}")
 
     # Excluir solo TRUE explícito — NULL y False son "sin membresía"
-    sin_pago = [u for u in todos if u.get("membresia_activa") is not True]
+    sin_pago = [u for u in todos if u.get("telegram_id") and not (
+        _active_access(u["telegram_id"]) if _active_access else u.get("membresia_activa") is True)]
     print(f"DEBUG marketing: usuarios sin membresía activa = {len(sin_pago)}")
 
     # Enriquecer con último pago en lote
@@ -174,53 +178,8 @@ def obtener_usuarios_sin_pago() -> list:
 
 
 def recordatorio_pagos_pendientes():
-    """Envía recordatorio a pagos pendientes de +24h (anti-spam)."""
-    hace_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    pendientes = _supabase.table("pagos_manuales") \
-        .select("*") \
-        .eq("estado", "pendiente") \
-        .lt("fecha_pago", hace_24h) \
-        .execute()
-
-    print(f"DEBUG recordatorio: {len(pendientes.data or [])} pagos pendientes")
-
-    for p in (pendientes.data or []):
-        uid    = p.get("usuario_id")
-        if not uid:
-            continue
-        u_res  = _supabase.table("usuarios").select("*").eq("telegram_id", uid).execute()
-        if not u_res.data:
-            continue
-        u      = u_res.data[0]
-        nombre = u.get("nombre", "")
-        email  = u.get("email", "")
-        plan   = p.get("membresia_comprada", "").upper()
-        monto  = p.get("monto", "?")
-
-        # Telegram — import lazy para no romper el módulo si bot no está listo
-        try:
-            from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-            markup = InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                InlineKeyboardButton("✅ Completar membresía",
-                    url=f"https://t.me/{_BOT_USERNAME}?start=planes"),
-            )
-            _bot.send_message(
-                uid,
-                f"👋 Hola *{nombre}*,\n\nVimos que empezaste a activar *{plan}* "
-                f"(S/{monto}) pero no completaste el pago. ¿Te ayudamos?",
-                parse_mode="Markdown", reply_markup=markup
-            )
-        except Exception as e:
-            print(f"⚠️ Telegram {uid}: {e}")
-
-        # Gmail
-        if email:
-            try:
-                html = _html_recordatorio(nombre, plan.lower(), monto, _BOT_USERNAME)
-                enviar_email(email, f"¿Completamos tu membresía {plan}? 🎬", html)
-            except Exception as e:
-                print(f"⚠️ Email {email}: {e}")
+    """Retired: old pending orders do not represent current account payments."""
+    return {"enabled": False, "reason": "legacy_payment_reminders_retired"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -228,10 +187,7 @@ def recordatorio_pagos_pendientes():
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _check_admin(data: dict) -> bool:
-    try:
-        return int(data.get("admin_id", 0)) in _ADMIN_IDS
-    except (ValueError, TypeError):
-        return False
+    return admin_authenticated()
 
 
 @marketing_bp.route("/api/admin/marketing/usuarios_sin_pago", methods=["POST"])
@@ -272,7 +228,7 @@ def api_enviar_mensaje_marketing():
             from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
             markup = InlineKeyboardMarkup(row_width=1)
             markup.add(
-                InlineKeyboardButton("💎 Ver planes VIP",
+                InlineKeyboardButton("🎟 Acceso mensual",
                     url=f"https://t.me/{_BOT_USERNAME}?start=planes"),
                 InlineKeyboardButton("🎬 Explorar catálogo",
                     url=f"https://t.me/{_BOT_USERNAME}?start=miniapp"),
@@ -306,7 +262,7 @@ def api_enviar_email_marketing():
         }), 500
 
     ids_target = data.get("telegram_ids", [])
-    asunto     = data.get("asunto", "🎬 Oferta especial — QuehayApp VIP").strip()
+    asunto     = data.get("asunto", "🎬 Novedades de QueHay").strip()
     mensaje    = data.get("mensaje", "").strip()
 
     if not mensaje:
@@ -348,8 +304,7 @@ def api_enviar_email_marketing():
 def cron_recordatorio_pagos():
     """GET https://cineapp-bot.onrender.com/cron/recordatorio_pagos (cron-job.org, 1x/día)"""
     try:
-        recordatorio_pagos_pendientes()
-        return jsonify({"success": True}), 200
+        return jsonify(success=True, **recordatorio_pagos_pendientes()), 200
     except Exception as e:
         print(f"❌ cron: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500

@@ -21,3 +21,9 @@ python-dateutil==2.8.2
 
 # Utilities
 gunicorn==21.2.0
+
+# Accounts and server-side sessions
+bcrypt==5.0.0
+SQLAlchemy==2.0.44
+psycopg[binary]==3.2.12
+Pillow==13.0.0

@@ -10,10 +10,8 @@ def check_admin(data):
     Verifica si el admin_id en data es válido
     Tolera int y string
     """
-    try:
-        return int(data.get("admin_id", 0)) in ADMIN_IDS
-    except (ValueError, TypeError):
-        return False
+    from security import admin_authenticated
+    return admin_authenticated()
 
 
 def tmdb_get(path, params=None):

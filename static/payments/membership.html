@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tu acceso mensual · QueHay Cine</title>
+  <link rel="stylesheet" href="/static/payments/membership.css">
+  <link rel="stylesheet" href="/static/support/access.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/static/session.js" defer></script>
+  <script src="/static/payments/membership.js" defer></script>
+
+<meta name="theme-color" content="#080f19">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/pwa/icons/icon-192.png?v=3">
+<link rel="apple-touch-icon" href="/static/pwa/icons/icon-192.png?v=3">
+<link rel="stylesheet" href="/static/pwa/install.css?v=3">
+<script src="/static/pwa/install.js" defer></script>
+<link rel="stylesheet" href="/static/profile/profile.css">
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="/" aria-label="QueHay Cine, volver al catálogo"><img src="/static/logo-que-hay-live.png" class="original-logo" alt="QueHay"><span>QUEHAY<span class="brand-sub">CINE EN TU ESPACIO</span></span></a><a id="account-link" class="quiet-link" href="/cuenta?next=membership">Mi cuenta <span aria-hidden="true">↗</span></a></header>
+  <main>
+    <section class="membership-hero" aria-labelledby="membership-title">
+      <div class="hero-copy"><p class="eyebrow">UN APORTE. MUCHAS HISTORIAS.</p><h1 id="membership-title">Tu próxima historia<br>empieza aquí<span>.</span></h1><p class="hero-description">Apoya QueHay y disfruta del catálogo durante 30 días. Un solo acceso para películas, series y anime, desde tu móvil o computadora.</p><a href="#formas-de-pago" class="primary-action">Elegir cómo pagar <span aria-hidden="true">↓</span></a><p class="calm-note">Sin renovación automática. Tú decides cuándo volver.</p></div>
+      <aside class="access-card" aria-label="Un solo acceso mensual"><div class="card-top"><span>ACCESO MENSUAL</span><span class="duration-pill">30 días</span></div><div class="price"><span>US$</span>1.50</div><p class="price-caption">Un aporte por 30 días de acceso.</p><div class="card-divider"></div><ul class="benefit-list"><li><span>✓</span> Películas, series y anime del catálogo</li><li><span>✓</span> Temporadas y capítulos dentro de la app</li><li><span>✓</span> Descargas donde haya un enlace disponible</li><li><span>✓</span> Acceso con tu cuenta, sin entrar a canales</li></ul><p class="card-footnote">El reproductor puede mostrar publicidad de terceros. El aporte no elimina esos anuncios.</p></aside>
+    </section>
+    <section class="how-it-works" aria-label="Cómo funciona"><div><span class="step-number">01</span><h2>Elige tu método</h2><p>Los tres activan el mismo acceso de 30 días.</p></div><div><span class="step-number">02</span><h2>Completa tu aporte</h2><p>Con Buy Me a Coffee o con el QR de tu billetera.</p></div><div><span class="step-number">03</span><h2>Vuelve a disfrutar</h2><p>Tu tiempo empieza cuando se confirma el pago.</p></div></section>
+    <section class="support-banner" aria-labelledby="support-membership-title"><picture><source media="(prefers-reduced-motion: reduce)" srcset="/static/support/porcon-critico-still.webp"><img src="/static/support/porcon-critico.webp" width="121" height="220" loading="lazy" decoding="async" alt="Porcón Crítico con ojitos tristes"></picture><div><p class="support-eyebrow">CONTIGO, LA FUNCIÓN CONTINÚA</p><h2 id="support-membership-title">Una pequeña ayuda. Muchas historias por vivir.</h2><p>Detrás de QueHay hay tiempo, cuidado y una comunidad que lo hace posible. Tu aporte nos ayuda a mantener este espacio y te da 30 días para ver y descargar el contenido disponible. Gracias por acompañar a Porcón.</p></div></section>
+    <section id="access-state" class="access-state" aria-live="polite" hidden></section>
+    <section id="formas-de-pago" class="payment-section" aria-labelledby="payment-title"><div class="section-heading"><div><p class="eyebrow">A TU MANERA</p><h2 id="payment-title">El mismo acceso.<br>Elige cómo apoyarnos.</h2></div><p>Importes fijos por método.<br>Una compra, sin cargos recurrentes.</p></div><div id="payment-methods" class="payment-methods"><p>Cargando opciones…</p></div><p id="guest-note" class="guest-note" hidden>Inicia sesión o crea tu cuenta antes de pagar. Así tu acceso queda asociado a ti.</p><p id="payment-feedback" role="status" aria-live="polite"></p></section>
+    <section id="payment-history" class="payment-history" hidden><div class="section-heading"><h2>Tus solicitudes</h2><button id="refresh-payments" type="button" class="outline-action">Actualizar estado</button></div><div id="order-list"></div></section>
+    <section class="questions" aria-labelledby="questions-title"><div><p class="eyebrow">ANTES DE ELEGIR</p><h2 id="questions-title">Todo claro,<br>desde el principio.</h2></div><div class="answers"><details open><summary>¿Cuándo empiezan mis 30 días?</summary><p>Cuando se confirma tu aporte. Buy Me a Coffee activa el acceso al recibir la confirmación del pago. Yape/Plin y Binance Pay requieren que revisemos el ingreso y aprobemos tu solicitud; no son instantáneos.</p></details><details><summary>¿Me cobrarán otra vez al terminar?</summary><p>No. No guardamos una autorización de cobro recurrente. Al vencer los 30 días, vuelves a comprar solo si quieres seguir viendo y descargando.</p></details><details><summary>¿Y si compro antes de que venza mi acceso?</summary><p>Añadimos 30 días al tiempo que todavía te queda. No pierdes los días disponibles.</p></details><details><summary>¿Cómo confirmo un pago con QR?</summary><p>Después de pagar, registra el número de operación, la fecha y el nombre del titular. Podrás ver el estado aquí. Comprobaremos el ingreso en la billetera antes de activar tu acceso.</p></details><details><summary>¿Qué pasa con las descargas y la publicidad?</summary><p>Las descargas siguen disponibles para cuentas con acceso vigente cuando el título tenga un enlace. El archivo se abre en MediaFire u otro proveedor externo. El reproductor de vídeo puede incluir anuncios de terceros.</p></details></div></section>
+    <footer class="membership-footer"><a href="/instalar">Instalar aplicación</a><a href="/">← Volver al catálogo</a><span>QUEHAY CINE · Historias que nos acompañan.</span></footer>
+  </main>
+  <dialog id="payment-dialog" class="payment-dialog" aria-labelledby="checkout-title"><button id="close-payment" class="dialog-close" type="button" aria-label="Cerrar pago">×</button><div id="checkout-content"></div><p id="checkout-feedback" role="status" aria-live="polite"></p></dialog>
+</body>
+</html>

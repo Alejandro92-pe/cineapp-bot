@@ -1,0 +1,24 @@
+.episodes-toolbar { display:flex; align-items:center; justify-content:space-between; gap:20px; margin:0 0 16px; }
+.episodes-toolbar h2 { color:#f0f3fc; font-size:22px; margin:0; letter-spacing:-.5px; }
+.episodes-toolbar label { color:#a9b5cc; font-size:12px; display:grid; gap:6px; }
+.episodes-toolbar select { border:1px solid #3b4b67; border-radius:10px; padding:12px; background:#152034; color:#f0f3fc; max-width:100%; min-height:44px; font:inherit; font-size:14px; }
+.episodes-status { color:#9caec8; font-size:13px; line-height:1.6; margin:0 0 18px; }
+.episodes-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.episode-card { display:flex; align-items:center; gap:16px; padding:18px; text-align:left; color:#dbe5f7; background:#131c2b; border:1px solid #263248; border-radius:12px; cursor:pointer; min-width:0; min-height:88px; width:100%; }
+.episode-card:hover { background:#1b2a42; border-color:#6686b0; }
+.episode-card[aria-pressed=true] { background:#1b304b; border-color:#8ebcf4; box-shadow:inset 3px 0 #b6d6ff; }
+.episode-number { font-size:24px; color:#8296b5; font-weight:600; min-width:32px; }
+.episode-info { display:grid; gap:5px; flex:1; min-width:0; overflow-wrap:anywhere; }
+.episode-info strong { font-size:14px; line-height:1.4; }.episode-info > span { font-size:12px; color:#9cafc8; }
+.episode-synopsis { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; line-height:1.5; }
+.episodes-more { display:block; padding:14px 24px; margin:16px auto 0; background:#243956; border:1px solid #4f709a; color:#e8f2ff; border-radius:10px; cursor:pointer; }
+#btnVerAhora:disabled { opacity:.5; cursor:not-allowed; }
+.episode-card:focus-visible,.episodes-toolbar select:focus-visible,.episodes-more:focus-visible { outline:3px solid #e1bd74; outline-offset:3px; }
+.modal-detalle { background:#0a111d; }
+.detalle-cuerpo { max-width:1080px; margin:auto; }
+.temp-wrap { padding:24px 0; border:0; background:transparent; margin-bottom:24px; }
+.episode-playbar { position:sticky; top:54px; z-index:5; background:#0a111df2; padding:8px 0; backdrop-filter:blur(12px); }
+.episode-playbar .detalle-btn-reproducir { background:#c6def9; color:#0c1c30; font-weight:700; }
+@media(min-width:800px) { .detalle-hero-contenido { max-width:1080px; margin:auto; } .detalle-titulo { font-size:40px; } .detalle-cuerpo { padding:30px 40px 80px; } }
+@media(max-width:600px) { .episodes-grid { grid-template-columns:minmax(0,1fr); } .episodes-toolbar { align-items:flex-start; flex-direction:column; gap:12px; } .episodes-toolbar label,.episodes-toolbar select { width:100%; box-sizing:border-box; } .episode-card { padding:14px; gap:12px; } .temp-wrap { padding:16px 0; } .detalle-cuerpo { padding-left:16px; padding-right:16px; } }
+@media(prefers-reduced-motion:reduce) { .episode-card { transition:none; } }

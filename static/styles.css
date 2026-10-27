@@ -1974,8 +1974,8 @@ h2.titulo-seccion {
 .spinner {
     width: 36px;
     height: 36px;
-    border: 3px solid rgba(249,115,22,0.2);
-    border-top-color: #f97316;
+    border: 3px solid #243c5a;
+    border-top-color: #78b7fb;
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
 }
@@ -1989,7 +1989,7 @@ h2.titulo-seccion {
     align-items: center;
     min-height: 60vh;
     gap: 16px;
-    color: #666;
+    color: #9daec5;
     font-size: 14px;
 }
 .app-loading .spinner {
@@ -1997,6 +1997,19 @@ h2.titulo-seccion {
     height: 48px;
     border-width: 4px;
 }
+@supports (mask: radial-gradient(black, transparent)) {
+    .spinner {
+        border: 0;
+        background: conic-gradient(from 0deg, #101c30 8%, #243c5a 44%, #4c78a9 72%, #a4cefa 97%, #101c30);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
+        mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
+    }
+    .app-loading .spinner {
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+        mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+    }
+}
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
  
 /* ============================================================
    MEJORAS GENERALES DE ELEGANCIA

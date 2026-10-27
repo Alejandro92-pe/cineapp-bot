@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tu cuenta · QueHay Cine</title><link rel="stylesheet" href="/static/account.css">
+<script src="https://telegram.org/js/telegram-web-app.js" defer></script><script src="/static/session.js" defer></script><script src="/static/profile/sync.js" defer></script><script src="/static/profile/avatars.js" defer></script><script src="/static/profile/library.js" defer></script><script src="/static/account.js" defer></script>
+<meta name="theme-color" content="#080f19">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/pwa/icons/icon-192.png?v=3">
+<link rel="apple-touch-icon" href="/static/pwa/icons/icon-192.png?v=3">
+<link rel="stylesheet" href="/static/pwa/install.css?v=3">
+<script src="/static/pwa/install.js" defer></script>
+<link rel="stylesheet" href="/static/profile/profile.css">
+</head>
+<body>
+<header><a class="brand account-brand" href="/"><img src="/static/logo-que-hay-live.png" class="original-logo" alt="QueHay"><div>QUEHAY<span>CINE</span></div></a><a class="back" href="/">Explorar catálogo <span aria-hidden="true">↗</span></a></header>
+<main>
+  <section class="intro"><p class="eyebrow">TU PRÓXIMA HISTORIA EMPIEZA AQUÍ</p>
+    <h1>Un lugar para<br>volver a <em>disfrutar.</em></h1>
+    <p class="lead">Guarda lo que quieres ver y vuelve a tus historias favoritas. Tu próxima sesión de cine empieza aquí.</p>
+    <div class="scene" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="cinema-mark"><img src="/static/logo-que-hay-live.png" class="original-logo" alt="QueHay"></div><span class="scene-label">PELÍCULAS &nbsp; / &nbsp; SERIES &nbsp; / &nbsp; ANIME</span></div>
+    <p class="footnote">Crear tu cuenta es gratis. Elige tu acceso cuando quieras empezar a ver.</p>
+  </section>
+  <section class="panel" aria-label="Acceso a tu cuenta">
+    <p id="account-loading" class="hint" role="status">Abriendo tu cuenta…</p><div id="forms" hidden>
+      <p class="eyebrow">BIENVENIDO A QUEHAY</p><h2 id="form-title">Qué bueno verte.</h2>
+      <p class="muted" id="form-description">Inicia sesión para continuar.</p>
+      <div class="tabs" role="group" aria-label="Acceso"><button id="tab-login" class="selected" type="button" aria-pressed="true">Iniciar sesión</button><button id="tab-register" type="button" aria-pressed="false">Crear cuenta</button></div>
+      <form id="account-form">
+        <label id="name-field" hidden>Tu nombre<input name="name" id="name" autocomplete="name" maxlength="80"></label>
+        <label>Correo electrónico<input name="email" type="email" id="email" required autocomplete="email" maxlength="254" placeholder="tu@correo.com"></label>
+        <label>Contraseña<span class="password-wrap"><input name="password" id="password" type="password" required autocomplete="current-password" placeholder="Tu contraseña"><button id="show-password" type="button" aria-label="Mostrar contraseña">Ver</button></span></label>
+        <p id="password-help" class="hint" hidden>Usa al menos 12 caracteres. Se aceptan frases y espacios.</p>
+        <button class="primary" id="submit" type="submit">Entrar a mi cuenta <span aria-hidden="true">→</span></button>
+      </form>
+      <div class="separator"><span>¿Ya usabas la Mini App?</span></div>
+      <button id="telegram-login" class="secondary" type="button">Continuar con Telegram</button>
+      <p class="hint">Si ya usas QueHay en Telegram, entra desde el bot para conservar tu acceso.</p>
+    </div>
+    <div id="signed-in" hidden>
+      <div class="account-profile-head"><div id="profile-avatar" class="profile-avatar" aria-label="Tu avatar"></div><div><p class="eyebrow">TU ESPACIO PERSONAL</p><h2 id="welcome">Tu cuenta está lista.</h2><p id="identity" class="muted"></p></div></div>
+      <details class="avatar-picker account-disclosure"><summary>Elige tu avatar</summary><div id="profile-choices" class="profile-choices"></div><p class="hint">Tu avatar te acompaña en todos tus dispositivos.</p></details>
+      <p id="profile-sync-status" class="hint" role="status"></p><a class="account-library-link" href="/?vista=guardados"><span>＋ Mi lista</span><small id="saved-count">Tus títulos guardados</small><span aria-hidden="true">→</span></a><section class="profile-membership" aria-label="Mi membresía"><span id="membership-badge" class="membership-badge">Consultando</span><p class="eyebrow">TU ACCESO</p><h3 id="membership-state">Comprobando membresía…</h3><p id="membership-expiry"></p><p id="membership-pending" class="membership-pending" hidden></p><p id="membership-terms" class="hint">30 días por compra. Sin renovación automática.</p><a id="membership-action" class="secondary link-button" href="/membresia">Ver membresía</a><button id="refresh-membership" class="logout" type="button">Actualizar estado</button></section>
+      <details class="account-disclosure" id="purchases"><summary>Mis compras y solicitudes <span id="orders-count"></span></summary><div id="membership-orders" aria-live="polite"></div></details>
+      <a href="/" class="primary link-button">Volver a ver <span aria-hidden="true">→</span></a>
+      <details class="account-disclosure"><summary>Seguridad y conexiones</summary>
+      <div class="account-detail"><span>Telegram</span><strong id="telegram-status">Sin vincular</strong></div>
+      <div class="account-detail"><span>Permisos</span><strong id="role">Usuario</strong></div>
+      <button id="link-telegram" type="button" class="secondary">Vincular mi Telegram</button>
+      <details><summary>Cambiar contraseña</summary><form id="password-form"><label>Contraseña actual<input type="password" name="current_password" autocomplete="current-password" required></label><label>Nueva contraseña<input type="password" name="password" autocomplete="new-password" minlength="12" required></label><button class="secondary" type="submit">Actualizar y cerrar otras sesiones</button></form></details>
+      </details>
+      <a href="/admin" id="admin-link" class="secondary link-button" hidden>Administración</a>
+      <button id="logout" type="button" class="logout">Cerrar sesión</button>
+    </div>
+    <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+  </section>
+</main>
+<footer><a href="/instalar">Instalar aplicación</a><span>QUEHAY CINE</span><span>Una cuenta. Muchas historias.</span></footer>
+</body></html>

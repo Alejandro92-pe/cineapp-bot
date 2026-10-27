@@ -2,6 +2,7 @@
 Endpoints Flask para cron y renovación de membresías
 """
 from flask import Blueprint, jsonify, request
+from security import admin_authenticated
 from datetime import datetime
 from supabase import create_client
 from services.notifications import verificar_vencimientos
@@ -73,7 +74,7 @@ def renovar_membresia():
         data = request.get_json()
         
         # Validar admin
-        if int(data.get("admin_id", 0)) not in ADMIN_IDS:
+        if not admin_authenticated():
             return jsonify({"error": "No autorizado"}), 403
         
         usuario_id = data.get("usuario_id")
@@ -124,7 +125,7 @@ def ver_estado_notificaciones():
     try:
         data = request.get_json()
         
-        if int(data.get("admin_id", 0)) not in ADMIN_IDS:
+        if not admin_authenticated():
             return jsonify({"error": "No autorizado"}), 403
         
         usuario_id = data.get("usuario_id")
@@ -172,7 +173,7 @@ def resetear_flags_manual():
     try:
         data = request.get_json()
         
-        if int(data.get("admin_id", 0)) not in ADMIN_IDS:
+        if not admin_authenticated():
             return jsonify({"error": "No autorizado"}), 403
         
         usuario_id = data.get("usuario_id")
