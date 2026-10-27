@@ -132,7 +132,15 @@ def install_security(app, membership_checker):
             return error('Esta prueba usa una copia del catálogo. La importación real requiere configurar Vimeus Listing por separado.', 503)
         if request.content_length and request.content_length > 256*1024 and path != "/api/admin/payments/qr":
             return error("Solicitud demasiado grande.", 413)
-        g.identity = store.session(request.cookies.get(COOKIE))
+        # Public documents/assets never consume a database connection. Keep the
+        # security headers below; authenticated APIs still verify every request.
+        public_document = request.method in ('GET', 'HEAD') and (
+            request.endpoint == 'static' or path in {
+                '/', '/admin', '/cuenta', '/membresia', '/instalar', '/offline',
+                '/sw.js', '/manifest.webmanifest', '/health'})
+        public_catalog = ((request.method in ('GET', 'HEAD') and path in {'/api/tendencias', '/api/top10'})
+                          or (request.method == 'POST' and path == '/api/contenido'))
+        g.identity = None if public_document or public_catalog else store.session(request.cookies.get(COOKIE))
         if request.endpoint is None:
             return None
         if path.startswith("/cron/"):

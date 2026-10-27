@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>QueHay Cine</title>
 
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 
 
 <link rel="stylesheet" href="/static/styles.css">
@@ -50,18 +50,18 @@
   <a href="/membresia"><svg viewBox="0 0 24 24"><path d="m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z"/></svg><span>Acceso</span></a>
 </nav>
 
-<script src="/static/escape.js"></script>
-<script src="/static/session.js"></script>
-<script src="/static/support/access.js"></script>
-<script src="/static/downloads.js"></script>
-<script src="/static/catalog/episodes.js"></script>
-<script src="/static/catalog/hero.js"></script>
-<script src="/static/catalog/browse.js"></script>
-<script src="/static/profile/sync.js"></script><script src="/static/profile/avatars.js"></script><script src="/static/profile/library.js"></script><script src="/static/catalog/episode-downloads.js"></script><script src="/static/catalog/trailers.js" defer></script>
-<script src="/static/catalog/playback.js"></script><script src="/static/app.js"></script>
+<script src="/static/escape.js" defer></script>
+<script src="/static/session.js" defer></script>
+<script src="/static/support/access.js" defer></script>
+
+
+<script src="/static/catalog/hero.js" defer></script>
+<script src="/static/catalog/browse.js" defer></script>
+<script src="/static/profile/sync.js" defer></script><script src="/static/profile/avatars.js" defer></script><script src="/static/profile/library.js" defer></script>
+<script src="/static/catalog/detail-loader.js" defer></script><script src="/static/app.js" defer></script>
 
 <script>
-window.Telegram.WebApp.ready();
+document.addEventListener('DOMContentLoaded',()=>window.Telegram?.WebApp?.ready());
 </script>
 
 

@@ -43,7 +43,7 @@
       $('saved-count').textContent=`${savedCount} ${savedCount===1?'título guardado':'títulos guardados'} en tu cuenta`;
       $('welcome').textContent = `Hola, ${state.user.name}.`;
       $('identity').textContent = state.user.email || 'Cuenta vinculada con Telegram';
-      $('telegram-status').textContent = state.user.telegram_id ? 'Vinculado y verificado' : 'Sin vincular';
+      $('telegram-status').textContent = state.user.telegram_id ? 'ID '+state.user.telegram_id+' · Verificado' : 'Sin vincular';
       $('link-telegram').hidden=!!state.user.telegram_id;
       $('role').textContent=state.is_admin?'Administrador':'Usuario';
       $('admin-link').hidden=!state.is_admin;
@@ -82,5 +82,11 @@
   window.addEventListener('profile-changed',updateProfile);
   window.addEventListener('session-changed',()=>{render();ProfileSync.refresh().then(updateProfile);});
   window.addEventListener('profile-status',()=>{$('profile-sync-status').textContent=ProfileSync.message;});
-  ProfileSync.ready.then(()=>{render();if(AccountSession.state.error)feedback(AccountSession.state.error);});
+  ProfileSync.ready.then(()=>{
+    render();
+    const verified=AccountSession.state.user?.telegram_id;
+    const opened=window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+    if(verified&&opened&&String(verified)!==String(opened))feedback('Esta sesión pertenece a otra cuenta de Telegram. Cierra sesión aquí y vuelve a abrir QueHay desde la cuenta que quieres usar.');
+    else if(AccountSession.state.error)feedback(AccountSession.state.error);
+  });
 })();

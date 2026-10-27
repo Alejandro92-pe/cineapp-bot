@@ -40,14 +40,22 @@
     header.append(arrows);wrap.append(header,rail);return wrap;
   }
   async function home(container,token){
+    let heroVisible=false;
+    const featuredRequest=fetch('/api/tendencias').then(r=>{if(!r.ok)throw new Error('No pudimos cargar los destacados.');return r.json();}).then(items=>{
+      if(token===revision){
+        const slides=CatalogHero.selectTitles(items,[]);
+        if(slides.length){const hero=CatalogHero.create(slides,item=>abrirModalContenido(item),()=>root.cambiarVista('explorar'));disposeHero=hero.dispose;container.replaceChildren(hero.element);heroVisible=true;}
+      }
+      return items;
+    });
     const [featured,latest,movies,series,anime,top,biblical]=await Promise.all([
-      fetch('/api/tendencias').then(r=>{if(!r.ok)throw new Error('No pudimos cargar los destacados.');return r.json();}),
+      featuredRequest,
       request({limit:12}),request({tipo:'pelicula',limit:8}),request({tipo:'serie',limit:8}),request({tipo:'anime',limit:8}),
       fetch('/api/top10').then(r=>r.ok?r.json():{data:[]}).catch(()=>({data:[]})),request({tipo:'biblico',limit:8})]);
     if(token!==revision)return;
-    container.replaceChildren();
+    if(!heroVisible)container.replaceChildren();
     const slides=CatalogHero.selectTitles(featured,movies.data);
-    if(slides.length){const hero=CatalogHero.create(slides,item=>abrirModalContenido(item),()=>root.cambiarVista('explorar'));disposeHero=hero.dispose;container.append(hero.element);}
+    if(slides.length){if(!heroVisible){const hero=CatalogHero.create(slides,item=>abrirModalContenido(item),()=>root.cambiarVista('explorar'));disposeHero=hero.dispose;container.append(hero.element);}}
     else if(!latest.data.length){container.append(empty('Las próximas historias están en camino.','El catálogo aparecerá aquí cuando haya títulos disponibles.'));return;}
     const intro=el('div',null,'cine-intro');intro.append(el('p','Tu siguiente historia, a un toque.'),el('a','Conoce el acceso de 30 días →'));intro.lastChild.href='/membresia';container.append(intro);
     if(top.data?.length){

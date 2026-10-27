@@ -112,6 +112,8 @@ let limiteActual = LIMITE_INICIAL;
 
 // ============ INICIALIZACIÓN ============
 async function iniciar() {
+  // The public catalogue does not depend on membership/profile requests.
+  if (!navigationStarted) cambiarVista(new URLSearchParams(location.search).get('vista')==='guardados'?'guardados':'inicio');
   await (window.ProfileSync?.ready || AccountSession.ready);
   userId = AccountSession.state.user?.telegram_id || null;
 
@@ -124,20 +126,6 @@ async function iniciar() {
   }
 
   try {
-    const planesRes = await fetch(`${API_BASE_URL}/api/planes`);
-    planesMembresias = await planesRes.json();
-
-    if (userId) {
-      const userRes = await fetch(`${API_BASE_URL}/api/usuario`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telegram_id: userId })
-      });
-      const userData = await userRes.json();
-      usuarioActual = userData.usuario;
-      membresiaActiva = userData.membresia;
-    }
-
     if (AccountSession.state.authenticated) {
       const accessResponse = await fetch('/api/payments/mine');
       if (accessResponse.ok) {
@@ -1513,7 +1501,10 @@ let detalleOpenRevision = 0;
 async function abrirModalContenido(item) {
   const opening=++detalleOpenRevision;
   try {
-    const response=await fetch('/api/contenido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id,limit:1})});
+    const [response]=await Promise.all([
+      fetch('/api/contenido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id,limit:1})}),
+      DetailAssets.ready(), AccountSession.ready
+    ]);
     if(!response.ok)throw new Error('No se pudo abrir este título. Inténtalo de nuevo.');
     const data=await response.json();if(opening!==detalleOpenRevision)return;
     const fresh=data.data?.[0];if(!fresh)throw new Error('Este título no está disponible.');
@@ -1716,11 +1707,11 @@ async function cargarRelacionados(item) {
 
 window.cerrarModalDetalle = function() {
   ++detalleOpenRevision;
-  InlinePlayback.close();
+  window.InlinePlayback?.close();
   document.getElementById('modalDetalle')?.classList.remove('active');
   document.body.style.overflow = '';
   contenidoSeleccionado = null;
-  EpisodeBrowser.reset();
+  window.EpisodeBrowser?.reset();
   if (detallePreviousFocus?.isConnected) detallePreviousFocus.focus();
   CatalogBrowse.refreshSaved();
 };
@@ -1921,7 +1912,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const contentId = new URLSearchParams(location.search).get('contenido');
   if (!contentId || !/^\d+$/.test(contentId)) return;
   try {
-    await (window.ProfileSync?.ready || AccountSession.ready);
     await abrirModalContenido({id:Number(contentId)});
   } catch { /* Catalogue remains usable if a shared item is unavailable. */ }
 });

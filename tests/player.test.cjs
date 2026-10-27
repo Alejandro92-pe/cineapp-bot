@@ -1,8 +1,8 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
-function setup(fetcher){
+function setup(fetcher, readyState="loading"){
  const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',classList:{add(){},remove(){}},removeAttribute(k){delete this[k];},scrollIntoView(){}});return nodes.get(id);};
- const events={};const history=[];const support=[];const window={AccessSupport:{handle:(r,p)=>{const reason=require("../static/support/access.js").reason(r,p);if(reason)support.push(reason);return !!reason;}}};const context={window,URL,document:{getElementById:get,addEventListener:(name,fn)=>events[name]=fn},EpisodeBrowser:{selection:()=>({}),next:async()=>null,hasNext:()=>true},AccountLibrary:{opened:(...args)=>history.push(args)},fetch:fetcher};
- vm.runInNewContext(fs.readFileSync('static/catalog/playback.js','utf8'),context);events.DOMContentLoaded();return {api:window.InlinePlayback,get,history,context,support};
+ const events={};const history=[];const support=[];const window={AccessSupport:{handle:(r,p)=>{const reason=require("../static/support/access.js").reason(r,p);if(reason)support.push(reason);return !!reason;}}};const context={window,URL,document:{readyState,getElementById:get,addEventListener:(name,fn)=>events[name]=fn},EpisodeBrowser:{selection:()=>({}),next:async()=>null,hasNext:()=>true},AccountLibrary:{opened:(...args)=>history.push(args)},fetch:fetcher};
+ vm.runInNewContext(fs.readFileSync('static/catalog/playback.js','utf8'),context);if(readyState==="loading")events.DOMContentLoaded();return {api:window.InlinePlayback,get,history,context,support};
 }
 test('opens authorized iframe inside detail with no new browser window',async()=>{const s=setup(async()=>({ok:true,json:async()=>({embed:true,url:'https://vimeus.com/e/movie?tmdb=22'})}));await s.api.start({id:1,titulo:'Movie',tipo:'pelicula'});assert.equal(s.get('inline-player').hidden,false);assert.equal(s.get('iframeReproductor').src,'https://vimeus.com/e/movie?tmdb=22');assert.equal(s.history.length,1);s.api.close();assert.equal(s.get('inline-player').hidden,true);assert.equal(s.get('iframeReproductor').src,undefined);});
 test('late playback response cannot reopen a closed title',async()=>{let resolve;const s=setup(()=>new Promise(r=>resolve=r));const pending=s.api.start({id:1,titulo:'Movie'});s.api.close();resolve({ok:true,json:async()=>({embed:true,url:'https://vimeus.com/e/movie'})});await pending;assert.equal(s.get('iframeReproductor').src,undefined);assert.equal(s.history.length,0);});
@@ -48,3 +48,5 @@ test('OK.ru opens only its canonical videoembed path inside the same player',asy
  await s.api.start({id:421,tipo:'biblico'});assert.equal(s.get('iframeReproductor').src,'https://ok.ru/videoembed/10328454335072?nochat=1');
  const bad=setup(async()=>({ok:true,status:200,json:async()=>({embed:true,url:'https://ok.ru/login'})}));await bad.api.start({id:421});assert.equal(bad.get('iframeReproductor').src,undefined);
 });
+
+test("lazy playback binds controls after DOMContentLoaded",()=>{const s=setup(async()=>({}),"complete");assert.equal(typeof s.get("player-next").onclick,"function");assert.equal(typeof s.get("player-close").onclick,"function");});

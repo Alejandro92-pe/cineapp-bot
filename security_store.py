@@ -95,13 +95,15 @@ class SecurityStore:
         if not token or len(token) > 128:
             return None
         with self.engine.connect() as c:
-            row = c.execute(select(sessions).where(sessions.c.token_hash == digest(token),
+            row = c.execute(select(sessions, *[col.label('identity_'+col.name) for col in accounts.c])
+                .join(accounts, accounts.c.id == sessions.c.account_id)
+                .where(sessions.c.token_hash == digest(token),
                 sessions.c.expires_at > time.time())).mappings().first()
             if not row:
                 return None
-            result = dict(row)
-            result["account"] = self.account(id=result["account_id"])
-            return result if result["account"] else None
+            result = {col.name: row[col.name] for col in sessions.c}
+            result["account"] = {col.name: row['identity_'+col.name] for col in accounts.c}
+            return result
 
     def revoke(self, token):
         with self.engine.begin() as c:
