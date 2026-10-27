@@ -162,7 +162,7 @@ def payment_routes(store, security_store, legacy_expiry):
         from billing.config import product_id
         payload = {"type": "extra_purchase.created", "live_mode": True, "created": int(time.time()), "data": {
             "id": int(hashlib.sha256(order_id.encode()).hexdigest()[:12],16), "status": "succeeded", "refunded": "false",
-            "amount": 1.50, "currency": "USD", "extras": [{"id": int(product_id()), "quantity": 1, "question_answers": [row["code"]]}]}}
+            "amount": 1.50, "currency": "USD", "extras": [{"id": int(product_id()), "amount": "1.50", "currency": "USD", "quantity": 1, "question_answers": [row["code"]]}]}}
         raw = json.dumps(payload).encode()
         signature = hmac.new(os.environ["BMC_WEBHOOK_SECRET"].encode(), raw, hashlib.sha256).hexdigest()
         result, status = process_bmc(raw, signature, store, legacy_expiry)

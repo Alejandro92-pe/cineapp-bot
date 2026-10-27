@@ -22,7 +22,7 @@ def create_order(client, method='bmc', auth=None, **extra):
 def payload(order, payment_id=1001):
     return {'event_id':123,'type':'extra_purchase.created','live_mode':True,'created':int(time.time()),
         'data':{'id':payment_id,'status':'succeeded','refunded':'false','amount':1.50,'currency':'USD',
-                'supporter_email':'unrelated@example.test','extras':[{'id':517243,'quantity':1,'question_answers':[order['code']]}]}}
+                'supporter_email':'unrelated@example.test','extras':[{'id':517243,'amount':'1.50','currency':'USD','quantity':1,'question_answers':[order['code']]}]}}
 
 
 def webhook(client, data, signed=True):
@@ -150,6 +150,30 @@ def test_signature_and_test_events_never_activate(client):
     assert webhook(client,payload(order),False).status_code==401
     data=payload(order);data['live_mode']=False
     assert webhook(client,data).json['test_event']
+    assert send(client,'/api/payments/mine',method='GET').json['active'] is False
+
+
+@pytest.mark.parametrize('settled', ['1.4850', '1.49', '1.51'])
+def test_signed_purchase_preserves_fixed_price_with_small_settlement_variance(client, system, settled):
+    order,_=create_order(client);data=payload(order);data['data']['amount']=settled
+    result=webhook(client,data)
+    assert result.json['success']
+    stored=system.billing_store.get(order['id'])
+    assert stored['amount_minor']==150 and stored['currency']=='USD'
+    assert webhook(client,data).json['duplicate'] is True
+
+
+@pytest.mark.parametrize('field,value', [('amount','1.00'),('amount',None),('amount','NaN'),('currency','PEN')])
+def test_product_price_and_currency_must_match_even_if_total_matches(client, field, value):
+    order,_=create_order(client);data=payload(order);data['data']['extras'][0][field]=value
+    assert webhook(client,data).json['review']
+    assert send(client,'/api/payments/mine',method='GET').json['active'] is False
+
+
+@pytest.mark.parametrize('settled', ['1.46', '1.54', '0.01', 'Infinity'])
+def test_larger_settlement_difference_requires_review(client, settled):
+    order,_=create_order(client);data=payload(order);data['data']['amount']=settled
+    assert webhook(client,data).json['review']
     assert send(client,'/api/payments/mine',method='GET').json['active'] is False
 
 

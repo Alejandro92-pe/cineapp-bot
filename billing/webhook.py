@@ -42,11 +42,17 @@ def process_bmc(raw, signature, store, legacy_expiry):
     extra = extras[0]
     try:
         amount = Decimal(str(data.get("amount")))
-        valid_amount = amount.is_finite() and amount == Decimal("1.50")
+        price = Decimal(str(extra.get("amount")))
+        # Real BMC deliveries can differ slightly from the shop price (e.g.
+        # 2.97 USD for a 3.00 USD item). Keep the item fixed at 1.50 USD,
+        # with at most 2% settlement variance; larger discrepancies need review.
+        valid_amount = (amount.is_finite() and price.is_finite()
+                        and price == Decimal("1.50")
+                        and abs(amount-price) <= Decimal("0.03"))
     except InvalidOperation:
         valid_amount = False
     if (str(extra.get("id")) != product_id() or type(extra.get("quantity")) is not int or extra["quantity"] != 1
-            or not valid_amount or data.get("currency") != "USD"):
+            or not valid_amount or data.get("currency") != "USD" or extra.get("currency") != "USD"):
         store.review(payment_id, "El producto, importe, moneda o cantidad no corresponde al acceso mensual de US$1.50.")
         return {"received": True, "review": True, "activated": False}, 200
     if data.get("status") != "succeeded" or not (data.get("refunded") is False or data.get("refunded") == "false"):
