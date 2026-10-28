@@ -98,18 +98,18 @@ def test_restart_keeps_schedule_and_missing_vimeus_uses_videoapi(system,monkeypa
     calls=[]
     monkeypatch.setattr(s,'run_videoapi_batch',lambda *a:calls.append('videoapi') or {})
     args=dict(videoapi_enabled=True,vimeus_key='',tmdb_key='test')
-    q=DurableQueue(system.security_store,clock=lambda:1000);q.set_setting('provider_turn',4)
+    q=DurableQueue(system.security_store,clock=lambda:900);q.set_setting('provider_turn',4)
     assert s.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
-    q=DurableQueue(system.security_store,clock=lambda:1299)
+    q=DurableQueue(system.security_store,clock=lambda:1199)
     assert s.run_batch(q,system.security_store,None,**args)=={'waiting':True}
-    q.clock=lambda:1300
+    q.clock=lambda:1200
     assert s.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
     assert len(calls)==2
 
 
 def test_full_day_schedule_is_four_to_one_with_no_early_requests(system,monkeypatch):
     from services import catalog_scheduler as s
-    now=[1000];q=DurableQueue(system.security_store,clock=lambda:now[0]);calls=[]
+    now=[900];q=DurableQueue(system.security_store,clock=lambda:now[0]);calls=[]
     monkeypatch.setattr(s,'run_videoapi_batch',lambda *a:calls.append('videoapi') or {})
     monkeypatch.setattr(s,'run_production_batch',lambda *a:calls.append('vimeus') or {})
     args=dict(videoapi_enabled=True,vimeus_key='fixture',tmdb_key='fixture')
@@ -119,3 +119,21 @@ def test_full_day_schedule_is_four_to_one_with_no_early_requests(system,monkeypa
         assert s.run_batch(q,system.security_store,None,**args)=={'waiting':True}
         now[0]+=1
     assert calls.count('videoapi')==231 and calls.count('vimeus')==57
+
+
+def test_cron_jitter_does_not_skip_five_minute_ticks_or_allow_boundary_bursts(system,monkeypatch):
+    from services import catalog_scheduler as s
+    now=[907];q=DurableQueue(system.security_store,clock=lambda:now[0]);calls=[]
+    monkeypatch.setattr(s,'run_videoapi_batch',lambda *a:calls.append('videoapi') or {})
+    monkeypatch.setattr(s,'run_production_batch',lambda *a:calls.append('vimeus') or {})
+    args=dict(videoapi_enabled=True,vimeus_key='fixture',tmdb_key='fixture')
+    for tick in (907,1204,1509,1801,2103):
+        now[0]=tick
+        assert 'provider' in s.run_batch(q,system.security_store,None,**args)
+        now[0]+=1
+        assert s.run_batch(q,system.security_store,None,**args)=={'waiting':True}
+    assert calls==['videoapi']*4+['vimeus']
+    now[0]=2699
+    assert 'provider' in s.run_batch(q,system.security_store,None,**args)
+    now[0]=2701
+    assert s.run_batch(q,system.security_store,None,**args)=={'waiting':True}

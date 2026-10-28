@@ -17,7 +17,7 @@ Seguridad:
 - Las migraciones no borran cuentas ni descargas. La 016 conserva el plazo administrativo de sesiones antiguas activas y amplía solamente visualización una vez.
 
 Importación:
-- Cola privada videoapi_jobs. Páginas de 24 en una inserción, un título por lote, 1,5 s entre peticiones y presupuesto de transporte de 18 s. El planificador reserva 300 s antes de permitir otro turno (el tiempo total incluye trabajo adicional de base de datos).
+- Cola privada videoapi_jobs. Páginas de 24 en una inserción, un título por lote, 1,5 s entre peticiones y presupuesto de transporte de 18 s. El planificador reserva una franja de cinco minutos y exige al menos 60 s entre turnos; tolera los segundos de variación del cron sin saltarse la siguiente franja. El tiempo total incluye trabajo adicional de base de datos.
 - Ciclo: VideoAPI, VideoAPI, VideoAPI, VideoAPI, Vimeus. Cursor persistente, incluso ante errores. Un importador a la vez. Los tipos película/serie/anime siguen rotando dentro de cada proveedor.
 - TMDB da temporadas y episodios; cada episodio se contrasta contra exists de VideoAPI. Se publica la lista confirmada completa al terminar el recorrido del título. El avance por episodio se guarda antes de continuar.
 - Títulos sin ningún episodio disponible no se publican. Identidades ambiguas ya duplicadas se dejan para revisión.

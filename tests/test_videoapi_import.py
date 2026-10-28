@@ -97,7 +97,7 @@ def test_catalog_page_validation_never_advances_on_bad_page(system):
 
 def test_scheduler_advances_after_vimeus_failure_and_keeps_batches_bounded(system, monkeypatch):
     from services import catalog_scheduler as scheduler
-    q=DurableQueue(system.security_store,clock=lambda:1000);calls=[]
+    q=DurableQueue(system.security_store,clock=lambda:900);calls=[]
     monkeypatch.setattr(scheduler,'run_videoapi_batch',lambda *a:calls.append('videoapi') or {'imported':1})
     def broken(*a):calls.append('vimeus');raise RuntimeError('unavailable')
     monkeypatch.setattr(scheduler,'run_production_batch',broken)
@@ -105,13 +105,13 @@ def test_scheduler_advances_after_vimeus_failure_and_keeps_batches_bounded(syste
     assert scheduler.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
     assert scheduler.run_batch(q,system.security_store,None,**args)=={'waiting':True}
     for n in range(1,4):
-        q.clock=lambda n=n:1000+n*300
+        q.clock=lambda n=n:900+n*300
         assert scheduler.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
-    q.clock=lambda:2199
+    q.clock=lambda:2099
     assert scheduler.run_batch(q,system.security_store,None,**args)=={'waiting':True}
-    q.clock=lambda:2200
+    q.clock=lambda:2100
     with pytest.raises(RuntimeError):scheduler.run_batch(q,system.security_store,None,**args)
-    q.clock=lambda:2500
+    q.clock=lambda:2400
     assert scheduler.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
     assert calls==['videoapi']*4+['vimeus','videoapi']
 

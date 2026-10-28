@@ -14,7 +14,12 @@ def run_batch(queue, store, database, *, videoapi_enabled=False, vimeus_key='', 
         if queue.get_setting('scheduler_after') > queue.clock(): return {'waiting': True}
         turn = int(queue.get_setting('provider_turn'))
         queue.set_setting('provider_turn', turn+1)
-        queue.set_setting('scheduler_after', queue.clock()+INTERVAL_SECONDS)
+        now = queue.clock()
+        # External cron arrivals jitter by a few seconds. Reserve this wall-clock
+        # slot, not 300 seconds after arrival (which would skip the next early tick).
+        # The extra 60-second floor prevents bursts across adjacent boundaries.
+        boundary = (int(now)//INTERVAL_SECONDS+1)*INTERVAL_SECONDS
+        queue.set_setting('scheduler_after', max(now+60, boundary))
     if PROVIDER_CYCLE[turn % len(PROVIDER_CYCLE)] == 'videoapi' or not vimeus_key:
         return {'provider': 'videoapi', **run_videoapi_batch(VideoAPIQueue(store), database, tmdb_key)}
     return {'provider': 'vimeus', **run_production_batch(queue, database, vimeus_key, tmdb_key)}
