@@ -136,6 +136,43 @@ def test_web_account_bmc_signed_activation_and_replay(client, system):
     assert system.bot.calls==[]
 
 
+def test_shop_answer_arrives_in_update_after_paid_event(client, system):
+    order,_=create_order(client)
+    created=payload(order)
+    created['data']['extras'][0]['question_answers']=[]
+    assert webhook(client,created).json['review']
+    assert not send(client,'/api/payments/mine',method='GET').json['active']
+    updated=payload(order);updated['type']='extra_purchase.updated'
+    assert webhook(client,updated).json['success']
+    expiry=system.billing_store.get(order['id'])['expires_at']
+    for event in (updated,payload(order),updated):
+        assert webhook(client,event).json['duplicate']
+    assert system.billing_store.get(order['id'])['expires_at']==expiry
+    assert send(client,'/api/playback/1',method='GET').status_code==200
+    assert send(client,'/api/download/1',method='GET').status_code==200
+
+
+@pytest.mark.parametrize('field,value', [('amount',0),('currency','PEN'),('status','pending'),('refunded','true')])
+def test_updated_shop_payment_keeps_payment_validation(client, field, value):
+    order,_=create_order(client);data=payload(order);data['type']='extra_purchase.updated'
+    data['data'][field]=value
+    assert webhook(client,data).json['review']
+    assert not send(client,'/api/payments/mine',method='GET').json['active']
+
+
+def test_updated_shop_payment_keeps_signature_code_and_receipt_checks(client, system):
+    order,_=create_order(client);data=payload(order);data['type']='extra_purchase.updated'
+    assert webhook(client,data,False).status_code==401
+    data['data']['extras'][0]['question_answers']=['QH-'+'F'*20]
+    assert webhook(client,data).json['review']
+    data['data']['extras'][0]['question_answers']=[order['code']]
+    assert webhook(client,data).json['success']
+    other=system.app.test_client();second,_=create_order(other,auth=register(other,'other@example.test'))
+    data['data']['extras'][0]['question_answers']=[second['code']]
+    assert webhook(other,data).json['review']
+    assert not send(other,'/api/payments/mine',method='GET').json['active']
+
+
 @pytest.mark.parametrize('field,value', [('amount',3.50),('amount',0),('amount','NaN'),('currency','PEN'),('status','pending'),('refunded','true')])
 def test_webhook_mismatch_queues_review_without_access(client, system, field, value):
     order,_=create_order(client);data=payload(order);data['data'][field]=value

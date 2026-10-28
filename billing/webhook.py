@@ -32,8 +32,10 @@ def process_bmc(raw, signature, store, legacy_expiry):
     payment_id = data.get("id")
     if type(payment_id) is not int or payment_id <= 0:
         return {"error": "Falta el identificador del pago."}, 400
-    if payload.get("type") != "extra_purchase.created":
-        if payload.get("type") in ("extra_purchase.refunded", "extra_purchase.updated") or str(payload.get("type", "")).startswith(("membership.", "recurring_donation.")):
+    # Shop answers can arrive after checkout, in extra_purchase.updated.
+    # Both events must pass every payment/order check and share the same receipt.
+    if payload.get("type") not in ("extra_purchase.created", "extra_purchase.updated"):
+        if payload.get("type") == "extra_purchase.refunded" or str(payload.get("type", "")).startswith(("membership.", "recurring_donation.")):
             store.review(payment_id, "Reembolso, actualización o suscripción antigua: requiere conciliación; no se concede otro período.")
         return {"received": True, "activated": False}, 200
     extras = data.get("extras")
