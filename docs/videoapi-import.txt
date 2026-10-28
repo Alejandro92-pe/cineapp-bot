@@ -1,5 +1,5 @@
 VIDEOAPI: IMPORTACIÓN POR LOTES Y CONTINUIDAD DE SESIÓN
-Base VideoAPI desplegada en 559c3e4. Aceleración 4:1 y prioridad de cola: preparada solo en local; pendiente de aprobación y despliegue.
+Base VideoAPI desplegada en 559c3e4. Prioridad de cola y ciclo 4:1 desplegados en producción el 28/10/2026, commit 82a50c2. Cron existente 7284732 guardado cada cinco minutos; autenticación conservada. Importador reactivado después del respaldo y las comprobaciones de acceso y descargas.
 
 Preparación de producción:
 1. Respaldar contenido, temporadas, episodios y cine_security. Conservar configuración actual.
@@ -35,7 +35,7 @@ Muestra los manifiestos verificados y conserva los enlaces del catálogo local. 
 Reversión:
 Para detener únicamente el nuevo importador, VIDEOAPI_IMPORT_ENABLED=false. Puede pausarse todo el catálogo en el panel. No borrar las tablas nuevas: contienen puntos de reanudación. Para revertir el código completo, mantener las migraciones aditivas y volver a verificar autenticación; el código anterior requerirá iniciar otra sesión administrativa.
 
-PREPARACIÓN DEL CRON A CINCO MINUTOS (NO APLICADA)
+PROCEDIMIENTO DEL CRON A CINCO MINUTOS (APLICADO EL 28/10/2026)
 1. Desplegar el código aprobado y verificar protección del cron, propietario y descargas.
 2. Editar el cron existente, no crear otro: GET /cron/verificar_vencimientos cada cinco minutos (*/5 * * * *), conservando el encabezado Authorization actual. No poner el secreto en la URL ni en este documento.
 3. Mantener CATALOG_IMPORT_ENABLED=true y VIDEOAPI_IMPORT_ENABLED=true. No cambian claves, planes, pagos ni hosting.
@@ -48,4 +48,6 @@ Pruebas de esta evolución:
 .venv\Scripts\python.exe scripts/test_videoapi_import_local.py --output import-priority-live
 .venv\Scripts\python.exe scripts/benchmark_import_priority.py
 La medición HTTP es offline, cuatro clientes concurrentes, respuestas externas simuladas con latencia de 100 ms y pausas reales de 1,5 s. Compara reposo/importación/importación/reposo en copias locales; la importación se fuerza durante ventanas activas para medir interferencia, sin afirmar que es el cron real. Mide respuesta del servidor, no carga de imágenes ni reproducción externa.
-Evidencias: .local/import-priority/benchmark.json, .local/import-priority/informe.html y .local/import-priority-live/results.json. No se cambiaron Render, Supabase ni cron-job.org en esta fase.
+Evidencias de la fase local: .local/import-priority/benchmark.json, .local/import-priority/informe.html y .local/import-priority-live/results.json. Esa fase no modificó producción.
+
+Despliegue autorizado posterior: Render dep-dbh5sm5g1s2s73d0fkbg (Live). Sin migración de esquema ni cambios de pagos. Respaldo privado, comparación de cuentas/enlaces, controles HTTP y mediciones de producción en .local/priority-production/. Las mediciones son muestras breves desde una computadora, no una garantía de capacidad concurrente o de estabilidad continua. Se verificó el ciclo 4:1 con pruebas de reloj; no se esperó un ciclo completo de 25 minutos en producción. Se corrigió además la tolerancia a la variación de segundos del cron: reserva de franja de cinco minutos con separación mínima de 60 segundos.
