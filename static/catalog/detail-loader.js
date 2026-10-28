@@ -3,7 +3,7 @@
   const resources = [
     '/static/downloads.js', '/static/catalog/episodes.js',
     '/static/catalog/episode-downloads.js', '/static/catalog/trailers.js',
-    '/static/catalog/playback.js?v=continuity-2'
+    '/static/catalog/player-screen.js?v=1', '/static/catalog/playback.js?v=screen-1'
   ];
   const loaded = new Map();
   function script(src) {

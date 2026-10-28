@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/static/catalog/detail.css?v=videoapi-1">
 <link rel="stylesheet" href="/static/catalog/hero.css">
 <link rel="stylesheet" href="/static/catalog/episode-compact.css">
+<link rel="stylesheet" href="/static/catalog/player-screen.css?v=1">
 <link rel="stylesheet" href="/static/support/access.css">
 </head>
 
@@ -58,7 +59,7 @@
 <script src="/static/catalog/hero.js" defer></script>
 <script src="/static/catalog/browse.js" defer></script>
 <script src="/static/profile/sync.js" defer></script><script src="/static/profile/avatars.js" defer></script><script src="/static/profile/library.js" defer></script>
-<script src="/static/catalog/detail-loader.js?v=continuity-2" defer></script><script src="/static/app.js" defer></script>
+<script src="/static/catalog/detail-loader.js?v=screen-1" defer></script><script src="/static/app.js" defer></script>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>window.Telegram?.WebApp?.ready());
@@ -107,7 +108,7 @@ document.addEventListener('DOMContentLoaded',()=>window.Telegram?.WebApp?.ready(
   </div>
 
 <section id="inline-player" class="inline-player" hidden aria-label="Reproductor integrado">
-  <div class="player-heading"><div class="player-identity"><span class="player-brand"><img src="/static/logo-que-hay-live.png" alt="">QUEHAY</span><strong id="player-title"></strong></div><button id="player-close" type="button" aria-label="Cerrar reproductor">✕</button></div>
+  <div class="player-heading"><div class="player-identity"><span class="player-brand"><img src="/static/logo-que-hay-live.png" alt="">QUEHAY</span><strong id="player-title"></strong></div><div class="player-heading-actions"><button id="player-fullscreen" type="button" aria-label="Pantalla completa" title="Pantalla completa" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="screen-expand" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path class="screen-contract" d="M3 8h5V3m8 0v5h5M8 21v-5H3m13 5v-5h5"/></svg></button><button id="player-close" type="button" aria-label="Cerrar reproductor">✕</button></div></div>
   <iframe id="iframeReproductor" title="Reproductor" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen referrerpolicy="origin"></iframe>
   <div class="player-toolbar" role="group" aria-label="Controles de reproducción">
    <label id="player-provider-label" title="Cambiar reproductor" hidden>
@@ -123,7 +124,7 @@ document.addEventListener('DOMContentLoaded',()=>window.Telegram?.WebApp?.ready(
     <svg class="player-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 4 11 8-11 8V4Zm14 0v16"/></svg>
    </button>
   </div>
-  <p id="player-status" role="status"></p><p class="player-ad-note">Puede incluir publicidad.</p>
+  <p id="player-status" role="status"></p><p id="player-screen-status" role="status" hidden></p><p class="player-ad-note">Puede incluir publicidad.</p>
 </section>
 
   <!-- Cuerpo -->

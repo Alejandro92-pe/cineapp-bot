@@ -2,13 +2,14 @@
 (function(root){
  let revision=0,current=null,nextBusy=false,provider='videoapi',manualProvider=false;
  const $=id=>document.getElementById(id);
- function close(){++revision;current=null;const frame=$('iframeReproductor');frame.onload=null;frame.removeAttribute('src');$('inline-player').hidden=true;$('modalDetalle').classList.remove('has-player');}
+ function close(){++revision;current=null;root.PlayerScreen?.close();const frame=$('iframeReproductor');frame.onload=null;frame.removeAttribute('src');$('inline-player').hidden=true;$('modalDetalle').classList.remove('has-player');}
  async function start(item){
   if(current?.id!==item.id){provider='videoapi';manualProvider=false;}
   const token=++revision;current=item;
   $('player-provider-label').hidden=!item.videoapi_enabled;
   $('player-provider').value=provider;
-  $('inline-player').hidden=true;$('modalDetalle').classList.remove('has-player');
+  const expanded=Boolean(root.PlayerScreen?.expanded());
+  $('inline-player').hidden=!expanded;if(!expanded)$('modalDetalle').classList.remove('has-player');
   $('player-title').textContent=item.titulo;
   $('player-status').textContent='Preparando el reproductor…';
   $('player-status').hidden=false;
@@ -24,7 +25,7 @@
    const query=params.toString()?'?'+params.toString():'';
    const response=await fetch(`/api/playback/${item.id}${query}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const payload=await response.json();
    if(token!==revision)return;
-   if(root.AccessSupport.handle(response,payload)){current=null;return;}
+   if(root.AccessSupport.handle(response,payload)){close();return;}
    if(!response.ok)throw Error(payload.error||'No pudimos autorizar la reproducción.');
    if(!payload.embed)throw Error('Este título todavía no tiene reproducción integrada. Sus enlaces de descarga se conservan.');
    const url=new URL(payload.url);const okru=url.origin==='https://ok.ru'&&/^\/videoembed\/[1-9][0-9]{0,19}$/.test(url.pathname);
@@ -33,6 +34,7 @@
    if(url.username||url.password)throw Error('Reproductor no permitido.');
    if(item.videoapi_enabled)$('player-provider').value=videoapi?'videoapi':'vimeus';
    $('inline-player').hidden=false;$('modalDetalle').classList.add('has-player');
+   root.PlayerScreen?.open();
    $('inline-player').scrollIntoView({block:'start',behavior:'smooth'});
    const frame=$('iframeReproductor');
    frame.onload=()=>{if(token===revision){$('player-status').textContent='';$('player-status').hidden=true;}};

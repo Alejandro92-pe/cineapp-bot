@@ -1742,69 +1742,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // La URL del reproductor se obtiene del backend tras verificar la vigencia.
 
-// ===== FUNCIONES DE FULLSCREEN PARA DESKTOP =====
-function iniciarDeteccionFullscreen() {
-    console.log("🖥️ Iniciando detección de fullscreen");
-    
-    // Escuchar cambios en el fullscreen del navegador
-    document.addEventListener('fullscreenchange', manejarFullscreen);
-    document.addEventListener('webkitfullscreenchange', manejarFullscreen);
-    
-    // Escuchar mensajes de Vimeus
-    window.addEventListener('message', manejarMensajeVimeus);
-}
-
-function manejarFullscreen() {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-        console.log("🖥️ Vimeus activó fullscreen");
-        activarFullscreenTelegram();
-    } else {
-        console.log("🖥️ Vimeus salió de fullscreen");
-        desactivarFullscreenTelegram();
-    }
-}
-
-function manejarMensajeVimeus(e) {
-    if (!['https://vimeus.com', 'https://www.vimeus.com'].includes(e.origin) || e.source !== document.getElementById('iframeReproductor')?.contentWindow || !e.data) return;
-    
-    const data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
-    
-    if (data.includes('fullscreen') || data.includes('expand')) {
-        console.log("📨 Vimeus envió señal de fullscreen");
-        activarFullscreenTelegram();
-    }
-}
-
-function activarFullscreenTelegram() {
-    const tg = window.Telegram?.WebApp;
-    if (!tg?.initData || !tg.isVersionAtLeast?.('8.0')) return;
-    
-    console.log("📱 Activando fullscreen en Telegram");
-    
-    if (typeof tg.requestFullscreen === 'function') {
-        try { tg.requestFullscreen(); } catch (_) { /* Native fullscreen is optional. */ }
-    }
-    
-    if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        screen.orientation.lock('landscape').catch(() => {});
-    }
-}
-
-function desactivarFullscreenTelegram() {
-    const tg = window.Telegram?.WebApp;
-    if (!tg?.initData || !tg.isVersionAtLeast?.('8.0')) return;
-    
-    console.log("📱 Desactivando fullscreen en Telegram");
-    
-    if (typeof tg.exitFullscreen === 'function') {
-        try { tg.exitFullscreen(); } catch (_) { /* Closing playback must always work. */ }
-    }
-    
-    if (screen.orientation && typeof screen.orientation.unlock === 'function') {
-        try { screen.orientation.unlock(); } catch (_) {}
-    }
-}
-
 // ===== FUNCIÓN PARA CERRAR EL REPRODUCTOR =====
 function cerrarReproductor() { InlinePlayback.close(); }
 

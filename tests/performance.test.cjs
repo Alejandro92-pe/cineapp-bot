@@ -9,14 +9,14 @@ test('opening two details shares lazy loads; a failed asset alone can retry',asy
  vm.runInNewContext(fs.readFileSync('static/catalog/detail-loader.js','utf8'),context);
  assert.equal(nodes.length,0);
  const first=context.window.DetailAssets.ready(),second=context.window.DetailAssets.ready();
- assert.equal(nodes.length,5);
+ assert.equal(nodes.length,6);
  const results=Promise.allSettled([first,second]);
  nodes[0].onerror();for(const n of nodes.slice(1))n.onload();
  assert.ok((await results).every(r=>r.status==='rejected'));
  const retry=context.window.DetailAssets.ready();
- assert.equal(nodes.length,6);assert.equal(nodes[5].src,nodes[0].src);
- nodes[5].onload();await retry;
- await context.window.DetailAssets.ready();assert.equal(nodes.length,6);
+ assert.equal(nodes.length,7);assert.equal(nodes[6].src,nodes[0].src);
+ nodes[6].onload();await retry;
+ await context.window.DetailAssets.ready();assert.equal(nodes.length,7);
 });
 
 test('home starts while account sync is pending; no legacy startup requests',async()=>{

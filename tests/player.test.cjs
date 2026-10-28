@@ -50,3 +50,16 @@ test('OK.ru opens only its canonical videoembed path inside the same player',asy
 });
 
 test("lazy playback binds controls after DOMContentLoaded",()=>{const s=setup(async()=>({}),"complete");assert.equal(typeof s.get("player-next").onclick,"function");assert.equal(typeof s.get("player-close").onclick,"function");});
+
+test('screen control activates only after playback authorization and releases on close',async()=>{
+ const s=setup(async()=>({ok:true,json:async()=>({embed:true,url:'https://videoapi.la/e/movie/22',provider:'videoapi'})}));const calls=[];
+ s.context.window.PlayerScreen={open:()=>calls.push('open'),close:()=>calls.push('close'),expanded:()=>false};
+ await s.api.start({id:22,videoapi_enabled:true});s.api.close();assert.deepEqual(calls,['open','close']);
+});
+test('next request keeps fullscreen shell visible, but access denial closes it',async()=>{
+ let resolve;const s=setup(()=>new Promise(r=>resolve=r));let closed=0;
+ s.context.window.PlayerScreen={expanded:()=>true,close:()=>closed++,open(){}};
+ const pending=s.api.start({id:1});assert.equal(s.get('inline-player').hidden,false);
+ resolve({status:403,ok:false,json:async()=>({code:'membership_required'})});await pending;
+ assert.equal(closed,1);assert.equal(s.get('inline-player').hidden,true);
+});
