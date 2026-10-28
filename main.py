@@ -702,7 +702,7 @@ def api_admin_contenido():
     query  = supabase_service.table("contenido").select("*", count="exact")
     if tipo != "todo":
         query = query.eq("tipo", tipo)
-    resultado = query.order("id", desc=True).range(offset, offset + limit - 1).execute()
+    resultado = query.order("id", desc=True).limit(limit).offset(offset).execute()
     return jsonify({"data": resultado.data, "total": resultado.count}), 200
 
 @app.route("/api/admin/publicar", methods=["POST"])
@@ -948,7 +948,7 @@ def api_contenido():
             return jsonify(error="Año inválido."), 400
     if data.get("descarga"):
         query = query.not_.is_("descarga","null").neq("descarga","")
-    resultados = query.order("id", desc=True).range(offset, offset+limit-1).execute()
+    resultados = query.order("id", desc=True).limit(limit).offset(offset).execute()
     if alias:resultados.data=[{**row,'start_season':alias['start_season']} for row in resultados.data]
     return jsonify({"data": resultados.data, "total": resultados.count})
 

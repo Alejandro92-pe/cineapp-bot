@@ -108,6 +108,10 @@ class Query:
     def limit(self, n):
         self.slice = (0,n)
         return self
+    def offset(self, n):
+        size = self.slice[1]-self.slice[0] if self.slice else None
+        self.slice = (n, n+size if size is not None else None)
+        return self
     def range(self, start, end):
         self.slice = (start,end+1)
         return self

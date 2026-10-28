@@ -54,7 +54,8 @@ def create_vimeus_routes(database, provider, tmdb_get=None):
             if target:
                 preceding = database.table('episodios').select('id', count='exact', head=True).eq('temporada_id', temporada_id).eq('disponible', True).lt('numero', target[0]['numero']).execute()
                 page = preceding.count // page_size + 1
-        rows = database.table("episodios").select("id,temporada_id,numero,titulo,sinopsis,imagen_url,duracion,descarga,provider_download_url,playback_url", count="exact").eq("temporada_id", temporada_id).eq("disponible", True).order("numero").range((page-1)*page_size, page*page_size-1).execute()
+        # Explicit limit/offset avoids range()'s exclusive end in postgrest 0.13.
+        rows = database.table("episodios").select("id,temporada_id,numero,titulo,sinopsis,imagen_url,duracion,descarga,provider_download_url,playback_url", count="exact").eq("temporada_id", temporada_id).eq("disponible", True).order("numero").limit(page_size).offset((page-1)*page_size).execute()
         public=[]
         for row in rows.data:
             item=dict(row);manual=item.pop('descarga',None);provider_link=item.pop('provider_download_url',None)
