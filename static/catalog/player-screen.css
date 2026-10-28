@@ -4,14 +4,13 @@
 .player-heading-actions button:disabled{opacity:.5;cursor:wait}
 .player-heading-actions svg{width:22px;height:22px;pointer-events:none}
 #player-fullscreen[aria-pressed=false] .screen-contract,#player-fullscreen[aria-pressed=true] .screen-expand{display:none}
-.inline-player.is-screen-full{position:fixed;inset:0;z-index:15000;width:100%;max-width:none;height:100%;height:100dvh;margin:0;padding:max(8px,env(safe-area-inset-top),var(--player-safe-top,0px)) max(8px,env(safe-area-inset-right),var(--player-safe-right,0px)) max(8px,env(safe-area-inset-bottom),var(--player-safe-bottom,0px)) max(8px,env(safe-area-inset-left),var(--player-safe-left,0px));box-sizing:border-box;display:flex;flex-direction:column;overflow:auto;background:#03070d}
-.inline-player.is-screen-full .player-heading{padding:0 0 8px;flex:none;gap:12px}
-.inline-player.is-screen-full .player-identity{gap:2px;overflow:hidden}
-.inline-player.is-screen-full .player-brand{display:none}
-.inline-player.is-screen-full .player-identity strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
-.inline-player.is-screen-full iframe{flex:1 1 0;min-height:0!important;max-height:none;width:100%;height:0;aspect-ratio:auto}
-.inline-player.is-screen-full .player-toolbar{flex:none;padding:8px 0 0}
-.inline-player.is-screen-full .player-ad-note{display:none}
-.inline-player.is-screen-full p{flex:none;margin:4px 0}
+/* In Telegram, video fills the viewport; controls overlay it, never reserve rows. */
+#player-fullscreen[hidden]{display:none!important}
+.inline-player.is-screen-full{position:fixed;inset:0;z-index:15000;width:100%;max-width:none;height:100%;height:var(--tg-viewport-height,100dvh);margin:0;padding:0;box-sizing:border-box;display:block;overflow:hidden;background:#000}
+.inline-player.is-screen-full iframe{position:absolute;inset:0;width:100%;height:100%;min-height:0!important;max-height:none;aspect-ratio:auto;border:0}
+.inline-player.is-screen-full .player-heading{position:absolute;z-index:2;top:calc(var(--player-safe-top,0px) + 8px);right:calc(var(--player-safe-right,0px) + 8px);width:44px;height:44px;margin:0;padding:0!important;background:none;pointer-events:none}
+.inline-player.is-screen-full .player-heading-actions{gap:0}
+.inline-player.is-screen-full #player-fullscreen{pointer-events:auto;background:#102139b8;border-color:#7599c266}
+.inline-player.is-screen-full .player-identity,.inline-player.is-screen-full #player-close,.inline-player.is-screen-full .player-toolbar,.inline-player.is-screen-full .player-ad-note{display:none!important}
+.inline-player.is-screen-full p:not([hidden]){position:absolute;z-index:2;left:calc(var(--player-safe-left,0px) + 12px);bottom:calc(var(--player-safe-bottom,0px) + 12px);max-width:calc(100% - 80px);margin:0;padding:8px 12px;background:#102139e6;border-radius:8px;pointer-events:none}
 @media(max-width:600px){.player-heading{padding-right:16px;gap:10px}.player-heading-actions{gap:6px}.player-heading strong{font-size:13px}}
-@media(orientation:landscape) and (max-height:500px){.inline-player.is-screen-full .player-heading{padding-bottom:4px}.inline-player.is-screen-full .player-toolbar{padding-top:4px}}
