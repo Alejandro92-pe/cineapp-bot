@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
 function setup(fetcher, readyState="loading"){
  const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',classList:{add(){},remove(){}},removeAttribute(k){delete this[k];},scrollIntoView(){}});return nodes.get(id);};
- const events={};const history=[];const support=[];const window={AccessSupport:{handle:(r,p)=>{const reason=require("../static/support/access.js").reason(r,p);if(reason)support.push(reason);return !!reason;}}};const context={window,URL,document:{readyState,getElementById:get,addEventListener:(name,fn)=>events[name]=fn},EpisodeBrowser:{selection:()=>({}),next:async()=>null,hasNext:()=>true},AccountLibrary:{opened:(...args)=>history.push(args)},fetch:fetcher};
+ const events={};const history=[];const support=[];const window={AccessSupport:{handle:(r,p)=>{const reason=require("../static/support/access.js").reason(r,p);if(reason)support.push(reason);return !!reason;}}};const context={window,URL,URLSearchParams,document:{readyState,getElementById:get,addEventListener:(name,fn)=>events[name]=fn},EpisodeBrowser:{selection:()=>({}),next:async()=>null,hasNext:()=>true},AccountLibrary:{opened:(...args)=>history.push(args)},fetch:fetcher};
  vm.runInNewContext(fs.readFileSync('static/catalog/playback.js','utf8'),context);if(readyState==="loading")events.DOMContentLoaded();return {api:window.InlinePlayback,get,history,context,support};
 }
 test('opens authorized iframe inside detail with no new browser window',async()=>{const s=setup(async()=>({ok:true,json:async()=>({embed:true,url:'https://vimeus.com/e/movie?tmdb=22'})}));await s.api.start({id:1,titulo:'Movie',tipo:'pelicula'});assert.equal(s.get('inline-player').hidden,false);assert.equal(s.get('iframeReproductor').src,'https://vimeus.com/e/movie?tmdb=22');assert.equal(s.history.length,1);s.api.close();assert.equal(s.get('inline-player').hidden,true);assert.equal(s.get('iframeReproductor').src,undefined);});
@@ -21,7 +21,7 @@ test('last episode disables next and offers the current download',async()=>{
  s.context.EpisodeBrowser.selection=()=>({episode:{id:58,numero:58,has_download:true},season:{numero:3}});s.context.EpisodeBrowser.hasNext=()=>false;
  const downloads=[];s.context.EpisodeDownloads={download:(...args)=>downloads.push(args)};
  await s.api.start({id:409,tipo:'anime',titulo:'Naruto'});
- assert.equal(s.get('player-next').disabled,true);assert.equal(s.get('player-next').textContent,'Último episodio');
+ assert.equal(s.get('player-next').disabled,true);assert.equal(s.get('player-next-label').textContent,'Último episodio');
  assert.equal(s.get('player-download').hidden,false);s.get('player-download').onclick();assert.deepEqual(downloads,[[409,58]]);
 });
 test('rapid next clicks cannot skip episodes and closing cancels pending navigation',async()=>{

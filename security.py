@@ -205,6 +205,8 @@ def install_security(app, membership_checker):
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; connect-src 'self'; frame-src https://vimeus.com https://www.vimeus.com https://www.youtube-nocookie.com https://ok.ru; "
             "worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://web.telegram.org")
+        if app.config.get('VIDEOAPI_ENABLED'):
+            response.headers['Content-Security-Policy'] = response.headers['Content-Security-Policy'].replace('frame-src ', 'frame-src https://videoapi.la ')
         if not local:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.path.startswith("/api/") or request.path in ADMIN_PATHS | USER_PATHS:
@@ -216,6 +218,9 @@ def install_security(app, membership_checker):
                 def clean(row):
                     result = {k:v for k,v in row.items() if k in CATALOG_FIELDS}
                     result["has_download"] = bool(row.get("descarga"))
+                    from services.videoapi_playback import eligible
+                    if eligible(app, row):
+                        result['videoapi_enabled'] = True
                     return result
                 if isinstance(payload, list):
                     payload = [clean(row) for row in payload]

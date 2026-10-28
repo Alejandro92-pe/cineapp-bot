@@ -16,6 +16,7 @@ LOCAL = ROOT / ".local"
 LOCAL.mkdir(exist_ok=True)
 parser = argparse.ArgumentParser()
 parser.add_argument('--public-origin')
+parser.add_argument('--videoapi-pilot', action='store_true', help='Local catalog copy with checked VideoAPI samples; no production writes')
 args = parser.parse_args()
 preview = bool(args.public_origin)
 if preview:
@@ -30,6 +31,7 @@ os.environ.update(APP_MODE="local", APP_ORIGIN="http://127.0.0.1:5010",
     TELEGRAM_WEBHOOK_SECRET=secrets.token_urlsafe(32), BMC_WEBHOOK_SECRET=secrets.token_urlsafe(32),
     BMC_MONTHLY_PRODUCT_ID="517243", BMC_MONTHLY_READY="false")
 os.environ['TELEGRAM_PREVIEW'] = 'true' if preview else 'false'
+os.environ['VIDEOAPI_ENABLED'] = 'true' if args.videoapi_pilot else 'false'
 if preview:
     os.environ.update(APP_ORIGIN=args.public_origin,
         SECURITY_DATABASE_URL='sqlite:///'+(LOCAL/'telegram-preview.sqlite').as_posix())
@@ -42,6 +44,10 @@ if preview:
             raise SystemExit('BOT_USERNAME local inválido.')
         for key in ('BOT_TOKEN', 'BOT_USERNAME', 'VIMEUS_VIEW_KEY'):
             if values.get(key): os.environ[key] = values[key]
+elif args.videoapi_pilot:
+    secret_file = LOCAL/'telegram-preview.json'
+    if secret_file.exists():
+        os.environ['VIMEUS_VIEW_KEY'] = json.loads(secret_file.read_text(encoding='utf-8')).get('VIMEUS_VIEW_KEY', '')
 from local_support import block_external_network
 block_external_network()
 from security import password_hash
@@ -67,18 +73,20 @@ for demo_id, kind in ((900101, "serie"), (900202, "anime")):
         "descarga": "https://www.mediafire.com/file/local-test/example/file"}).eq("id", imported["contenido_id"]).execute()
 from scripts.seed_local_catalog import seed_catalog
 seed_catalog(supabase_service)
-if preview:
+if preview or args.videoapi_pilot:
     from scripts.seed_telegram_preview import seed_preview
     seed_preview(supabase_service, security_store)
+if args.videoapi_pilot:
+    app.config['VIDEOAPI_PILOT'] = json.loads((LOCAL/'videoapi-pilot.json').read_text(encoding='utf-8'))['entries']
 from services.manual_vimeus import restore as restore_manual_vimeus
-restore_manual_vimeus(supabase_service,LOCAL/('manual-vimeus-preview.json' if preview else 'manual-vimeus-demo.json'))
+restore_manual_vimeus(supabase_service,LOCAL/('manual-vimeus-preview.json' if preview or args.videoapi_pilot else 'manual-vimeus-demo.json'))
 app.config['ALLOW_PREVIEW_METADATA_FETCH']=preview
 from services.metadata_import import restore as restore_metadata
-restore_metadata(supabase_service,LOCAL/('metadata-preview-edits.json' if preview else 'metadata-demo-edits.json'))
+restore_metadata(supabase_service,LOCAL/('metadata-preview-edits.json' if preview or args.videoapi_pilot else 'metadata-demo-edits.json'))
 from services.okru_editor import restore as restore_okru
-restore_okru(supabase_service,LOCAL/('okru-preview-edits.json' if preview else 'okru-demo-edits.json'))
+restore_okru(supabase_service,LOCAL/('okru-preview-edits.json' if preview or args.videoapi_pilot else 'okru-demo-edits.json'))
 # Manual downloads restore last, including newly created biblical episodes.
-if preview:
+if preview or args.videoapi_pilot:
     from services.preview_downloads import restore as restore_downloads
     restore_downloads(supabase_service,LOCAL/'episode-downloads.json')
 print('Vista local: '+os.environ['APP_ORIGIN']+'/cuenta', flush=True)

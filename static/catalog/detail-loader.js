@@ -3,7 +3,7 @@
   const resources = [
     '/static/downloads.js', '/static/catalog/episodes.js',
     '/static/catalog/episode-downloads.js', '/static/catalog/trailers.js',
-    '/static/catalog/playback.js'
+    '/static/catalog/playback.js?v=videoapi-1'
   ];
   const loaded = new Map();
   function script(src) {

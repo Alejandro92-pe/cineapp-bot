@@ -391,6 +391,7 @@ def registrar_publicacion(contenido_id: int):
 from marketing import marketing_bp, init_marketing, enviar_email as _enviar_email_mkt, _html_bienvenida as _html_bienvenida_mkt
 
 app = Flask(__name__)
+app.config['VIDEOAPI_ENABLED'] = os.getenv('VIDEOAPI_ENABLED', 'true').lower() == 'true'
 
 def legacy_access_expiry(telegram_id):
     if not telegram_id:
@@ -1016,6 +1017,21 @@ def api_playback(contenido_id):
     if not result.data:
         return jsonify(error="Contenido no disponible."), 404
     item = result.data[0]
+    provider = request.args.get('provider')
+    if provider not in (None, 'vimeus', 'videoapi'):
+        return jsonify(error='Proveedor no permitido.'), 400
+    from services.videoapi_playback import eligible, playback as videoapi_playback
+    if provider == 'videoapi' or (provider is None and eligible(app, item)):
+        episode_id = request.args.get('episodio_id', type=int)
+        if 'episodio_id' in request.args and (episode_id is None or episode_id < 1):
+            return jsonify(error='Episodio inválido.'), 400
+        selected = videoapi_playback(app, supabase_service, item, episode_id)
+        if selected is not None:
+            payload, status = selected
+            if status == 200 and request.method == 'POST' and not g.identity.get('admin'):
+                try: popularity_store.record(g.identity['account']['id'], contenido_id)
+                except Exception: app.logger.warning('Popularity recording unavailable')
+            return jsonify(payload), status
     if item.get('fuente') == 'okru':
         from providers.okru import embed_url
         link = item.get('playback_url')
@@ -1048,7 +1064,7 @@ def api_playback(contenido_id):
                     return jsonify(error="Episodio inválido."), 400
                 # Vimeus documents se/ep as optional: its own selector can be
                 # used before a verified Listing snapshot has been imported.
-                return jsonify(url="https://vimeus.com/e/"+kind+"?"+urlencode(params), embed=True, provider_selection=True)
+                return jsonify(url="https://vimeus.com/e/"+kind+"?"+urlencode(params), embed=True, provider='vimeus', provider_selection=True)
             episodes = supabase_service.table("episodios").select("temporada_id,numero").eq("id", episode_id).eq("disponible", True).execute().data
             seasons = supabase_service.table("temporadas").select("numero").eq("id", episodes[0]["temporada_id"]).eq("contenido_id", contenido_id).execute().data if episodes else []
             if not seasons:
@@ -1059,7 +1075,7 @@ def api_playback(contenido_id):
                 popularity_store.record(g.identity['account']['id'], contenido_id)
             except Exception:
                 app.logger.warning('Popularity recording unavailable')
-        return jsonify(url="https://vimeus.com/e/"+kind+"?"+urlencode(params), embed=True)
+        return jsonify(url="https://vimeus.com/e/"+kind+"?"+urlencode(params), embed=True, provider='vimeus')
     link = item.get("enlace_canal")
     season_id = request.args.get("temporada_id", type=int)
     if season_id:

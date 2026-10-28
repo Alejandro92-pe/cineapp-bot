@@ -14,7 +14,7 @@ def app_module(tmp_path_factory):
         SUPABASE_URL="",SUPABASE_KEY="",SUPABASE_SERVICE_KEY="",VIMEUS_VIEW_KEY="test-view-not-real",
         CRON_SECRET="test-cron-secret-"*3, TELEGRAM_WEBHOOK_SECRET="test-tg-secret-"*3,
         BMC_WEBHOOK_SECRET="test-bmc-secret-"*3,PAYPAL_WEBHOOK_ID="",
-        BMC_MONTHLY_PRODUCT_ID="517243", BMC_MONTHLY_READY="false")
+        BMC_MONTHLY_PRODUCT_ID="517243", BMC_MONTHLY_READY="false", VIDEOAPI_ENABLED="false")
     from security import password_hash
     os.environ["ADMIN_PASSWORD_HASH"]=password_hash("Local-admin-test-2026!")
     import main

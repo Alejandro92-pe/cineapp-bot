@@ -43,3 +43,20 @@
 @media(max-width:700px){.detalle-hero{height:340px!important}.detalle-hero-contenido{padding:80px 22px 28px!important}.detalle-cuerpo{padding:12px 20px 44px!important}.detalle-titulo{font-size:32px!important}.detail-action-group{max-width:440px;margin-bottom:22px}.detail-primary-actions{gap:8px}.detail-primary{font-size:12px;min-height:87px}.detail-action-group .detalle-acciones{gap:8px}.player-heading{padding-left:70px}.inline-player iframe{max-height:none}.episode-row .episode-card{min-width:0}.episode-info{min-width:0}.episode-info strong{overflow-wrap:anywhere}}
 
 @media(min-width:900px){.detalle-hero{height:clamp(360px,32vw,520px)!important}.detalle-sinopsis{max-width:960px;font-size:15px!important}.detalle-meta{font-size:13px!important}.episode-info strong{font-size:16px}.episode-info>span{font-size:13px}}
+.player-toolbar:has(#player-provider-label:not([hidden])){display:flex;padding-top:12px}
+.player-toolbar{align-items:center;flex-wrap:wrap}
+.player-toolbar button:not([hidden]),#player-provider-label:not([hidden]){display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;font-size:13px}
+.player-toolbar [hidden]{display:none!important}
+.player-action-icon{width:20px;height:20px;flex:none;pointer-events:none}
+#player-provider-label{position:relative;flex:none;border:1px solid #3c526e;border-radius:10px;background:#16263a;color:#dce9f9;padding-left:12px}
+#player-provider{min-height:42px;max-width:100%;padding:8px 8px 8px 0;border:0;border-radius:10px;background:#16263a;color:inherit;font:inherit;cursor:pointer}
+#player-provider-label:focus-within,.player-toolbar button:focus-visible{outline:2px solid #7dbbff;outline-offset:3px}
+.player-toolbar #player-next{background:#22466e;border-color:#456d99;color:#f1f7ff;font-weight:600}
+.player-toolbar button:disabled{opacity:.5;cursor:default}
+@media(max-width:600px){
+ .player-toolbar{gap:8px;padding-right:16px;padding-left:16px}
+ #player-provider-label:not([hidden]),.player-toolbar #player-download:not([hidden]){width:44px;height:44px;flex:0 0 44px;padding:0;border-radius:12px}
+ #player-provider{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px}
+ .player-download-label{display:none}
+ .player-toolbar #player-next{flex:1;min-width:0;max-width:230px;padding:10px 8px;border-radius:12px;font-size:12px;white-space:nowrap;gap:7px}
+}

@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="/static/pwa/promo.css">
 <script src="/static/pwa/install.js" defer></script>
 <link rel="stylesheet" href="/static/profile/profile.css">
-<link rel="stylesheet" href="/static/catalog/detail.css">
+<link rel="stylesheet" href="/static/catalog/detail.css?v=videoapi-1">
 <link rel="stylesheet" href="/static/catalog/hero.css">
 <link rel="stylesheet" href="/static/catalog/episode-compact.css">
 <link rel="stylesheet" href="/static/support/access.css">
@@ -109,7 +109,20 @@ document.addEventListener('DOMContentLoaded',()=>window.Telegram?.WebApp?.ready(
 <section id="inline-player" class="inline-player" hidden aria-label="Reproductor integrado">
   <div class="player-heading"><div class="player-identity"><span class="player-brand"><img src="/static/logo-que-hay-live.png" alt="">QUEHAY</span><strong id="player-title"></strong></div><button id="player-close" type="button" aria-label="Cerrar reproductor">✕</button></div>
   <iframe id="iframeReproductor" title="Reproductor" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen referrerpolicy="origin"></iframe>
-  <div class="player-toolbar"><button id="player-retry" type="button">Reintentar</button><button id="player-download" type="button" hidden>Descargar episodio ↓</button><button id="player-next" type="button" hidden>Siguiente episodio →</button></div>
+  <div class="player-toolbar" role="group" aria-label="Controles de reproducción">
+   <label id="player-provider-label" title="Cambiar reproductor" hidden>
+    <svg class="player-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6" stroke-linecap="round"/></svg>
+    <select id="player-provider" aria-label="Cambiar reproductor"><option value="videoapi">VideoAPI</option><option value="vimeus">Vimeus</option></select>
+   </label>
+   <button id="player-retry" type="button">Reintentar</button>
+   <button id="player-download" type="button" aria-label="Descargar episodio" title="Descargar episodio" hidden>
+    <svg class="player-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+    <span class="player-download-label">Descargar episodio</span>
+   </button>
+   <button id="player-next" type="button" hidden><span id="player-next-label">Siguiente episodio</span>
+    <svg class="player-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 4 11 8-11 8V4Zm14 0v16"/></svg>
+   </button>
+  </div>
   <p id="player-status" role="status"></p><p class="player-ad-note">Puede incluir publicidad.</p>
 </section>
 
