@@ -24,7 +24,8 @@ cache = Table('catalog_cache', metadata, Column('key', String(64), primary_key=T
 
 
 class DurableQueue:
-    def __init__(self, store, clock=time.time):
+    def __init__(self, store, clock=time.time, job_table=jobs, namespace=""):
+        self.jobs, self.namespace = job_table, namespace
         self.engine, self.local, self.clock = store.engine, store.local, clock
         self.insert = sqlite_insert if store.local else pg_insert
         self.local_lock = threading.Lock()
@@ -45,10 +46,12 @@ class DurableQueue:
                 if acquired: connection.execute(text('SELECT pg_advisory_unlock(812194760123)'))
 
     def get_setting(self, key):
+        key = self.namespace + key
         with self.engine.connect() as c:
             return c.execute(select(settings.c.value).where(settings.c.key == key)).scalar_one_or_none() or 0
 
     def set_setting(self, key, value):
+        key = self.namespace + key
         stmt = self.insert(settings).values(key=key, value=value)
         with self.engine.begin() as c:
             c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value': value}))
@@ -66,6 +69,7 @@ class DurableQueue:
             c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'payload': value, 'expires': self.clock()+86400}))
 
     def discover(self, provider, resource):
+        jobs = self.jobs
         key = 'page:' + resource
         page = int(self.get_setting(key)) or 1
         finished = self.get_setting('finished:' + resource)
@@ -79,17 +83,26 @@ class DurableQueue:
             for row in batch:
                 c.execute(self.insert(jobs).values(**row).on_conflict_do_nothing(index_elements=['kind', 'tmdb']))
             next_page = page+1 if pagination['has_next'] else 1
-            c.execute(self.insert(settings).values(key=key, value=next_page).on_conflict_do_update(index_elements=['key'], set_={'value': next_page}))
+            c.execute(self.insert(settings).values(key=self.namespace+key, value=next_page).on_conflict_do_update(index_elements=['key'], set_={'value': next_page}))
             if not pagination['has_next']:
                 done_key = 'finished:' + resource
-                c.execute(self.insert(settings).values(key=done_key, value=self.clock()).on_conflict_do_update(index_elements=['key'], set_={'value': self.clock()}))
+                c.execute(self.insert(settings).values(key=self.namespace+done_key, value=self.clock()).on_conflict_do_update(index_elements=['key'], set_={'value': self.clock()}))
         return len(batch)
 
     def summary(self):
+        jobs = self.jobs
         with self.engine.connect() as c:
             return {r[0]: r[1] for r in c.execute(select(jobs.c.status, func.count()).group_by(jobs.c.status))}
 
+    def manifest(self, provider, row, get_metadata):
+        if row['kind'] == 'pelicula':
+            doc, warnings = movie_manifest(json.loads(row['source']), get_metadata)
+            doc['contenido']['tmdb_media'] = 'movie'
+            return doc, warnings
+        return build_manifest(provider, row['tmdb'], row['kind'], get_metadata, metadata_seconds=600)
+
     def run(self, provider, get_metadata, publish, discover=True):
+        jobs = self.jobs
         with self.lock() as acquired:
             if not acquired: return {'busy': True}
             if self.get_setting('batch_after') > self.clock(): return {'waiting': True, 'queue': self.summary()}
@@ -123,7 +136,7 @@ class DurableQueue:
                         jobs.c.ready <= self.clock(), jobs.c.kind == kinds[index])
                         .order_by(jobs.c.created_at, jobs.c.tmdb).limit(1)).mappings().first()
                     if row:
-                        stmt = self.insert(settings).values(key='work_turn', value=(index+1) % len(kinds))
+                        stmt = self.insert(settings).values(key=self.namespace+'work_turn', value=(index+1) % len(kinds))
                         c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value': (index+1) % len(kinds)}))
                         break
                 if not row: return {'queue': self.summary(), 'discovery_review': discovery_review}
@@ -131,15 +144,11 @@ class DurableQueue:
                 target = (jobs.c.kind == row['kind']) & (jobs.c.tmdb == row['tmdb'])
                 c.execute(update(jobs).where(target).values(status='running'))
             try:
-                if row['kind'] == 'pelicula':
-                    doc, warnings = movie_manifest(json.loads(row['source']), get_metadata)
-                    doc['contenido']['tmdb_media'] = 'movie'
-                else:
-                    doc, warnings = build_manifest(provider, row['tmdb'], row['kind'], get_metadata, metadata_seconds=600)
+                doc, warnings = self.manifest(provider, row, get_metadata)
                 # Whole-title RPC is idempotent; a crash after publication only causes a safe reimport.
                 publish(doc)
                 with self.engine.begin() as c:
-                    c.execute(update(jobs).where(target).values(status='done', note='; '.join(warnings)[:300]))
+                    c.execute(update(jobs).where(target).values(status='done', ready=self.clock()+604800, note='; '.join(warnings)[:300]))
                 result = {'imported': 1, 'kind': row['kind'], 'tmdb_id': row['tmdb']}
             except BatchPause:
                 with self.engine.begin() as c:
@@ -149,7 +158,7 @@ class DurableQueue:
                 attempts = row['attempts']+1
                 with self.engine.begin() as c:
                     c.execute(update(jobs).where(target).values(status='failed' if attempts >= 3 else 'pending',
-                        attempts=attempts, ready=self.clock()+min(3600, 300*2**attempts), note='Importación incompleta. Revisar el título; no se publica un conjunto parcial.'))
+                        attempts=attempts, ready=self.clock()+min(3600, 300*2**attempts), note='ImportaciÃ³n incompleta. Revisar el tÃ­tulo; no se publica un conjunto parcial.'))
                 result = {'review': True}
             return {**result, 'queue': self.summary(), 'discovery_review': discovery_review}
 
@@ -174,7 +183,7 @@ class CachedTransport(PacedTransport):
 
 def run_production_batch(queue, database, vimeus_key, tmdb_key):
     if not vimeus_key or not tmdb_key:
-        raise ImportFailure('Faltan las claves de importación.')
+        raise ImportFailure('Faltan las claves de importaciÃ³n.')
     transport = CachedTransport(queue, seconds=1.5, max_seconds=18)
     provider, tmdb = VimeusClient(vimeus_key, transport), TMDBClient(tmdb_key, transport)
     def publish(doc):

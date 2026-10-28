@@ -33,7 +33,8 @@ def test_default_and_manual_fallback_preserve_catalog_and_downloads(client, vide
     assert send(client, '/api/playback/1', method='GET').json['provider'] == 'videoapi'
     assert send(client, '/api/playback/1?provider=vimeus', method='GET').json['provider'] == 'vimeus'
     monkeypatch.setattr('services.videoapi_playback.available', lambda *args: False)
-    assert send(client, '/api/playback/1?provider=videoapi', method='GET').json['provider'] == 'vimeus'
+    assert send(client, '/api/playback/1?provider=videoapi', method='GET').status_code == 404
+    assert send(client, '/api/playback/1', method='GET').json['provider'] == 'vimeus'
     assert videoapi.supabase_service.rows == before
     assert send(client, '/api/download/1', method='GET').json['url'] == before['contenido'][0]['descarga']
 
@@ -98,9 +99,16 @@ def test_unavailable_provider_falls_back_without_trusting_response(failure):
     def get(*args, **kwargs):
         if failure == 'timeout': raise requests.Timeout()
         return Response()
-    assert Availability(get=get)('pelicula', 1) is False
+    assert Availability(get=get)('pelicula', 1) is None
 
 
 @pytest.mark.parametrize('kind,tmdb,season,episode', [('movie',1,None,None), ('pelicula','1/evil',None,None), ('serie',1,None,None), ('anime',1,1,0)])
 def test_embed_rejects_invalid_identifiers(kind, tmdb, season, episode):
     with pytest.raises(ValueError): embed_url(kind, tmdb, season, episode)
+
+
+def test_transient_probe_failure_keeps_explicit_selection(client, videoapi, monkeypatch):
+    owner_login(client)
+    monkeypatch.setattr('services.videoapi_playback.available', lambda *a: None)
+    assert send(client, '/api/playback/1?provider=videoapi', method='GET').json['provider']=='videoapi'
+    assert send(client, '/api/playback/1', method='GET').json['provider']=='videoapi'

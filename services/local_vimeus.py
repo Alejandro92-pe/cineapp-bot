@@ -76,7 +76,7 @@ def apply_local(database, document):
                 for ep in database.rows["episodios"]:
                     if ep["temporada_id"] != season["id"]:
                         continue
-                    if (ep["temporada_id"], ep["numero"]) not in seen and ep["disponible"]:
+                    if (ep["temporada_id"], ep["numero"]) not in seen and ep["disponible"] and not ep.get('videoapi_available'):
                         ep["disponible"] = False
                         removed += 1
                     active += int(ep["disponible"])
@@ -89,6 +89,9 @@ def apply_local(database, document):
 
 
 def rpc(database, name, args):
+    if name == 'importar_videoapi':
+        from services.local_videoapi import apply_local as apply_videoapi
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=apply_videoapi(database, args['documento'])))
     if name != "importar_vimeus":
         raise ValueError("Unsupported local RPC")
     return SimpleNamespace(execute=lambda: SimpleNamespace(data=apply_local(database, args["documento"])))

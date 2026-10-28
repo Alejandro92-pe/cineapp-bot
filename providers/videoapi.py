@@ -38,15 +38,17 @@ class Availability:
             if cached and cached[0] > self.clock():
                 self.cache.move_to_end(path)
                 return cached[1]
-        available, ttl = False, 30
+        available, ttl = None, 30
         try:
             response = self.get('https://videoapi.la/api/v1/public/exists/' + path[3:],
                                 timeout=(1.5, 2), allow_redirects=False)
             if response.status_code == 200:
                 payload = response.json()
                 if isinstance(payload, dict) and type(payload.get('exists')) is bool:
-                    available = payload['exists'] and payload.get('path') == path
-                    ttl = 1800 if available else 120
+                    if payload['exists'] and payload.get('path') == path:
+                        available, ttl = True, 1800
+                    elif not payload['exists'] and payload.get('path') is None:
+                        available, ttl = False, 120
         except (requests.RequestException, ValueError):
             pass
         with self.lock:

@@ -112,7 +112,9 @@ def install_security(app, membership_checker):
         return {k: account.get(k) for k in ("id", "email", "name", "telegram_id")}
 
     def issue(account, admin=False):
-        ttl = 3600 if admin else 43200
+        # Viewing and administrative elevation have independent lifetimes.
+        # Owner viewing access remains permanent; authentication is still bounded.
+        ttl = 604800
         token, csrf = store.new_session(account["id"], ttl, admin, request.cookies.get(COOKIE))
         response = jsonify(success=True, authenticated=True, user=account_view(account),
                            is_admin=admin, csrf_token=csrf)
@@ -169,7 +171,7 @@ def install_security(app, membership_checker):
                 if not g.identity:
                     return error("Inicia sesión para continuar.", 401, 'auth_required')
                 if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), g.identity["csrf"]):
-                    return error("La sesión necesita actualizarse.", 403)
+                    return error("La sesión necesita actualizarse.", 403, 'csrf_refresh_required')
         if path in {"/", "/admin", "/cuenta", "/membresia", "/instalar", "/offline", "/sw.js", "/manifest.webmanifest", "/api/payments/config", "/health", "/api/planes", "/api/tendencias",
                     "/api/auth/me", "/api/top10", "/paypal/success", "/paypal/cancel"} or path.startswith(("/static/", "/api/payments/qr/")) or path in PUBLIC_POSTS:
             return None
@@ -260,8 +262,14 @@ def install_security(app, membership_checker):
     def me():
         if not g.identity:
             return jsonify(authenticated=False, local=local, preview=preview)
-        return jsonify(authenticated=True, user=account_view(g.identity["account"]),
+        response = jsonify(authenticated=True, user=account_view(g.identity["account"]),
             is_admin=admin_authenticated(), csrf_token=g.identity["csrf"], local=local, preview=preview)
+        # Refresh browser expiry to the SAME server deadline, including migrated
+        # sessions. This never extends a revoked or expired authentication.
+        response.set_cookie(COOKIE, request.cookies[COOKIE],
+            max_age=max(0, int(g.identity['expires_at']-time.time())),
+            secure=not local or preview, httponly=True, samesite='Lax', path='/')
+        return response
 
     @app.post("/api/auth/register")
     def register():

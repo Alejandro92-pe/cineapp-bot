@@ -16,7 +16,7 @@ const response=(url,provider)=>({ok:true,json:async()=>({embed:true,url,provider
 test('switch removes the old iframe URL and ignores a stale provider response',async()=>{
  const {context,node,requests}=setup();const item={id:1,titulo:'Prueba',tipo:'pelicula',videoapi_enabled:true};
  const first=context.InlinePlayback.start(item);
- assert.match(requests[0].url,/provider=videoapi/);
+ assert.equal(requests[0].url,'/api/playback/1');
  node('player-provider').onchange({target:{value:'vimeus'}});
  assert.equal(node('iframeReproductor').src,undefined);
  assert.match(requests[1].url,/provider=vimeus/);
@@ -44,7 +44,7 @@ test('automatic fallback shows the actual provider and still prefers VideoAPI on
  requests[0].resolve(response('https://vimeus.com/e/movie?tmdb=1','vimeus'));await pending;
  assert.equal(node('player-provider').value,'vimeus');
  pending=context.InlinePlayback.start(item);
- assert.match(requests[1].url,/provider=videoapi/);
+ assert.equal(requests[1].url,'/api/playback/1');
  requests[1].resolve(response('https://videoapi.la/e/movie/1?primary_color=78b7fb&secondary_color=111d30&icon_color=edf5ff','videoapi'));await pending;
  assert.equal(node('player-provider').value,'videoapi');
  assert.match(node('iframeReproductor').src,/primary_color=78b7fb/);

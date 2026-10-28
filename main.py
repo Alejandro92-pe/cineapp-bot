@@ -853,9 +853,10 @@ def cron_verificar_vencimientos():
     try:
         verificar_vencimientos()
         if os.getenv('CATALOG_IMPORT_ENABLED') == 'true' and not LOCAL_MODE and not catalog_job_store.get_setting('paused'):
-            from services.catalog_jobs import run_production_batch
-            return jsonify(run_production_batch(catalog_job_store, supabase_service,
-                           os.getenv('VIMEUS_API_KEY', ''), os.getenv('TMDB_API_KEY', '')))
+            from services.catalog_scheduler import run_batch
+            return jsonify(run_batch(catalog_job_store, security_store, supabase_service,
+                           videoapi_enabled=os.getenv('VIDEOAPI_IMPORT_ENABLED') == 'true',
+                           vimeus_key=os.getenv('VIMEUS_API_KEY', ''), tmdb_key=os.getenv('TMDB_API_KEY', '')))
         return "OK", 200
     except Exception as e:
         return "Error", 500
@@ -873,6 +874,14 @@ catalog_job_store = DurableQueue(security_store)
 @app.get('/api/admin/catalog/queue')
 def catalog_queue_status():
     configured=os.getenv('CATALOG_IMPORT_ENABLED') == 'true' and not LOCAL_MODE
+    if os.getenv('VIDEOAPI_IMPORT_ENABLED') == 'true':
+        from services.videoapi_jobs import VideoAPIQueue
+        providers = {'vimeus': catalog_job_store.summary(), 'videoapi': VideoAPIQueue(security_store).summary()}
+        totals = {}
+        for values in providers.values():
+            for key, value in values.items(): totals[key] = totals.get(key, 0)+value
+        return jsonify(enabled=configured and not bool(catalog_job_store.get_setting('paused')),
+                       configured=configured, queue=totals, providers=providers)
     return jsonify(enabled=configured and not bool(catalog_job_store.get_setting('paused')), configured=configured,
                    queue=catalog_job_store.summary())
 
@@ -1025,7 +1034,7 @@ def api_playback(contenido_id):
         episode_id = request.args.get('episodio_id', type=int)
         if 'episodio_id' in request.args and (episode_id is None or episode_id < 1):
             return jsonify(error='Episodio inválido.'), 400
-        selected = videoapi_playback(app, supabase_service, item, episode_id)
+        selected = videoapi_playback(app, supabase_service, item, episode_id, explicit=provider == 'videoapi')
         if selected is not None:
             payload, status = selected
             if status == 200 and request.method == 'POST' and not g.identity.get('admin'):

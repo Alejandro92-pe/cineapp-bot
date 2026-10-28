@@ -2,13 +2,32 @@
 (() => {
   const originalFetch = window.fetch.bind(window);
   const state = {authenticated: false, user: null, is_admin: false, csrf_token: null};
+  let refreshing = null;
+  function syncSession() {
+    if (!refreshing) refreshing = refresh().finally(() => { refreshing = null; });
+    return refreshing;
+  }
   window.fetch = async function(input, options = {}) {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);
     if (url.origin !== location.origin) throw new Error('La aplicación solo consulta su propio servidor.');
     const headers = new Headers(options.headers || (input instanceof Request ? input.headers : undefined));
     const method = (options.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
     if (!['GET', 'HEAD'].includes(method) && state.csrf_token) headers.set('X-CSRF-Token', state.csrf_token);
-    const response = await originalFetch(input, {...options, headers, credentials:'same-origin'});
+    const accountBefore = state.user?.id;
+    const retryInput = input instanceof Request ? input.clone() : input;
+    let response = await originalFetch(input, {...options, headers, credentials:'same-origin'});
+    // Only retry a request explicitly rejected BEFORE its handler ran. Never
+    // replay network errors/payments with an uncertain outcome or another user.
+    if (response.status === 403 && !url.pathname.startsWith('/api/auth/')) {
+      const failure = await response.clone().json().catch(() => ({}));
+      if (failure.code === 'csrf_refresh_required') {
+        await syncSession();
+        if (accountBefore && state.authenticated && state.user?.id === accountBefore) {
+          headers.set('X-CSRF-Token', state.csrf_token);
+          response = await originalFetch(retryInput, {...options, headers, credentials:'same-origin'});
+        }
+      }
+    }
     if (url.pathname.startsWith('/api/auth/') || url.pathname === '/api/admin/login') {
       const previousAccount = state.user?.id;
       const payload = await response.clone().json().catch(() => ({}));
@@ -36,4 +55,7 @@
     return state;
   }).catch(error => { state.error = error.message; return state; });
   window.AccountSession = {state, ready, refresh, telegram};
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncSession().catch(() => {});
+  });
 })();

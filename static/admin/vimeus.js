@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data=await response.json();if(!response.ok)throw Error('No pudimos consultar el avance. Verifica tu sesión de administrador.');
       queueEnabled=data.enabled;queueToggle.hidden=!data.configured;queueToggle.textContent=data.enabled?'Pausar importación':'Reanudar importación';
       const q=data.queue||{};queueStatus.textContent=`${data.enabled?'Activa':data.configured?'Pausada':'Desactivada'} · ${q.done||0} títulos importados · ${q.pending||0} pendientes · ${q.failed||0} para revisar.`;
+      if(data.providers)queueStatus.textContent+=' '+Object.entries(data.providers).map(([name,counts])=>`${name==='videoapi'?'VideoAPI':'Vimeus'}: ${counts.done||0} procesados, ${counts.pending||0} pendientes`).join(' · ')+'. Una misma ficha puede estar disponible en ambos.';
     }catch(error){queueStatus.textContent=error.message;}finally{queueToggle.disabled=false;}
   }
   document.getElementById('catalog-queue-refresh').onclick=()=>queueState();

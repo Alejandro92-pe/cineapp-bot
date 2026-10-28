@@ -3,7 +3,7 @@
   const resources = [
     '/static/downloads.js', '/static/catalog/episodes.js',
     '/static/catalog/episode-downloads.js', '/static/catalog/trailers.js',
-    '/static/catalog/playback.js?v=videoapi-1'
+    '/static/catalog/playback.js?v=continuity-2'
   ];
   const loaded = new Map();
   function script(src) {
@@ -11,7 +11,7 @@
       const node = document.createElement('script');
       node.src = src;
       node.onload = resolve;
-      node.onerror = () => { loaded.delete(src); node.remove(); reject(new Error('No se pudieron cargar los controles. Vuelve a abrir el título.')); };
+      node.onerror = () => { loaded.delete(src); node.remove(); reject(new Error('No se pudieron cargar los controles. Vuelve a abrir el tÃ­tulo.')); };
       document.head.append(node);
     }));
     return loaded.get(src);

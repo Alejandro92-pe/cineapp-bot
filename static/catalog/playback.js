@@ -1,10 +1,10 @@
 /* The provider iframe stays inside the title detail. No guessed progress events. */
 (function(root){
- let revision=0,current=null,nextBusy=false,provider='videoapi';
+ let revision=0,current=null,nextBusy=false,provider='videoapi',manualProvider=false;
  const $=id=>document.getElementById(id);
  function close(){++revision;current=null;const frame=$('iframeReproductor');frame.onload=null;frame.removeAttribute('src');$('inline-player').hidden=true;$('modalDetalle').classList.remove('has-player');}
  async function start(item){
-  if(current?.id!==item.id)provider='videoapi';
+  if(current?.id!==item.id){provider='videoapi';manualProvider=false;}
   const token=++revision;current=item;
   $('player-provider-label').hidden=!item.videoapi_enabled;
   $('player-provider').value=provider;
@@ -20,7 +20,7 @@
    $('player-next').hidden=!selection.episode;
    const params=new URLSearchParams();
    if(selection.episode)params.set('episodio_id',selection.episode.id);
-   if(item.videoapi_enabled)params.set('provider',provider);
+   if(item.videoapi_enabled&&manualProvider)params.set('provider',provider);
    const query=params.toString()?'?'+params.toString():'';
    const response=await fetch(`/api/playback/${item.id}${query}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const payload=await response.json();
    if(token!==revision)return;
@@ -49,7 +49,7 @@
  async function next(){const item=current,token=revision;if(!item||nextBusy)return;nextBusy=true;const button=$('player-next');button.disabled=true;try{const selected=await EpisodeBrowser.next();if(current!==item||revision!==token)return;if(selected)await start(item);else{$('player-status').textContent='Llegaste al último episodio disponible.';$('player-status').hidden=false;}}catch(error){if(revision===token){$('player-status').textContent=error.message;$('player-status').hidden=false;button.disabled=false;}}finally{nextBusy=false;}}
  function bindControls(){
   $('player-close').onclick=close;$('player-retry').onclick=()=>current&&start(current);$('player-next').onclick=next;
-  $('player-provider').onchange=event=>{provider=event.target.value;if(current)start(current);};
+  $('player-provider').onchange=event=>{provider=event.target.value;manualProvider=true;if(current)start(current);};
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindControls,{once:true});
  else bindControls();

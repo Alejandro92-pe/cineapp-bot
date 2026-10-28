@@ -17,7 +17,11 @@ LOCAL.mkdir(exist_ok=True)
 parser = argparse.ArgumentParser()
 parser.add_argument('--public-origin')
 parser.add_argument('--videoapi-pilot', action='store_true', help='Local catalog copy with checked VideoAPI samples; no production writes')
+parser.add_argument('--videoapi-import-preview', action='store_true', help='Show the locally verified import manifests')
 args = parser.parse_args()
+if args.videoapi_import_preview:
+    if args.public_origin: parser.error('La importación de muestra solo se abre en loopback.')
+    args.videoapi_pilot = True
 preview = bool(args.public_origin)
 if preview:
     from services.preview import validate_preview_origin
@@ -89,6 +93,13 @@ restore_okru(supabase_service,LOCAL/('okru-preview-edits.json' if preview or arg
 if preview or args.videoapi_pilot:
     from services.preview_downloads import restore as restore_downloads
     restore_downloads(supabase_service,LOCAL/'episode-downloads.json')
+if args.videoapi_import_preview:
+    from services.local_videoapi import apply_local as apply_videoapi
+    for doc in json.loads((LOCAL/'videoapi-import/manifests.json').read_text(encoding='utf-8')):
+        result = apply_videoapi(supabase_service, doc)
+        app.config['VIDEOAPI_PILOT'][str(result['contenido_id'])] = {
+            'tmdb_id':doc['contenido']['tmdb_id'], 'tipo':doc['contenido']['tipo'],
+            'episodes':[[s['numero'],e['numero']] for s in doc['temporadas'] for e in s['capitulos']]}
 print('Vista local: '+os.environ['APP_ORIGIN']+'/cuenta', flush=True)
 print("Credencial de prueba en .local/access.txt. No es tu contraseña de producción.", flush=True)
 app.run(host="127.0.0.1", port=5011 if preview else 5010, debug=False, use_reloader=False)

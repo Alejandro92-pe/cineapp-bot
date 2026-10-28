@@ -28,6 +28,9 @@ sessions = Table("sessions", metadata,
     Column("csrf", String(64), nullable=False),
     Column("expires_at", Float, nullable=False),
     Column("admin", Integer, nullable=False, default=0))
+admin_leases = Table('admin_leases', metadata,
+    Column('token_hash', String(64), ForeignKey(sessions.c.token_hash, ondelete='CASCADE'), primary_key=True),
+    Column('expires_at', Float, nullable=False))
 limits = Table("rate_limits", metadata,
     Column("key", String(64), primary_key=True),
     Column("window", BigInteger, primary_key=True),
@@ -60,6 +63,7 @@ class SecurityStore:
         from services import popularity  # Private ranking table; production needs migration 006.
         from services import profiles  # Private account preferences; migration 010 in production.
         from services import catalog_jobs  # Durable production queue; migration 014.
+        from services import videoapi_jobs  # Independent queue; migration 015.
         if local:
             metadata.create_all(self.engine)
 
@@ -81,27 +85,35 @@ class SecurityStore:
                 accounts.c.telegram_id.is_(None)).values(telegram_id=telegram_id))
             return result.rowcount == 1
 
-    def new_session(self, account_id, ttl=43200, admin=False, old_token=None):
+    def new_session(self, account_id, ttl=604800, admin=False, old_token=None):
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         with self.engine.begin() as c:
             c.execute(delete(sessions).where(sessions.c.expires_at <= time.time()))
             if old_token:
                 c.execute(delete(sessions).where(sessions.c.token_hash == digest(old_token)))
             c.execute(sessions.insert().values(token_hash=digest(token), account_id=account_id,
-                csrf=csrf, expires_at=time.time()+ttl, admin=int(admin)))
+                csrf=csrf, expires_at=time.time()+ttl, admin=0))
+            if admin:
+                c.execute(admin_leases.insert().values(token_hash=digest(token), expires_at=time.time()+3600))
         return token, csrf
 
     def session(self, token):
         if not token or len(token) > 128:
             return None
         with self.engine.connect() as c:
-            row = c.execute(select(sessions, *[col.label('identity_'+col.name) for col in accounts.c])
+            row = c.execute(select(sessions, admin_leases.c.expires_at.label('admin_until'),
+                *[col.label('identity_'+col.name) for col in accounts.c])
                 .join(accounts, accounts.c.id == sessions.c.account_id)
+                .outerjoin(admin_leases, admin_leases.c.token_hash == sessions.c.token_hash)
                 .where(sessions.c.token_hash == digest(token),
                 sessions.c.expires_at > time.time())).mappings().first()
             if not row:
                 return None
             result = {col.name: row[col.name] for col in sessions.c}
+            until = row['admin_until']
+            # Elevation lives only in its short lease. The legacy flag stays 0,
+            # so rolling back older code cannot grant seven-day admin access.
+            result['admin'] = int(until is not None and until > time.time())
             result["account"] = {col.name: row['identity_'+col.name] for col in accounts.c}
             return result
 

@@ -1,0 +1,37 @@
+VIDEOAPI: IMPORTACIÓN POR LOTES Y CONTINUIDAD DE SESIÓN
+Estado: preparado en local. Requiere aprobación antes de producción.
+
+Preparación de producción:
+1. Respaldar contenido, temporadas, episodios y cine_security. Conservar configuración actual.
+2. Aplicar migrations/015_videoapi_catalog.sql después de 014 y migrations/016_session_continuity.sql.
+3. Desplegar el código con VIDEOAPI_IMPORT_ENABLED=false. Verificar login, propietario, reproducción, descargas y cuenta sin membresía.
+4. Activar VIDEOAPI_IMPORT_ENABLED=true, manteniendo CATALOG_IMPORT_ENABLED=true y el cron autenticado existente.
+5. Revisar /api/admin/catalog/queue: conteos por proveedor. Los trabajos contados no son necesariamente fichas únicas, porque una ficha puede existir en ambos proveedores.
+6. Verificar varias ejecuciones espaciadas del cron. Cada proveedor tiene descubrimiento y trabajo rotativo pelicula/serie/anime. No iniciar una descarga masiva del catálogo.
+
+Seguridad:
+- VideoAPI usa exclusivamente endpoints públicos, sin crear credenciales ni activar funciones pagadas.
+- TMDB conserva la clave privada y es-MX con el comportamiento de tráiler ya existente.
+- Sesión de visualización: 7 días absolutos. Elevación administrativa: 1 hora, guardada en admin_leases. Propietario permanente sigue siendo únicamente Telegram 5824989040.
+- El campo legacy sessions.admin se guarda en 0; un rollback no conserva privilegios por 7 días.
+- Las migraciones no borran cuentas ni descargas. La 016 conserva el plazo administrativo de sesiones antiguas activas y amplía solamente visualización una vez.
+
+Importación:
+- Cola privada videoapi_jobs. Páginas de 24, un título por lote, 1,5 s entre peticiones, presupuesto 18 s y mínimo 60 s entre ejecuciones.
+- TMDB da temporadas y episodios; cada episodio se contrasta contra exists de VideoAPI. Se publica la lista confirmada completa al terminar el recorrido del título. El avance por episodio se guarda antes de continuar.
+- Títulos sin ningún episodio disponible no se publican. Identidades ambiguas ya duplicadas se dejan para revisión.
+- Identidad: TMDB movie o tv. Serie y anime del mismo TMDB reutilizan la ficha canónica; enlaces de alias se conservan.
+- Publicación aditiva: no retirar capítulos ajenos ni sobrescribir URLs manuales/OK.ru. La sincronización posterior de Vimeus respeta los capítulos marcados por VideoAPI.
+- Se revisan semanalmente los trabajos completados para encontrar nuevos episodios. Fallos repetidos requieren revisión.
+- No incluye un reproductor nuevo ni inventa descargas o eventos de progreso.
+
+Prueba reproducible local:
+.venv\Scripts\python.exe scripts/test_videoapi_import_local.py
+Lee solamente TMDB_API_KEY del respaldo local de configuración. Nunca instancia Supabase ni Telegram; usa SQLite y una copia del catálogo. Cada ejecución crea una cola aislada en .local/videoapi-import/runs. Acelera el calendario de lotes, NO el intervalo entre consultas.
+.venv\Scripts\python.exe scripts/run_local.py --videoapi-import-preview
+Muestra los manifiestos verificados y conserva los enlaces del catálogo local. El servidor no tiene salida de red; los embeds se cargan desde el navegador.
+
+Reversión:
+Para detener únicamente el nuevo importador, VIDEOAPI_IMPORT_ENABLED=false. Puede pausarse todo el catálogo en el panel. No borrar las tablas nuevas: contienen puntos de reanudación. Para revertir el código completo, mantener las migraciones aditivas y volver a verificar autenticación; el código anterior requerirá iniciar otra sesión administrativa.
+
+Evidencia de esta fase: .local/videoapi-import/informe.html y results.json. No se modificó producción.
