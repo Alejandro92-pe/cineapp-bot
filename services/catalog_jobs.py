@@ -24,11 +24,16 @@ cache = Table('catalog_cache', metadata, Column('key', String(64), primary_key=T
 
 
 class DurableQueue:
+    pending_states = ('pending',)
+    running_states = {'running': 'pending'}
     def __init__(self, store, clock=time.time, job_table=jobs, namespace=""):
         self.jobs, self.namespace = job_table, namespace
         self.engine, self.local, self.clock = store.engine, store.local, clock
         self.insert = sqlite_insert if store.local else pg_insert
-        self.local_lock = threading.Lock()
+        # All queue instances sharing a local store share the production-style lock.
+        if not hasattr(store, 'catalog_lock'):
+            store.catalog_lock = threading.Lock()
+        self.local_lock = store.catalog_lock
 
     @contextmanager
     def lock(self):
@@ -80,8 +85,8 @@ class DurableQueue:
         batch = [{'kind': KINDS[resource], 'tmdb': integer(r.get('tmdb_id'), 1), 'source': json.dumps(r),
                   'status': 'pending', 'attempts': 0, 'ready': 0, 'created_at': self.clock()} for r in rows]
         with self.engine.begin() as c:
-            for row in batch:
-                c.execute(self.insert(jobs).values(**row).on_conflict_do_nothing(index_elements=['kind', 'tmdb']))
+            if batch:
+                c.execute(self.insert(jobs).values(batch).on_conflict_do_nothing(index_elements=['kind', 'tmdb']))
             next_page = page+1 if pagination['has_next'] else 1
             c.execute(self.insert(settings).values(key=self.namespace+key, value=next_page).on_conflict_do_update(index_elements=['key'], set_={'value': next_page}))
             if not pagination['has_next']:
@@ -92,7 +97,15 @@ class DurableQueue:
     def summary(self):
         jobs = self.jobs
         with self.engine.connect() as c:
-            return {r[0]: r[1] for r in c.execute(select(jobs.c.status, func.count()).group_by(jobs.c.status))}
+            result = {}
+            for status, count in c.execute(select(jobs.c.status, func.count()).group_by(jobs.c.status)):
+                # Keep the existing admin counters compatible with refresh jobs.
+                status = {'refresh_pending': 'pending', 'refresh_running': 'running'}.get(status, status)
+                result[status] = result.get(status, 0) + count
+            return result
+
+    def prepare_work(self):
+        """Optional maintenance, after discovery and before claiming one job."""
 
     def manifest(self, provider, row, get_metadata):
         if row['kind'] == 'pelicula':
@@ -108,7 +121,8 @@ class DurableQueue:
             if self.get_setting('batch_after') > self.clock(): return {'waiting': True, 'queue': self.summary()}
             self.set_setting('batch_after', self.clock()+60)
             with self.engine.begin() as c:
-                c.execute(update(jobs).where(jobs.c.status == 'running').values(status='pending'))
+                for running, pending in self.running_states.items():
+                    c.execute(update(jobs).where(jobs.c.status == running).values(status=pending))
                 c.execute(delete(cache).where(cache.c.expires < self.clock()))
             discovery_review = False
             try:
@@ -124,25 +138,30 @@ class DurableQueue:
                 # Keep its page cursor unchanged so it can be retried on the next rotation.
                 self.set_setting('turn', turn+1)
                 discovery_review = True
+            self.prepare_work()
             with self.engine.begin() as c:
                 # Discovery and processing have separate cursors. An old backlog
                 # of series must not starve newer movies/anime, including on pause.
                 kinds = ('pelicula', 'serie', 'anime')
                 work_turn = int(self.get_setting('work_turn')) % len(kinds)
                 row = None
-                for step in range(len(kinds)):
-                    index = (work_turn + step) % len(kinds)
-                    row = c.execute(select(jobs).where(jobs.c.status == 'pending',
-                        jobs.c.ready <= self.clock(), jobs.c.kind == kinds[index])
-                        .order_by(jobs.c.created_at, jobs.c.tmdb).limit(1)).mappings().first()
-                    if row:
-                        stmt = self.insert(settings).values(key=self.namespace+'work_turn', value=(index+1) % len(kinds))
-                        c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value': (index+1) % len(kinds)}))
-                        break
+                for pending in self.pending_states:
+                    for step in range(len(kinds)):
+                        index = (work_turn + step) % len(kinds)
+                        row = c.execute(select(jobs).where(jobs.c.status == pending,
+                            jobs.c.ready <= self.clock(), jobs.c.kind == kinds[index])
+                            .order_by(jobs.c.created_at, jobs.c.tmdb).limit(1)).mappings().first()
+                        if row:
+                            stmt = self.insert(settings).values(key=self.namespace+'work_turn', value=(index+1) % len(kinds))
+                            c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value': (index+1) % len(kinds)}))
+                            break
+                    if row: break
                 if not row: return {'queue': self.summary(), 'discovery_review': discovery_review}
                 row = dict(row)
                 target = (jobs.c.kind == row['kind']) & (jobs.c.tmdb == row['tmdb'])
-                c.execute(update(jobs).where(target).values(status='running'))
+                pending = row['status']
+                running = next(k for k, v in self.running_states.items() if v == pending)
+                c.execute(update(jobs).where(target).values(status=running))
             try:
                 doc, warnings = self.manifest(provider, row, get_metadata)
                 # Whole-title RPC is idempotent; a crash after publication only causes a safe reimport.
@@ -152,12 +171,12 @@ class DurableQueue:
                 result = {'imported': 1, 'kind': row['kind'], 'tmdb_id': row['tmdb']}
             except BatchPause:
                 with self.engine.begin() as c:
-                    c.execute(update(jobs).where(target).values(status='pending', ready=self.clock()+60))
+                    c.execute(update(jobs).where(target).values(status=pending, ready=self.clock()+60))
                 result = {'paused': True}
             except Exception:
                 attempts = row['attempts']+1
                 with self.engine.begin() as c:
-                    c.execute(update(jobs).where(target).values(status='failed' if attempts >= 3 else 'pending',
+                    c.execute(update(jobs).where(target).values(status='failed' if attempts >= 3 else pending,
                         attempts=attempts, ready=self.clock()+min(3600, 300*2**attempts), note='ImportaciÃ³n incompleta. Revisar el tÃ­tulo; no se publica un conjunto parcial.'))
                 result = {'review': True}
             return {**result, 'queue': self.summary(), 'discovery_review': discovery_review}

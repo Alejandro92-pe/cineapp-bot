@@ -19,20 +19,26 @@ jobs = Table('videoapi_jobs', metadata,
 
 
 class VideoAPIQueue(DurableQueue):
+    pending_states = ('pending', 'refresh_pending')
+    running_states = {'running': 'pending', 'refresh_running': 'refresh_pending'}
     def __init__(self, store, clock=time.time):
         super().__init__(store, clock, job_table=jobs, namespace='videoapi:')
 
-    def discover(self, provider, resource):
-        count = super().discover(provider, resource)
-        # Revisit completed titles weekly for newly released episodes; snapshots
-        # stay additive. Failed jobs require review rather than endless retries.
+    def prepare_work(self):
+        # Keep completed titles completed while the first pass has eligible work.
+        # Admit at most one weekly refresh; paused refreshes retain their lower
+        # priority and checkpoints even when new titles arrive or a worker restarts.
         with self.engine.begin() as c:
-            rows = c.execute(select(jobs).where(jobs.c.status == 'done', jobs.c.ready <= self.clock())).mappings().all()
-            for row in rows:
+            if c.execute(select(jobs.c.tmdb).where(jobs.c.status == 'pending',
+                    jobs.c.ready <= self.clock()).limit(1)).first(): return
+            if c.execute(select(jobs.c.tmdb).where(jobs.c.status.in_(
+                    ('refresh_pending', 'refresh_running'))).limit(1)).first(): return
+            row = c.execute(select(jobs).where(jobs.c.status == 'done', jobs.c.ready <= self.clock())
+                            .order_by(jobs.c.ready, jobs.c.created_at, jobs.c.tmdb).limit(1)).mappings().first()
+            if row:
                 source = json.loads(row['source']); source.pop('progress', None)
                 c.execute(update(jobs).where(jobs.c.kind == row['kind'], jobs.c.tmdb == row['tmdb']).values(
-                    status='pending', source=json.dumps(source), attempts=0, note=None))
-        return count
+                    status='refresh_pending', source=json.dumps(source), attempts=0, note=None))
 
     def manifest(self, provider, row, get):
         source = json.loads(row['source'])

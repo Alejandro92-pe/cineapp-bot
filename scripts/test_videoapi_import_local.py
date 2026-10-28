@@ -5,6 +5,7 @@ accelerated for this rehearsal; the real 1.5-second HTTP pacing is preserved.
 No Supabase client, Telegram bot, Render or production write is instantiated.
 """
 import hashlib
+import argparse
 import json
 import sys
 import time
@@ -32,7 +33,11 @@ def downloads(db):
 
 
 def main():
-    out=ROOT/'.local/videoapi-import';out.mkdir(exist_ok=True)
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--output',default='videoapi-import')
+    args=parser.parse_args()
+    if not args.output.replace('-','').replace('_','').isalnum():parser.error('Usa un nombre de carpeta simple.')
+    out=ROOT/'.local'/args.output;out.mkdir(exist_ok=True)
     # Explicitly discard all configuration except the TMDB read-only credential.
     saved=json.loads((ROOT/'.local/production-20261026/render-before.json').read_text(encoding='utf-8'))
     key=next((r['value'] for r in saved if r['key']=='TMDB_API_KEY'),'')

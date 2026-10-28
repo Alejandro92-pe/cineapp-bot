@@ -1,5 +1,5 @@
 VIDEOAPI: IMPORTACIÓN POR LOTES Y CONTINUIDAD DE SESIÓN
-Estado: preparado en local. Requiere aprobación antes de producción.
+Base VideoAPI desplegada en 559c3e4. Aceleración 4:1 y prioridad de cola: preparada solo en local; pendiente de aprobación y despliegue.
 
 Preparación de producción:
 1. Respaldar contenido, temporadas, episodios y cine_security. Conservar configuración actual.
@@ -17,12 +17,13 @@ Seguridad:
 - Las migraciones no borran cuentas ni descargas. La 016 conserva el plazo administrativo de sesiones antiguas activas y amplía solamente visualización una vez.
 
 Importación:
-- Cola privada videoapi_jobs. Páginas de 24, un título por lote, 1,5 s entre peticiones, presupuesto 18 s y mínimo 60 s entre ejecuciones.
+- Cola privada videoapi_jobs. Páginas de 24 en una inserción, un título por lote, 1,5 s entre peticiones y presupuesto de transporte de 18 s. El planificador reserva 300 s antes de permitir otro turno (el tiempo total incluye trabajo adicional de base de datos).
+- Ciclo: VideoAPI, VideoAPI, VideoAPI, VideoAPI, Vimeus. Cursor persistente, incluso ante errores. Un importador a la vez. Los tipos película/serie/anime siguen rotando dentro de cada proveedor.
 - TMDB da temporadas y episodios; cada episodio se contrasta contra exists de VideoAPI. Se publica la lista confirmada completa al terminar el recorrido del título. El avance por episodio se guarda antes de continuar.
 - Títulos sin ningún episodio disponible no se publican. Identidades ambiguas ya duplicadas se dejan para revisión.
 - Identidad: TMDB movie o tv. Serie y anime del mismo TMDB reutilizan la ficha canónica; enlaces de alias se conservan.
 - Publicación aditiva: no retirar capítulos ajenos ni sobrescribir URLs manuales/OK.ru. La sincronización posterior de Vimeus respeta los capítulos marcados por VideoAPI.
-- Se revisan semanalmente los trabajos completados para encontrar nuevos episodios. Fallos repetidos requieren revisión.
+- Los trabajos completados son elegibles para revisión después de una semana, pero las primeras importaciones listas tienen prioridad global. Solo se admite una revisión pendiente; conserva estado refresh_pending/refresh_running y avance entre pausas/reinicios. Si el catálogo inicial es grande, sus revisiones se aplazan mientras haya primeras importaciones listas. Los trabajos en espera por error no fuerzan actividad ni saltan Retry-After. Fallos repetidos requieren revisión.
 - No incluye un reproductor nuevo ni inventa descargas o eventos de progreso.
 
 Prueba reproducible local:
@@ -34,4 +35,17 @@ Muestra los manifiestos verificados y conserva los enlaces del catálogo local. 
 Reversión:
 Para detener únicamente el nuevo importador, VIDEOAPI_IMPORT_ENABLED=false. Puede pausarse todo el catálogo en el panel. No borrar las tablas nuevas: contienen puntos de reanudación. Para revertir el código completo, mantener las migraciones aditivas y volver a verificar autenticación; el código anterior requerirá iniciar otra sesión administrativa.
 
-Evidencia de esta fase: .local/videoapi-import/informe.html y results.json. No se modificó producción.
+PREPARACIÓN DEL CRON A CINCO MINUTOS (NO APLICADA)
+1. Desplegar el código aprobado y verificar protección del cron, propietario y descargas.
+2. Editar el cron existente, no crear otro: GET /cron/verificar_vencimientos cada cinco minutos (*/5 * * * *), conservando el encabezado Authorization actual. No poner el secreto en la URL ni en este documento.
+3. Mantener CATALOG_IMPORT_ENABLED=true y VIDEOAPI_IMPORT_ENABLED=true. No cambian claves, planes, pagos ni hosting.
+4. El cambio de código por sí solo no cambia el servicio externo de cron: a diez minutos recibirá la mitad de turnos.
+5. Medir tiempos p50/p95 del catálogo y episodios, errores y consumo durante varias ejecuciones reales. La prueba Windows/SQLite no predice la capacidad de Render gratuito. Ante degradación, devolver el cron a diez minutos o pausar importaciones desde el panel.
+6. No se requiere migración nueva. Antes de volver a código anterior, pausar importaciones y conservar puntos de avance: el código antiguo no reconoce refresh_pending/refresh_running. No convertirlos a pending mientras quede backlog inicial; revisarlos antes del rollback.
+
+Pruebas de esta evolución:
+.venv\Scripts\python.exe -m pytest tests/test_import_priority.py tests/test_videoapi_import.py tests/test_durable_catalog_queue.py tests/test_catalog_queue.py -q
+.venv\Scripts\python.exe scripts/test_videoapi_import_local.py --output import-priority-live
+.venv\Scripts\python.exe scripts/benchmark_import_priority.py
+La medición HTTP es offline, cuatro clientes concurrentes, respuestas externas simuladas con latencia de 100 ms y pausas reales de 1,5 s. Compara reposo/importación/importación/reposo en copias locales; la importación se fuerza durante ventanas activas para medir interferencia, sin afirmar que es el cron real. Mide respuesta del servidor, no carga de imágenes ni reproducción externa.
+Evidencias: .local/import-priority/benchmark.json, .local/import-priority/informe.html y .local/import-priority-live/results.json. No se cambiaron Render, Supabase ni cron-job.org en esta fase.

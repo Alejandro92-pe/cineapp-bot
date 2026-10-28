@@ -104,11 +104,16 @@ def test_scheduler_advances_after_vimeus_failure_and_keeps_batches_bounded(syste
     args=dict(videoapi_enabled=True,vimeus_key='test',tmdb_key='test')
     assert scheduler.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
     assert scheduler.run_batch(q,system.security_store,None,**args)=={'waiting':True}
-    q.clock=lambda:1100
+    for n in range(1,4):
+        q.clock=lambda n=n:1000+n*300
+        assert scheduler.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
+    q.clock=lambda:2199
+    assert scheduler.run_batch(q,system.security_store,None,**args)=={'waiting':True}
+    q.clock=lambda:2200
     with pytest.raises(RuntimeError):scheduler.run_batch(q,system.security_store,None,**args)
-    q.clock=lambda:1200
+    q.clock=lambda:2500
     assert scheduler.run_batch(q,system.security_store,None,**args)['provider']=='videoapi'
-    assert calls==['videoapi','vimeus','videoapi']
+    assert calls==['videoapi']*4+['vimeus','videoapi']
 
 
 def test_completed_series_are_rechecked_weekly_without_duplication(system):
@@ -116,6 +121,6 @@ def test_completed_series_are_rechecked_weekly_without_duplication(system):
     q.discover(p,'series');q.run(p,metadata,published.append,discover=False)
     q.clock=lambda:1000+604801
     q.discover(p,'series')
-    assert q.summary()=={'pending':1}
+    assert q.summary()=={'done':1}  # Discovery cannot reset all completed jobs.
     q.run(p,metadata,published.append,discover=False)
     assert q.summary()=={'done':1} and len(published)==2
