@@ -48,3 +48,17 @@ test('network failure is visible and can be retried', async () => {
   await controller.mount(item); assert.equal(controller.state.error,'No disponible');
   fails=false; await controller.more(); assert.equal(controller.state.selected.id,1); assert.equal(controller.state.error,'');
 });
+
+test('resume opens only its page and next loads the following block', async()=>{
+ const calls=[];
+ const c=new EpisodeController(async url=>{
+  calls.push(url);
+  if(url.includes('/temporadas/'))return {temporadas:seasons};
+  if(url.includes('around=180'))return {episodios:[episode(180,180)],page:15,total:220,has_next:true};
+  return {episodios:[episode(181,181)],page:16,total:220,has_next:true};
+ },()=>{});
+ await c.mount({...item,last_episode:180,last_season:2});
+ assert.equal(calls.length,2);assert.equal(c.state.selected.id,180);
+ assert.ok(calls[1].includes('page_size=12'));assert.equal(c.state.start_page,15);
+ assert.equal((await c.next()).id,181);assert.ok(calls.at(-1).endsWith('page=16'));
+});

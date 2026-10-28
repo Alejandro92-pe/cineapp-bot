@@ -138,7 +138,8 @@ def install_security(app, membership_checker):
             request.endpoint == 'static' or path in {
                 '/', '/admin', '/cuenta', '/membresia', '/instalar', '/offline',
                 '/sw.js', '/manifest.webmanifest', '/health'})
-        public_catalog = ((request.method in ('GET', 'HEAD') and path in {'/api/tendencias', '/api/top10'})
+        public_catalog = ((request.method in ('GET', 'HEAD') and (path in {'/api/tendencias', '/api/top10'}
+                           or request.endpoint in {'api_get_temporadas', 'vimeus.episodes'}))
                           or (request.method == 'POST' and path == '/api/contenido'))
         g.identity = None if public_document or public_catalog else store.session(request.cookies.get(COOKIE))
         if request.endpoint is None:

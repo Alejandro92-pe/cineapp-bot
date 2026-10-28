@@ -5,14 +5,26 @@
   const state={type:'todo',query:'',genre:'',year:'',download:false};
   let revision=0, currentView='inicio', timer;
   let disposeHero=()=>{};
+  // Short-lived public metadata only. Access, payments and downloads never use it.
+  const publicCache=new Map();
+  async function cachedPublic(key,load){
+    const now=Date.now(), stored=publicCache.get(key);
+    if(stored && now-stored.at<60000)return stored.value;
+    const value=Promise.resolve().then(load);
+    publicCache.set(key,{at:now,value});
+    if(publicCache.size>24)publicCache.delete(publicCache.keys().next().value);
+    try{return await value;}catch(error){if(publicCache.get(key)?.value===value)publicCache.delete(key);throw error;}
+  }
   const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
   function button(text,handler,cls='cine-button'){const n=el('button',text,cls);n.type='button';n.onclick=handler;return n;}
   function image(item,cls){const n=el('img',null,cls);n.src=safeImageSrc(item.imagen_url);n.alt='';n.loading='lazy';n.onerror=()=>{n.onerror=null;n.src='/static/placeholder.svg';};return n;}
   function metadata(item){return [types[item.tipo]||item.tipo,item.año,item.genero?.split(',')[0]].filter(Boolean).join(' · ');}
   async function request(filters={}){
+    return cachedPublic(JSON.stringify(filters),async()=>{
     const response=await fetch('/api/contenido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:'todo',limit:LIMIT,offset:0,...filters})});
     if(!response.ok)throw new Error('No pudimos cargar el catálogo. Inténtalo de nuevo.');
     return response.json();
+    });
   }
   function payload(offset=0){return {tipo:state.type,busqueda:state.query.trim(),genero:state.genre,año:state.year||null,descarga:state.download,limit:LIMIT,offset};}
   function card(item){
@@ -51,7 +63,7 @@
     const [featured,latest,movies,series,anime,top,biblical]=await Promise.all([
       featuredRequest,
       request({limit:12}),request({tipo:'pelicula',limit:8}),request({tipo:'serie',limit:8}),request({tipo:'anime',limit:8}),
-      fetch('/api/top10').then(r=>r.ok?r.json():{data:[]}).catch(()=>({data:[]})),request({tipo:'biblico',limit:8})]);
+      cachedPublic('top10',()=>fetch('/api/top10').then(r=>{if(!r.ok)throw Error('Ranking no disponible');return r.json();})).catch(()=>({data:[]})),request({tipo:'biblico',limit:8})]);
     if(token!==revision)return;
     if(!heroVisible)container.replaceChildren();
     const slides=CatalogHero.selectTitles(featured,movies.data);

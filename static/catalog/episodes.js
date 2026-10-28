@@ -14,20 +14,18 @@
         this.state.seasons = result.temporadas || [];
         const first = this.state.seasons.find(s=>s.numero===item.start_season) || this.state.seasons.find(s=>s.id===item.last_season) || this.state.seasons.find(s => s.numero > 0 && s.episodios > 0) || this.state.seasons[0];
         if (first) {
-          await this.season(first.id);
-          const resumeVersion=this.version;
-          while(item.last_episode && this.state.item===item && !this.state.episodes.some(e=>e.id===item.last_episode) && this.state.has_next && !this.state.error){await this.more();if(this.version!==resumeVersion)return;}
+          await this.season(first.id, item.last_episode);
           if(this.state.item===item && this.state.episodes.some(e=>e.id===item.last_episode))this.select(item.last_episode);
           return;
         }
         this.state.loading = false; this.render(this.state);
       } catch (error) { if (version === this.version) this.fail(error); }
     }
-    async season(id) {
+    async season(id, around = null) {
       const season = this.state.seasons.find(s => s.id === Number(id));
       if (!season) return;
       const version = ++this.version;
-      this.state = { ...this.state, season, selected: null, episodes: [], loading: true, fetching: false, error: '', page: 0, has_next: false };
+      this.state = { ...this.state, season, selected: null, episodes: [], loading: true, fetching: false, error: '', page: 0, start_page: 1, around, has_next: false };
       this.render(this.state);
       await this.more(version);
     }
@@ -35,9 +33,10 @@
       if (!this.state.season || this.state.fetching) return;
       this.state.fetching = true; this.render(this.state);
       try {
-        const result = await this.load(`/api/episodios/${this.state.item.id}/${this.state.season.id}?page=${(this.state.page || 0)+1}`);
+        const resume=this.state.page===0 && this.state.around ? `&around=${encodeURIComponent(this.state.around)}` : '';
+        const result = await this.load(`/api/episodios/${this.state.item.id}/${this.state.season.id}?page_size=12${resume}&page=${(this.state.page || 0)+1}`);
         if (version !== this.version) return;
-        this.state = { ...this.state, episodes: [...this.state.episodes, ...result.episodios], page: result.page,
+        this.state = { ...this.state, start_page: this.state.page===0 ? result.page : this.state.start_page, episodes: [...this.state.episodes, ...result.episodios], page: result.page,
           has_next: result.has_next, total: result.total, fetching: false, loading: false, error: '' };
         this.state.selected ||= this.state.episodes[0] || null;
         this.render(this.state);
@@ -100,6 +99,7 @@
     status.textContent = state.error || (state.loading ? 'Cargando capítulos…' : state.episodes.length ?
       `${state.total} episodios` : 'Los episodios de este título aún no están disponibles.');
     wrap.append(status);
+    if(state.start_page>1){const first=document.createElement('button');first.type='button';first.className='episodes-more';first.textContent='Ver desde el primer capítulo';first.onclick=()=>controller.season(state.season.id);wrap.append(first);}
     const grid = document.createElement('div'); grid.className = 'episodes-grid';
     state.episodes.forEach(ep => {
       const row = document.createElement('article');row.className='episode-row';

@@ -52,7 +52,9 @@ def is_admin(user_id):
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 supabase = supabase_service if LOCAL_MODE else create_client(SUPABASE_URL, SUPABASE_KEY)
-bot = LocalBot() if LOCAL_MODE else telebot.TeleBot(BOT_TOKEN)
+# Complete webhook work within the request. Gunicorn already provides concurrency;
+# acknowledging before a background handler finishes hides failures from Telegram.
+bot = LocalBot() if LOCAL_MODE else telebot.TeleBot(BOT_TOKEN, threaded=False)
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "Popcornqh_admin_bot")
 
@@ -480,9 +482,17 @@ def api_admin_login():
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 @app.route('/webhook/telegram', methods=['POST'])
 def webhook():
-    json_str = request.get_data().decode("UTF-8")
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get('update_id'), int):
+        return jsonify(error='Actualización inválida.'), 400
+    try:
+        update = telebot.types.Update.de_json(payload)
+        bot.process_new_updates([update])
+    except Exception as exc:
+        # Log only the class: exception strings can contain bot tokens or messages.
+        app.logger.error('Telegram update failed: %s', type(exc).__name__)
+        return jsonify(error='Inténtalo de nuevo.'), 503
+    app.logger.info('Telegram update processed: %s', 'message' if update.message else 'other')
     return "OK", 200
 
 # ============ ENDPOINTS ============

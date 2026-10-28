@@ -1503,7 +1503,7 @@ async function abrirModalContenido(item) {
   try {
     const [response]=await Promise.all([
       fetch('/api/contenido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:item.id,limit:1})}),
-      DetailAssets.ready(), AccountSession.ready
+      DetailAssets.ready()
     ]);
     if(!response.ok)throw new Error('No se pudo abrir este título. Inténtalo de nuevo.');
     const data=await response.json();if(opening!==detalleOpenRevision)return;
@@ -1606,12 +1606,11 @@ async function abrirModalContenido(item) {
   const badgeVisto = document.getElementById('badgeVisto');
   if (badgeVisto) badgeVisto.style.display = yaVisto ? 'flex' : 'none';
 
-  await cargarTemporadas(item);
-  if (contenidoSeleccionado?.id !== item.id) return;
-  cargarRelacionados(item);
-
   const modal = document.getElementById('modalDetalle');
   if (modal) { modal.classList.add('active'); modal.scrollTop = 0; document.body.style.overflow = 'hidden'; modal.querySelector('.detalle-back').focus(); }
+  // The title is usable immediately; chapters and recommendations load in place.
+  cargarRelacionados(item);
+  await cargarTemporadas(item);
 }
 
 function actualizarBtnFav(btn, isFav) {

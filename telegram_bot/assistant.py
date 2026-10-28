@@ -40,7 +40,8 @@ class QueHayBot:
                               disable_web_page_preview=True)
 
     def menu(self, chat_id, name=''):
-        markup = ReplyKeyboardMarkup(resize_keyboard=True, input_field_placeholder='Busca un título o elige una opción')
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True,
+            input_field_placeholder='Busca un título o elige una opción')
         for row in MENU_ROWS:
             markup.row(*row)
         self.send(chat_id, f'🍿 <b>¡Hola{", " + escape(name[:60]) if name else ""}! Estás en QueHay.</b>\n\n'

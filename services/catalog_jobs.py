@@ -112,8 +112,20 @@ class DurableQueue:
                 self.set_setting('turn', turn+1)
                 discovery_review = True
             with self.engine.begin() as c:
-                row = c.execute(select(jobs).where(jobs.c.status == 'pending', jobs.c.ready <= self.clock())
-                                .order_by(jobs.c.created_at, jobs.c.tmdb).limit(1)).mappings().first()
+                # Discovery and processing have separate cursors. An old backlog
+                # of series must not starve newer movies/anime, including on pause.
+                kinds = ('pelicula', 'serie', 'anime')
+                work_turn = int(self.get_setting('work_turn')) % len(kinds)
+                row = None
+                for step in range(len(kinds)):
+                    index = (work_turn + step) % len(kinds)
+                    row = c.execute(select(jobs).where(jobs.c.status == 'pending',
+                        jobs.c.ready <= self.clock(), jobs.c.kind == kinds[index])
+                        .order_by(jobs.c.created_at, jobs.c.tmdb).limit(1)).mappings().first()
+                    if row:
+                        stmt = self.insert(settings).values(key='work_turn', value=(index+1) % len(kinds))
+                        c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value': (index+1) % len(kinds)}))
+                        break
                 if not row: return {'queue': self.summary(), 'discovery_review': discovery_review}
                 row = dict(row)
                 target = (jobs.c.kind == row['kind']) & (jobs.c.tmdb == row['tmdb'])

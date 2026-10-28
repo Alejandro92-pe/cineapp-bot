@@ -91,7 +91,7 @@ class Query:
         self.filters.append(lambda r: str(r.get(key, "")) <= str(value))
         return self
     def lt(self, key, value):
-        self.filters.append(lambda r: str(r.get(key, "")) < str(value))
+        self.filters.append(lambda r: r.get(key) is not None and r[key] < value)
         return self
     @property
     def not_(self):

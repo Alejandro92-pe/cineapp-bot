@@ -33,3 +33,33 @@ test('home starts while account sync is pending; no legacy startup requests',asy
  assert.deepEqual(calls,['/api/payments/mine']);
  assert.equal(context.membresiaActiva.membresias_planes.nombre,'Propietario');
 });
+
+test('detail is visible before chapters finish and does not wait for account sync',async()=>{
+ const nodes=new Map();
+ function node(){return {style:{},classList:{values:new Set(),contains(x){return this.values.has(x)},add(x){this.values.add(x)},toggle(){}},querySelector:()=>({focus(){},setAttribute(){}}),setAttribute(){}};}
+ const doc={activeElement:{},body:{style:{}},getElementById:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)}};
+ let release;
+ const context={document:doc,detalleOpenRevision:0,contenidoSeleccionado:null,detallePreviousFocus:null,
+  fetch:async()=>({ok:true,json:async()=>({data:[{id:7,titulo:'Historia',tipo:'anime'}]})}),
+  DetailAssets:{ready:async()=>{}},AccountSession:{ready:new Promise(()=>{})},InlinePlayback:{close(){}},
+  _resetTemporadas(){},safeImageSrc:()=>'',safeImageUrl:()=>'',escapeHtml:x=>x,esFavorito:()=>false,
+  actualizarBtnFav(){},actualizarBtnLike(){},localStorage:{getItem:()=>null},cargarRelacionados(){},
+  cargarTemporadas:()=>new Promise(r=>release=r),alert:message=>{throw Error(message)}};
+ const source=fs.readFileSync('static/app.js','utf8');
+ vm.runInNewContext(source.slice(source.indexOf('async function abrirModalContenido('),source.indexOf('function actualizarBtnFav(')),context);
+ const pending=context.abrirModalContenido({id:7});await new Promise(r=>setImmediate(r));
+ assert.equal(nodes.get('detalleTitulo').textContent,'Historia');assert.ok(nodes.get('modalDetalle').classList.contains('active'));
+ release();await pending;
+});
+
+test('public cache coalesces requests, expires and evicts failures',async()=>{
+ const source=fs.readFileSync('static/catalog/browse.js','utf8');
+ let now=1000,calls=0;
+ const ctx={Date:{now:()=>now},Map,Promise};
+ vm.runInNewContext(source.slice(source.indexOf('  const publicCache='),source.indexOf('  const el=')),ctx);
+ const load=async()=>{calls++;return {data:[1]}};
+ await Promise.all([ctx.cachedPublic('home',load),ctx.cachedPublic('home',load)]);assert.equal(calls,1);
+ now+=61000;await ctx.cachedPublic('home',load);assert.equal(calls,2);
+ await assert.rejects(ctx.cachedPublic('bad',async()=>{throw Error('network')}));
+ assert.deepEqual(await ctx.cachedPublic('bad',load),{data:[1]});assert.equal(calls,3);
+});

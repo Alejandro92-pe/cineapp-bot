@@ -49,6 +49,7 @@ def test_actual_dispatch_new_six_button_menu(assistant, system):
     response = process(assistant)
     assert '<Ale&>' not in response['text'] and '&lt;Ale&amp;&gt;' in response['text']
     assert [[b['text'] for b in row] for row in buttons(response)['keyboard']] == [list(row) for row in MENU_ROWS]
+    assert buttons(response)['is_persistent'] is True
     assert system.supabase_service.table('usuarios').select('*').eq('telegram_id', 900000005).execute().data
     process(assistant)
     assert len(system.supabase_service.table('usuarios').select('*').eq('telegram_id', 900000005).execute().data) == 1
@@ -195,3 +196,13 @@ def test_deployment_menu_configuration_is_explicit_and_offline():
                            set_chat_menu_button=lambda **kw: calls.append(('menu', kw)))
     apply_configuration(fake, config)
     assert len(calls) == 8
+
+def test_webhook_dispatches_real_menu_and_owner_account(client, system, assistant, monkeypatch):
+    import os
+    monkeypatch.setattr(system, 'bot', assistant.bot)
+    headers={'X-Telegram-Bot-Api-Secret-Token':os.environ['TELEGRAM_WEBHOOK_SECRET']}
+    for i,text in enumerate(('/start','/cuenta')):
+        response=send(client,'/webhook/telegram',{'update_id':100+i,'message':message(text,uid=OWNER_ID).json},headers=headers)
+        assert response.status_code==200
+    assert buttons(assistant.bot.sent[0])['is_persistent'] is True
+    assert 'Acceso permanente' in assistant.bot.sent[-1]['text']

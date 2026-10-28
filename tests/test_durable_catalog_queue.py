@@ -103,3 +103,23 @@ def test_queue_status_owner_only_and_local_disabled(client):
     assert response.status_code == 200 and response.json == {'enabled': False, 'configured': False, 'queue': {}}
     assert send(client, '/api/admin/catalog/queue/settings', {'enabled': False}, csrf).status_code == 200
     assert send(client, '/api/admin/catalog/queue/settings', {'enabled': 'yes'}, csrf).status_code == 400
+
+
+def test_processing_rotates_despite_older_series_and_paused_anime(queue, monkeypatch):
+    from services import catalog_jobs
+    for kind, tmdb, created in [('serie', 1, 1), ('serie', 2, 2), ('pelicula', 3, 100), ('anime', 4, 200)]:
+        with queue.engine.begin() as c:
+            c.execute(jobs.insert().values(kind=kind, tmdb=tmdb, source='{}', status='pending', attempts=0, ready=0, created_at=created))
+    visited=[]
+    monkeypatch.setattr(catalog_jobs, 'movie_manifest', lambda *a: (visited.append('pelicula') or {'contenido': {}}, []))
+    def manifest(provider, tmdb, kind, *a, **kw):
+        visited.append(kind)
+        if kind == 'anime': raise BatchPause()
+        return {'contenido': {}}, []
+    monkeypatch.setattr(catalog_jobs, 'build_manifest', manifest)
+    for tick in (1000, 2000, 3000, 4000):
+        queue.clock=lambda tick=tick: tick
+        queue.run(Provider(), metadata, lambda doc: None, discover=False)
+    assert visited == ['pelicula', 'serie', 'anime', 'serie']
+    assert queue.summary() == {'done': 3, 'pending': 1}
+    assert queue.get_setting('work_turn') == 2

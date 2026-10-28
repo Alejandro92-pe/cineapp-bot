@@ -38,11 +38,23 @@ def create_vimeus_routes(database, provider, tmdb_get=None):
         # Pagination also avoids Supabase's default 1,000-row response cap.
         try:
             page = integer(request.args.get("page", "1"), 1)
+            page_size = integer(request.args.get("page_size", "50"), 1)
         except ImportFailure:
             return jsonify(error="Página inválida."), 400
-        if page > 100:
+        if page_size > 50 or (page-1)*page_size >= 5000:
             return jsonify(error="Página inválida."), 400
-        rows = database.table("episodios").select("id,temporada_id,numero,titulo,sinopsis,imagen_url,duracion,descarga,provider_download_url,playback_url", count="exact").eq("temporada_id", temporada_id).eq("disponible", True).order("numero").range((page-1)*50, page*50-1).execute()
+        # Resume directly on the saved episode's page, not by downloading every
+        # previous page of a long anime. Only public metadata is returned here.
+        if request.args.get('around'):
+            try:
+                episode_id = integer(request.args['around'], 1)
+            except ImportFailure:
+                return jsonify(error='Episodio inválido.'), 400
+            target = database.table('episodios').select('numero').eq('id', episode_id).eq('temporada_id', temporada_id).eq('disponible', True).limit(1).execute().data
+            if target:
+                preceding = database.table('episodios').select('id', count='exact', head=True).eq('temporada_id', temporada_id).eq('disponible', True).lt('numero', target[0]['numero']).execute()
+                page = preceding.count // page_size + 1
+        rows = database.table("episodios").select("id,temporada_id,numero,titulo,sinopsis,imagen_url,duracion,descarga,provider_download_url,playback_url", count="exact").eq("temporada_id", temporada_id).eq("disponible", True).order("numero").range((page-1)*page_size, page*page_size-1).execute()
         public=[]
         for row in rows.data:
             item=dict(row);manual=item.pop('descarga',None);provider_link=item.pop('provider_download_url',None)
@@ -52,6 +64,6 @@ def create_vimeus_routes(database, provider, tmdb_get=None):
                 from providers.okru import embed_url
                 item['has_playback']=bool(embed_url(link))
             public.append(item)
-        return jsonify(episodios=public, page=page, has_next=page*50 < rows.count, total=rows.count)
+        return jsonify(episodios=public, page=page, has_next=page*page_size < rows.count, total=rows.count)
 
     return bp
