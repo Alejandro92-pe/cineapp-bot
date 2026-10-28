@@ -1,10 +1,10 @@
-/* Four featured films with accessible controls and a disposable rotation timer. */
+/* Three featured films, selected on the server for each three-day period. */
 (function(root){
  function selectTitles(featured,latest){
   const seen=new Set();return [...featured,...latest].filter(item=>{
    if(item.tipo!=='pelicula'||item.disponible===false||seen.has(String(item.id)))return false;
    seen.add(String(item.id));return true;
-  }).slice(0,4);
+  }).slice(0,3);
  }
  function rotation(count,render,{schedule=setInterval,cancel=clearInterval,blocked=()=>false,paused=false}={}){
   let index=0,stopped=false;

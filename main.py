@@ -1106,9 +1106,8 @@ def api_download(contenido_id):
 
 @app.route("/api/tendencias", methods=["GET"])
 def api_tendencias():
-    resultados = supabase_service.table("contenido").select("*") \
-        .eq("destacado", True).eq("disponible", True).order("orden_destacado").limit(10).execute()
-    return jsonify(resultados.data)
+    from services.hero import HeroRotation
+    return jsonify(HeroRotation(catalog_job_store, supabase_service).titles())
 
 @app.route("/webhook/buymeacoffee", methods=["POST"])
 def webhook_buymeacoffee():
