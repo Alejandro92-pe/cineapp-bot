@@ -1517,7 +1517,7 @@ async function abrirModalContenido(item) {
   contenidoSeleccionado = item;
 
   const bgEl = document.getElementById('detalleHeroBg');
-  if (bgEl) bgEl.style.backgroundImage = `url('${safeImageUrl(item.backdrop_url || item.imagen_url || '')}')`;
+  if (bgEl) CatalogArtwork.detail(bgEl, {backdrop_url: item.backdrop_url ? safeImageSrc(item.backdrop_url) : '', imagen_url:safeImageSrc(item.imagen_url)});
 
   const imgEl = document.getElementById('detalleImagen');
   if (imgEl) { imgEl.style.display=''; imgEl.src = safeImageSrc(item.imagen_url); imgEl.onerror = () => { imgEl.onerror=null; imgEl.src='/static/placeholder.svg'; }; }

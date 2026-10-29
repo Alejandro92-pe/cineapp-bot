@@ -17,7 +17,7 @@
   const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text)node.textContent=text;return node;};
   const button=(label,handler,cls)=>{const b=el('button',cls,label);b.type='button';b.onclick=handler;return b;};
   const hero=el('section','cine-hero cine-carousel');hero.setAttribute('aria-roledescription','carrusel');hero.setAttribute('aria-label','Películas destacadas');
-  const art=el('img','cine-hero-art');art.alt='';art.loading='eager';art.fetchPriority='high';art.onerror=()=>{art.onerror=null;art.src='/static/placeholder.svg';};
+  const art=el('img','cine-hero-art');art.alt='';art.loading='eager';art.fetchPriority='high';art.onerror=()=>{art.onerror=null;art.srcset='';art.src='/static/placeholder.svg';};
   const copy=el('div','cine-hero-copy');const title=el('h1');title.id='cine-hero-title';
   const metadata=el('p','cine-hero-meta');const summary=el('p','cine-hero-summary');
   copy.append(el('p','cine-eyebrow','QUEHAY PRESENTA'),title,metadata,summary);
@@ -33,7 +33,7 @@
   const choices=items.map((item,i)=>{const b=button('',()=>model.go(i),'hero-dot');b.setAttribute('aria-label',`Mostrar ${item.titulo}`);dots.append(b);return b;});
   controls.append(previous,dots,next,position,pause);hero.append(art,el('div','cine-hero-shade'),copy,controls,announcement);
   function render(index,paused){
-   selected=items[index];art.src=safeImageSrc(selected.backdrop_url||selected.imagen_url);title.textContent=selected.titulo;
+   selected=items[index];CatalogArtwork.hero(art,{backdrop_url:selected.backdrop_url?safeImageSrc(selected.backdrop_url):'',imagen_url:safeImageSrc(selected.imagen_url)});title.textContent=selected.titulo;
    metadata.textContent=[selected.año,selected.genero?.split(',')[0],Number(selected.rating)>0?'★ '+Number(selected.rating).toFixed(1):''].filter(Boolean).join(' · ');
    summary.textContent=selected.sinopsis||'Descubre esta historia en nuestro catálogo.';
    position.textContent=`${index+1} / ${items.length}`;pause.textContent=paused?'▷':'Ⅱ';pause.setAttribute('aria-label',paused?'Reanudar carrusel':'Pausar carrusel');

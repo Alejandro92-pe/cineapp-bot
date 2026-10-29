@@ -1,0 +1,5 @@
+.cine-hero-art.artwork-poster-fallback{object-fit:contain;object-position:right center;background:#080f19}
+.detalle-hero-bg{filter:none!important;transform:none!important}
+.detalle-hero-bg>img{width:100%;height:100%;display:block;object-fit:cover;object-position:center 30%}
+.detalle-hero-bg>img.artwork-poster-fallback{object-fit:contain;object-position:right center;background:#080f19}
+@media(max-width:700px){.cine-hero-art.artwork-poster-fallback{object-position:center top}}

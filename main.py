@@ -1109,6 +1109,24 @@ def api_tendencias():
     from services.hero import HeroRotation
     return jsonify(HeroRotation(catalog_job_store, supabase_service).titles())
 
+
+@app.get('/api/public/landing')
+def landing_selection():
+    from services.artwork import ArtworkMaintenance
+    return jsonify(ArtworkMaintenance(catalog_job_store, supabase_service).public())
+
+
+@app.get('/cron/actualizar_imagenes')
+def refresh_artwork():
+    # Separate bounded job: never delays or consumes an import-provider turn.
+    if LOCAL_MODE or os.getenv('ARTWORK_REFRESH_ENABLED') != 'true':
+        return jsonify(enabled=False)
+    from providers.tmdb import TMDBClient
+    from services.artwork import ArtworkMaintenance
+    key=os.getenv('TMDB_API_KEY','')
+    if not key:return jsonify(error='Metadatos pendientes de configuración.'),503
+    return jsonify(ArtworkMaintenance(catalog_job_store,supabase_service,TMDBClient(key,timeout=(2,4))).run())
+
 @app.route("/webhook/buymeacoffee", methods=["POST"])
 def webhook_buymeacoffee():
     from billing.webhook import process_bmc

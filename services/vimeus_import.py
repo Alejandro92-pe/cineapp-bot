@@ -40,6 +40,7 @@ def build_manifest(provider, tmdb_id, kind, tmdb_get=None, metadata_seconds=20):
             metadata = tmdb_get(f"/tv/{tmdb_id}")
             content.update(titulo=metadata.get("name") or content["titulo"],
                 sinopsis=metadata.get("overview") or "", imagen_url=image_url(metadata.get("poster_path")) or content["imagen_url"],
+                backdrop_url=image_url(metadata.get('backdrop_path')).replace('/w500','/w1280') or content['backdrop_url'],
                 genero=", ".join(g["name"] for g in metadata.get("genres", []) if g.get("name")))
             rating = tmdb_rating(metadata)
             if rating is not None:

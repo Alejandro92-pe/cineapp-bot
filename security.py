@@ -159,7 +159,7 @@ def install_security(app, membership_checker):
             request.endpoint == 'static' or path in {
                 '/', '/admin', '/cuenta', '/membresia', '/instalar', '/offline',
                 '/sw.js', '/manifest.webmanifest', '/health'})
-        public_catalog = ((request.method in ('GET', 'HEAD') and (path in {'/api/tendencias', '/api/top10'}
+        public_catalog = ((request.method in ('GET', 'HEAD') and (path in {'/api/tendencias', '/api/top10', '/api/public/landing'}
                            or request.endpoint in {'api_get_temporadas', 'vimeus.episodes'}))
                           or (request.method == 'POST' and path == '/api/contenido'))
         g.identity = None if public_document or public_catalog else store.session(request.cookies.get(COOKIE))
@@ -192,7 +192,7 @@ def install_security(app, membership_checker):
                 if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), g.identity["csrf"]):
                     return error("La sesión necesita actualizarse.", 403, 'csrf_refresh_required')
         if path in {"/", "/admin", "/cuenta", "/membresia", "/instalar", "/offline", "/sw.js", "/manifest.webmanifest", "/api/payments/config", "/health", "/api/planes", "/api/tendencias",
-                    "/api/auth/me", "/api/top10", "/paypal/success", "/paypal/cancel"} or path.startswith(("/static/", "/api/payments/qr/")) or path in PUBLIC_POSTS:
+                    "/api/auth/me", "/api/top10", "/api/public/landing", "/paypal/success", "/paypal/cancel"} or path.startswith(("/static/", "/api/payments/qr/")) or path in PUBLIC_POSTS:
             return None
         if path.startswith("/api/admin/") or path in ADMIN_PATHS:
             if not admin_authenticated():
@@ -232,6 +232,14 @@ def install_security(app, membership_checker):
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.path.startswith("/api/") or request.path in ADMIN_PATHS | USER_PATHS:
             response.headers["Cache-Control"] = "no-store"
+        # Public artwork only. Never permit cross-origin account/payment requests.
+        if request.path == '/api/public/landing' and request.method in ('GET','HEAD') and response.status_code == 200:
+            allowed={'https://quehay.live','https://www.quehay.live'}
+            if local:allowed.update({'http://127.0.0.1:5013','http://127.0.0.1:5015'})
+            if request.headers.get('Origin') in allowed:
+                response.headers['Access-Control-Allow-Origin']=request.headers['Origin']
+            response.headers['Vary']='Origin'
+            response.headers['Cache-Control']='public, max-age=900'
         if response.is_json and response.status_code < 400 and (
                 request.path in ("/api/contenido", "/api/tendencias") or request.path.startswith("/api/temporadas/")):
             payload = response.get_json()

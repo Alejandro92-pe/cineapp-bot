@@ -17,7 +17,7 @@
   }
   const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
   function button(text,handler,cls='cine-button'){const n=el('button',text,cls);n.type='button';n.onclick=handler;return n;}
-  function image(item,cls){const n=el('img',null,cls);n.src=safeImageSrc(item.imagen_url);n.alt='';n.loading='lazy';n.onerror=()=>{n.onerror=null;n.src='/static/placeholder.svg';};return n;}
+  function image(item,cls){const n=el('img',null,cls);CatalogArtwork.poster(n,safeImageSrc(item.imagen_url));n.alt='';n.loading='lazy';n.onerror=()=>{n.onerror=null;n.srcset='';n.src='/static/placeholder.svg';};return n;}
   function metadata(item){return [types[item.tipo]||item.tipo,item.año,item.genero?.split(',')[0]].filter(Boolean).join(' · ');}
   async function request(filters={}){
     return cachedPublic(JSON.stringify(filters),async()=>{
@@ -84,7 +84,7 @@
     const promoCopy=el('div',null,'install-promo-copy');promoCopy.append(el('p','QUEHAY VA CONTIGO','install-promo-eyebrow'),el('h2','Tu cine. A un toque.'),el('p','Lleva QueHay a la pantalla de inicio de tu Android. Tus películas, series y bíblicos, siempre a mano.','install-promo-description'));
     const install=el('a','Instalar en mi Android  ↗','install-promo-cta');install.href='/instalar';promoCopy.append(install,el('span','Sin buscar enlaces. Vuelve directo a tu catálogo.','install-promo-note'));
     const phone=el('div',null,'install-promo-phone');phone.setAttribute('aria-hidden','true');const phoneHeader=el('div',null,'install-promo-brand');const icon=el('img');icon.src='/static/logo-que-hay-live.png';icon.alt='';phoneHeader.append(icon,el('span','QUEHAY'));
-    const screen=el('div',null,'install-promo-screen');const art=el('img');art.alt='';art.loading='lazy';art.src=safeImageSrc(slides[0]?.backdrop_url||slides[0]?.imagen_url||'/static/placeholder.svg');screen.append(art,el('span','UNA HISTORIA TE ESPERA'));
+    const screen=el('div',null,'install-promo-screen');const art=el('img');art.alt='';art.loading='lazy';CatalogArtwork.hero(art,{backdrop_url:slides[0]?.backdrop_url?safeImageSrc(slides[0].backdrop_url):'',imagen_url:safeImageSrc(slides[0]?.imagen_url)});screen.append(art,el('span','UNA HISTORIA TE ESPERA'));
     const mini=el('div',null,'install-promo-posters');mini.append(...movies.data.slice(0,3).map(item=>image(item,'')));phone.append(phoneHeader,screen,mini);promo.append(promoCopy,phone);container.append(promo);
     const foot=el('footer',null,'cine-page-footer');foot.append(el('strong','QUEHAY CINE'),el('span','Historias que nos acompañan.'),el('a','Descubre la membresía'));foot.lastChild.href='/membresia';container.append(foot);
   }
