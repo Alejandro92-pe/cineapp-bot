@@ -119,8 +119,8 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
         return jsonify(catalog.titles(kind,request.args.get('q','')[:80],page))
     @app.get('/tv/api/title/<int:cid>')
     def title(cid):
-        item=catalog.item(cid)
-        return jsonify(item=item,seasons=catalog.seasons(cid)) if item else error('Título no disponible.',404)
+        result=catalog.details(cid)
+        return jsonify(result) if result else error('Título no disponible.',404)
     @app.get('/tv/api/episodes/<int:cid>/<int:sid>')
     def episodes(cid,sid):
         page=request.args.get('page',1,type=int)

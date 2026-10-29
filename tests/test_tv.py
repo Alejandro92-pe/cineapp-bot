@@ -135,3 +135,41 @@ def test_tv_top10_movies_filters_and_preserves_weekly_order(tv):
     assert ranked['mode'] == 'ranked'
     assert [r['id'] for r in ranked['items']] == [5, 3]
     assert all('descarga' not in row for row in ranked['items'])
+
+
+def test_tv_detail_reports_real_episode_and_missing_state(tv):
+    app, _, _, db = tv
+    c = app.test_client()
+    movie = get(c, 'title/1').json
+    assert movie['playable'] and not movie['episodic'] and movie['first_episode'] is None
+    series = get(c, 'title/2').json
+    assert series['episodic'] and series['first_episode']['numero'] == 1
+    assert series['first_episode']['season'] == 1 and series['playable']
+    assert 'descarga' not in series['first_episode']
+    db.rows['episodios'] = []
+    missing = get(c, 'title/2').json
+    assert missing['episodic'] and not missing['playable'] and missing['first_episode'] is None
+    assert get(c, 'title/99999').status_code == 404
+
+
+def test_tv_snapshot_deduplicates_and_excludes_private_fields(tmp_path):
+    import json
+    from tv.snapshot import prepare
+    (tmp_path/'videoapi-production').mkdir()
+    (tmp_path/'visual-refresh').mkdir()
+    (tmp_path/'vimeus-manifests').mkdir()
+    title={'id':10,'titulo':'Serie','tipo':'serie','tmdb_id':20,'disponible':True}
+    backup={'public.contenido':[dict(title,descarga='SECRET')],
+        'public.temporadas':[{'id':22,'contenido_id':10,'numero':1,'enlace':'SECRET'}, {'id':23,'contenido_id':10,'numero':1}],
+        'public.episodios':[{'id':1,'temporada_id':22,'numero':1,'titulo':'Uno','descarga':'SECRET','disponible':True}, {'id':2,'temporada_id':23,'numero':1,'titulo':'Uno','disponible':True}],
+        'cine_security.accounts':[{'password_hash':'SECRET'}]}
+    (tmp_path/'videoapi-production/backup-private.json').write_text(json.dumps(backup),encoding='utf8')
+    (tmp_path/'visual-refresh/catalog-all.json').write_text(json.dumps([title]),encoding='utf8')
+    manifest={'contenido':title,'temporadas':[{'numero':1,'capitulos':[{'numero':1,'titulo':'Otro'}, {'numero':2,'titulo':'Dos','provider_download_url':'SECRET'}]}]}
+    (tmp_path/'vimeus-manifests/serie-20.json').write_text(json.dumps(manifest),encoding='utf8')
+    data, report=prepare(tmp_path)
+    assert len(data['temporadas']) == 1 and len(data['episodios']) == 2
+    assert data['temporadas'][0]['episodios'] == 2
+    assert 'SECRET' not in json.dumps(data) and 'accounts' not in data
+    assert data['episodios'][0]['titulo'] == 'Uno'
+    assert report['public_gets'] == 0 and not report['missing']

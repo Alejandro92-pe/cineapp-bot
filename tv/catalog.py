@@ -39,10 +39,32 @@ class Catalog:
     def seasons(self, cid):
         return self.db.table('temporadas').select('id,numero,episodios').eq('contenido_id',cid).order('numero').limit(100).execute().data
 
+    def details(self, cid):
+        item = self.item(cid)
+        if not item: return None
+        seasons = self.seasons(cid)
+        first = None
+        ordered = sorted(seasons, key=lambda s: (s['numero'] == 0, s['numero']))
+        for s in ordered:
+            rows = self.db.table('episodios').select(EPISODES).eq('temporada_id',s['id']).eq('disponible',True).order('numero').limit(1).execute().data
+            if rows:
+                first = {**rows[0], 'season':s['numero']}
+                break
+        related = [r for r in self.titles(item['tipo'])['items'] if r['id'] != cid]
+        genres = {g.strip() for g in (item.get('genero') or '').lower().split(',')} - {''}
+        related.sort(key=lambda r: not bool(genres & {g.strip() for g in (r.get('genero') or '').lower().split(',')}))
+        episodic = bool(seasons) or item['tipo'] in ('serie','anime')
+        return {'item':item, 'seasons':seasons, 'first_episode':first, 'episodic':episodic,
+                'playable':bool(self.source(cid, first['id'] if first else None)), 'related':related[:8]}
+
     def episodes(self, cid, sid, page):
         if not self.item(cid) or not any(s['id'] == sid for s in self.seasons(cid)):
             return None
-        rows = self.db.table('episodios').select(EPISODES,count='exact').eq('temporada_id',sid).eq('disponible',True).order('numero').limit(6).offset((page-1)*6).execute()
+        content = self.db.table('contenido').select('fuente,tmdb_id,tipo').eq('id',cid).limit(1).execute().data[0]
+        rows = self.db.table('episodios').select(EPISODES+',playback_url',count='exact').eq('temporada_id',sid).eq('disponible',True).order('numero').limit(6).offset((page-1)*6).execute()
+        for ep in rows.data:
+            link = ep.pop('playback_url', None)
+            ep['playable'] = bool(okru_embed(link)) if content.get('fuente') == 'okru' else bool(content.get('fuente') == 'vimeus' and content.get('tmdb_id') and content['tipo'] in ('serie','anime'))
         return {'items':rows.data, 'total':rows.count, 'page':page, 'has_next':page*6 < (rows.count or 0)}
 
     def source(self, cid, eid=None):

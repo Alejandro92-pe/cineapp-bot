@@ -33,17 +33,23 @@
   $('search-form').onsubmit=e=>{e.preventDefault();go(new URLSearchParams({search:'1',q:$('search-input').value.trim()}).toString());};
   $('catalog-prev').onclick=()=>go(new URLSearchParams({kind,q,page:page-1}).toString());$('catalog-next').onclick=()=>go(new URLSearchParams({kind,q,page:page+1}).toString());bindCards();TVFocus.focus(params.has('search')&&!q?$('search-input'):cards[0]||$('search-input'));
  }
- async function titleView(cid,rev){const data=await api('title/'+cid);if(rev!==revision)return;detail=data;season=data.seasons.find(s=>s.numero>0)||data.seasons[0];episodePage=1;
-  screen.innerHTML=`<article class="detail">${hero(data.item,true)}${data.seasons.length?`<section class="episode-section"><div class="section-heading"><h2>Elige dónde empieza tu historia</h2><span>Temporadas y episodios</span></div><div class="season-tabs" data-row="seasons">${data.seasons.map(s=>`<button data-nav data-season="${s.id}" id="season-${s.id}" aria-pressed="${s===season}">${s.numero===0?'Especiales':'Temporada '+s.numero}</button>`).join('')}</div><div id="episode-results"><p class="loading">Cargando episodios…</p></div></section>`:''}</article>`;
-  $('detail-back').onclick=()=>go(returnHash);$('detail-play').onclick=()=>data.seasons.length?TVFocus.focus($('season-'+season.id)):play(data.item,null);
+ async function titleView(cid,rev){const data=await api('title/'+cid);if(rev!==revision)return;detail=data;activateNav(data.item.tipo);season=data.seasons.find(s=>s.id===data.first_episode?.temporada_id)||data.seasons.find(s=>s.episodios>0);episodePage=1;
+  screen.innerHTML=TVDetail.render(data,image,esc,meta,card);
+  $('detail-back').onclick=()=>go(returnHash);
+  $('detail-play').onclick=()=>play(data.item,data.first_episode);
+  if($('detail-episodes'))$('detail-episodes').onclick=()=>TVFocus.focus($('season-'+season.id));
+  $('detail-info').onclick=()=>TVFocus.focus($('story-back'));
+  $('story-back').onclick=()=>TVFocus.focus(data.playable?$('detail-play'):$('detail-back'));
+  if($('detail-other-series'))$('detail-other-series').onclick=()=>go('kind=serie');
+  screen.querySelectorAll('[data-title]').forEach(b=>b.onclick=()=>{returnHash='kind='+data.item.tipo;go('title='+b.dataset.title);});
   screen.querySelectorAll('[data-season]').forEach(b=>b.onclick=()=>{season=data.seasons.find(s=>s.id===Number(b.dataset.season));episodePage=1;loadEpisodes(rev,true).catch(e=>toast(e.message));});
-  if(season)await loadEpisodes(rev,false);if(rev===revision)TVFocus.focus($('detail-play'));
+  if(season)await loadEpisodes(rev,false);if(rev===revision)TVFocus.focus(data.playable?$('detail-play'):$('detail-back'));
  }
  async function loadEpisodes(rev,focus){const seq=++seasonRevision,sid=season.id,cid=detail.item.id,p=episodePage;
   const data=await api(`episodes/${cid}/${sid}?page=${p}`);if(rev!==revision||seq!==seasonRevision)return;
   screen.querySelectorAll('[data-season]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.season)===sid)));
-  $('episode-results').innerHTML=`<div class="episodes" data-row="episodes">${data.items.map(ep=>`<button data-nav class="episode" id="episode-${ep.id}" data-episode="${ep.id}"><div class="episode-image"><img loading="lazy" alt="" src="${image(ep.imagen_url||detail.item.backdrop_url,'w500')}"><b>EPISODIO ${ep.numero}</b></div><div class="episode-content"><small>${esc(ep.duracion?ep.duracion+' min':'')}</small><h3>${esc(ep.titulo||'Episodio '+ep.numero)}</h3><p>${esc(ep.sinopsis||'Continúa la historia con este episodio.')}</p></div></button>`).join('')}</div><div class="pages" data-row="episode-pages"><button data-nav id="episode-prev" ${p===1?'disabled':''}>← Anteriores</button><span>${data.total?((p-1)*6+1)+'–'+Math.min(p*6,data.total)+' de '+data.total+' episodios':'Sin episodios disponibles'}</span><button data-nav id="episode-more" ${!data.has_next?'disabled':''}>Más episodios →</button></div>`;
-  screen.querySelectorAll('[data-episode]').forEach(b=>b.onclick=()=>play(detail.item,data.items.find(e=>e.id===Number(b.dataset.episode))));
+  $('episode-results').innerHTML=`<div class="episodes" data-row="episodes">${data.items.map(ep=>`<button data-nav class="episode" id="episode-${ep.id}" data-episode="${ep.id}" aria-disabled="${!ep.playable}"><div class="episode-image"><img loading="lazy" alt="" src="${image(ep.imagen_url||detail.item.backdrop_url,'w500')}"><b>EPISODIO ${ep.numero}${!ep.playable?' · Sin video':''}</b></div><div class="episode-content"><small>${esc(ep.duracion?ep.duracion+' min':'')}</small><h3>${esc(ep.titulo||'Episodio '+ep.numero)}</h3><p>${esc(ep.sinopsis||'Continúa la historia con este episodio.')}</p></div></button>`).join('')}</div><div class="pages" data-row="episode-pages"><button data-nav id="episode-prev" ${p===1?'disabled':''}>← Anteriores</button><span>${data.total?((p-1)*6+1)+'–'+Math.min(p*6,data.total)+' de '+data.total+' episodios':'Sin episodios disponibles'}</span><button data-nav id="episode-more" ${!data.has_next?'disabled':''}>Más episodios →</button></div>`;
+  screen.querySelectorAll('[data-episode]').forEach(b=>b.onclick=()=>{const ep=data.items.find(e=>e.id===Number(b.dataset.episode));if(ep.playable)play(detail.item,ep);else toast('Este episodio todavía no tiene video disponible para TV.');});
   $('episode-prev').onclick=()=>{episodePage--;loadEpisodes(rev,true).catch(e=>toast(e.message));};$('episode-more').onclick=()=>{episodePage++;loadEpisodes(rev,true).catch(e=>toast(e.message));};
   if(focus)TVFocus.focus(screen.querySelector('[data-episode]')||$('season-'+sid));
  }
@@ -69,7 +75,7 @@
    $('player-frame').src=d.url;$('player').hidden=false;document.querySelector('.topbar').inert=true;screen.inert=true;TVFocus.focus($('player-enter'));
   }catch(e){toast(e.message);}
  }
- function closePlayer(){playRevision++;$('player-frame').src='about:blank';$('player').hidden=true;document.querySelector('.topbar').inert=false;screen.inert=false;TVFocus.focus(playing?.ep?$('episode-'+playing.ep.id):$('detail-play'));playing=null;next=null;}
+ function closePlayer(){playRevision++;$('player-frame').src='about:blank';$('player').hidden=true;document.querySelector('.topbar').inert=false;screen.inert=false;TVFocus.focus((playing?.ep?$('episode-'+playing.ep.id):null)||$('detail-play'));playing=null;next=null;}
  rootBack();function rootBack(){window.TVBack=()=>{if($('account-dialog').open){closeAccount();return true;}if(!$('player').hidden){closePlayer();return true;}if(location.hash){go(location.hash.includes('title=')?returnHash:'');return true;}TVFocus.focus(document.querySelector('[data-view="home"]'));return false;};}
  window.addEventListener('popstate',()=>{if(!$('player').hidden)closePlayer();render();});
  document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>go('kind='+b.dataset.kind));document.querySelector('[data-view="home"]').onclick=()=>go('');$('search-nav').onclick=()=>go('search=1');$('account-nav').onclick=openAccount;$('account-close').onclick=closeAccount;$('account-dialog').addEventListener('cancel',e=>{e.preventDefault();closeAccount();});

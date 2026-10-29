@@ -14,6 +14,12 @@ from tv.app import create_app
 
 def load_snapshot(root):
     db=LocalDatabase()
+    complete=Path(__file__).resolve().parents[1]/'.local/tv/catalog.json'
+    if complete.is_file():
+        data=json.loads(complete.read_text(encoding='utf8'))
+        for table in ('contenido','temporadas','episodios'):
+            db.rows[table]=data[table]
+        return db
     path=root/'visual-refresh/catalog-all.json'
     if not path.is_file():raise RuntimeError('Falta la copia local del catálogo; no se consulta producción.')
     rows=json.loads(path.read_text(encoding='utf8'))

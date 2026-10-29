@@ -74,3 +74,25 @@ una selección de diez películas recientes, identificada como descubrimiento.
 No se copiaron estadísticas de producción ni se inventaron reproducciones.
 La prueba local nueva comprueba orden, filtro de series/no disponibles y límite.
 10 pruebas TV aprobadas. Captura adicional: .local/tv/top10.png.
+
+FICHAS Y CATÁLOGO LOCAL (29/10/2026)
+Fichas independientes en static/detail.js y detail.css: play circular, afiche,
+portada horizontal, sinopsis completa, géneros y otras sugerencias del catálogo.
+Series: empezar el primer capítulo o elegir temporada; seis episodios por página.
+Los capítulos sin fuente reproducible se identifican sin abrir un reproductor vacío.
+
+snapshot.py combina solo campos del catálogo de las copias locales existentes.
+Con --refresh-missing consulta exclusivamente GET públicos de temporadas/episodios
+para los títulos sin capítulos; guarda resultados en .local/tv/catalog.json.
+No hace cambios en Supabase ni utiliza las cuentas privadas de la copia.
+Resultado: 776 fichas, 527 temporadas, 9.687 episodios; 174 títulos con episodios.
+Se hicieron 129 consultas GET públicas, secuenciales y con pausas; sin errores.
+Quedan 31 fichas de series/anime sin episodios: 30 tienen fuente canal y una
+no tiene proveedor asignado. Se conserva el estado pendiente; no se inventa
+numeración ni se afirma que todos los videos estén verificados.
+Detalle: .local/tv/catalog-report.json. Se conservaron las portadas horizontales.
+
+12 pruebas TV y dos de navegación aprobadas. Verificación visual a 1080p y 720p:
+Carrie tiene una temporada de ocho capítulos; primera página 1–6 y segunda 7–8.
+El play circular abrió VideoAPI T1E1; retorno, sinopsis y navegación comprobados.
+No se ha empaquetado, publicado ni modificado la web o APK móvil.
