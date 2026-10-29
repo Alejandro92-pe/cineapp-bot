@@ -9,7 +9,8 @@ from security import password_hash
 from billing.schema import access
 from sqlalchemy import select
 from local_support import LocalDatabase, block_external_network
-from tv.app import create_app
+from tv.app import create_app, private_lan
+from werkzeug.serving import make_server
 
 
 def load_snapshot(root):
@@ -45,9 +46,11 @@ def load_snapshot(root):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--snapshot-root',type=Path,required=True);parser.add_argument('--port',type=int,default=5020)
+    parser.add_argument('--lan-host',help='IP privada de esta PC; solo cuentas de demostración.')
     args=parser.parse_args();out=Path(__file__).resolve().parents[1]/'.local/tv';out.mkdir(parents=True,exist_ok=True)
-    block_external_network()  # Backend cannot reach Render, Supabase, mail, bots or imports.
-    store=SecurityStore('sqlite:///'+(out/'preview.sqlite').as_posix(),local=True)
+    if args.lan_host and not private_lan(args.lan_host):parser.error('--lan-host debe ser una IP privada RFC1918 de esta PC.')
+    host=args.lan_host or '127.0.0.1'
+    store=SecurityStore('sqlite:///'+(out/('preview-lan.sqlite' if args.lan_host else 'preview.sqlite')).as_posix(),local=True)
     for name,email,enabled in [('Ale · demo','tv@example.test',True),('Invitado · demo','sinacceso@example.test',False)]:
         account=store.account(email=email)
         if not account:account=store.create_account(name,email,password_hash('Televisor-Local-2026!'))
@@ -56,9 +59,12 @@ def main():
                 if not c.execute(select(access).where(access.c.account_id==account['id'])).first():
                     c.execute(access.insert().values(account_id=account['id'],expires_at=time.time()+30*86400))
     database=load_snapshot(args.snapshot_root.resolve())
-    app=create_app(database,store,origin=f'http://127.0.0.1:{args.port}')
-    print(f'TV local: http://127.0.0.1:{args.port}/tv | Demo: tv@example.test / Televisor-Local-2026!',flush=True)
-    app.run(host='127.0.0.1',port=args.port,debug=False,use_reloader=False)
+    app=create_app(database,store,origin=f'http://{host}:{args.port}',lan_preview=bool(args.lan_host))
+    # Bind the explicitly chosen interface before blocking outbound DNS/connect.
+    server=make_server(host,args.port,app,threaded=True)
+    block_external_network()  # Backend cannot reach Render, Supabase, mail, bots or imports.
+    print(f'TV local: http://{host}:{args.port}/tv | Solo cuentas de demostración.',flush=True)
+    server.serve_forever()
 
 
 if __name__=='__main__':main()

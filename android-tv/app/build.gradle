@@ -1,0 +1,35 @@
+plugins { id 'com.android.application' }
+def previewOrigin = providers.gradleProperty('tvOrigin').getOrElse('http://192.168.100.3:5021')
+def parsed = new URI(previewOrigin)
+def host = parsed.host ?: ''
+def privateHost = host ==~ /(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})/
+if (!privateHost || host.tokenize('.').any { it.toInteger() > 255 } || parsed.scheme != 'http' || parsed.port < 1 || parsed.port > 65535 || parsed.rawPath || parsed.rawQuery || parsed.rawFragment || parsed.rawUserInfo) {
+    throw new GradleException('Esta APK de prueba solo admite un origen HTTP de red privada con puerto explícito.')
+}
+android {
+    namespace 'live.quehay.tv'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'live.quehay.tv.preview'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+        buildConfigField 'String', 'TV_ORIGIN', '"' + previewOrigin + '"'
+    }
+    buildFeatures { buildConfig true }
+    buildTypes { debug { debuggable false }; release { minifyEnabled false } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError true }
+    sourceSets.main.res.srcDir(layout.buildDirectory.dir('generated/tvRes'))
+}
+tasks.register('generateTvNetwork') {
+    inputs.property('host', host)
+    outputs.dir(layout.buildDirectory.dir('generated/tvRes'))
+    doLast {
+        def out = layout.buildDirectory.file('generated/tvRes/xml/network_security_config.xml').get().asFile
+        out.parentFile.mkdirs()
+        out.text = """<network-security-config><base-config cleartextTrafficPermitted="false"/><domain-config cleartextTrafficPermitted="true"><domain includeSubdomains="false">${host}</domain></domain-config></network-security-config>"""
+    }
+}
+tasks.named('preBuild').configure { dependsOn('generateTvNetwork') }

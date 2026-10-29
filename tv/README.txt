@@ -2,7 +2,8 @@ QUÉ HAY TV — primera fase local (29 de octubre de 2026)
 
 ALCANCE
 Interfaz independiente para preparar Android TV y Google TV. No se monta en
-main.py, no modifica Render ni la APK móvil. No es todavía una APK de TV.
+main.py, no modifica Render ni la APK móvil. Hay un paquete de prueba separado
+en android-tv/; véase android-tv/README.txt para vinculación y red local.
 Diseño para pantalla grande: hero horizontal, filas de portadas, foco visible,
 flechas/OK/volver, buscador, temporadas y capítulos en bloques de seis.
 No expone pagos, descargas, descompresión ni enlaces a canales.
@@ -186,3 +187,19 @@ QA local a 720p y 1080p: rueda, flechas, selección de carátulas y episodios,
 retorno al menú sin salto y capa de reproducción. Dos pruebas de navegación
 aprobadas. Evidencia: .local/tv/menu-fixed-qa.json y menu-fixed-*.png.
 Solo archivos TV; sin empaquetado ni cambios en producción.
+
+APK TV DE PRUEBA (29/10/2026)
+Android TV / Google TV 0.1 en android-tv/, identificador live.quehay.tv.preview.
+No comparte ni reemplaza el proyecto android/ del móvil. Manifest TV, banner,
+foco de mando, OK, Atrás, WebView y pantalla completa nativa del proveedor.
+Sin pagos, descargas, permisos extra, credenciales ni JavaScriptInterface.
+Compila con el SDK/JDK ya instalados. APK firmada para instalación manual.
+
+preview.py mantiene loopback por defecto; solo --lan-host permite una IP privada
+explícita, con base preview-lan.sqlite de demostración. Backend sin tráfico
+saliente, peticiones de origen exacto y clientes LAN/loopback. No se usa en Render.
+Prueba LAN servida en 192.168.100.3:5021: el usuario confirmó acceso desde celular.
+Vinculación completa probada con contextos separados, recarga y revocación.
+23 pruebas Python y 4 de navegación/adaptador de mando aprobadas. Firma y manifest
+APK verificados; compilación y lint sin errores. Mando y reproducción físicos
+pendientes. Guía detallada en android-tv/README.txt. No hay integración real todavía.

@@ -1,6 +1,7 @@
 """Local-only TV application. Deliberately not mounted on main.py or Render."""
 import hmac
 import time
+import ipaddress
 from pathlib import Path
 from urllib.parse import urlsplit
 from flask import Flask, request, jsonify, send_from_directory, g
@@ -17,10 +18,19 @@ ROOT = Path(__file__).resolve().parent
 PHONE_COOKIE, TV_COOKIE, PAIR_COOKIE = 'qh_tv_phone_local', 'qh_tv_device_local', 'qh_tv_pair_local'
 
 
-def create_app(database, security, origin='http://127.0.0.1:5020'):
+def private_lan(host):
+    try:
+        ip=ipaddress.ip_address(host)
+        return any(ip in ipaddress.ip_network(net) for net in ('10.0.0.0/8','172.16.0.0/12','192.168.0.0/16'))
+    except (ValueError, TypeError):
+        return False
+
+
+def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_preview=False):
     parsed=urlsplit(origin)
-    if not security.local or parsed.hostname not in ('127.0.0.1','localhost') or parsed.scheme!='http' or parsed.path:
-        raise RuntimeError('Esta fase TV solo admite una base aislada y un servidor loopback.')
+    allowed_host=parsed.hostname in ('127.0.0.1','localhost') or (lan_preview and private_lan(parsed.hostname))
+    if not security.local or not allowed_host or parsed.scheme!='http' or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
+        raise RuntimeError('TV de prueba requiere base aislada y loopback, o una IP privada LAN explícita.')
     app=Flask(__name__,static_folder=str(ROOT/'static'),static_url_path='/tv/assets')
     app.config.update(MAX_CONTENT_LENGTH=8192)
     pairing, catalog, billing = PairingStore(security), Catalog(database), BillingStore(security)
@@ -38,6 +48,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
     @app.before_request
     def boundary():
         if request.host != parsed.netloc:return error('Origen no permitido.',403)
+        if lan_preview and request.remote_addr not in ('127.0.0.1','::1') and not private_lan(request.remote_addr):return error('Solo disponible en la red local.',403)
         g.device=pairing.session(request.cookies.get(TV_COOKIE))
         g.phone=security.session(request.cookies.get(PHONE_COOKIE))
         if request.method not in ('GET','HEAD'):
