@@ -7,7 +7,8 @@ window.TVDetail = {
     const genres=(item.genero||'').split(',').map(s=>s.trim()).filter(Boolean).slice(0,4);
     const playLabel=first?`Empezar T${first.season} · E${first.numero}`:'Reproducir';
     const status=data.episodic&&!first?'Los episodios de este título aún no están disponibles en este catálogo.':!data.playable?'Este título aún no tiene reproducción disponible para TV.':'';
-    return `<article class="detail detail-cinema">
+    return `<article class="detail detail-cinema ${data.episodic?'detail-series':'detail-movie'}">
+      ${data.episodic?`<div class="series-atmosphere"><img src="${image(item.backdrop_url||item.imagen_url,'w1280')}" alt=""></div>`:''}
       <section class="cinema-hero">
         <div class="cinema-background"><img src="${image(item.backdrop_url||item.imagen_url,'w1280')}" alt=""></div>
         <div class="detail-breadcrumb" data-row="detail-back"><button data-nav id="detail-back" aria-label="Volver al catálogo">← Volver</button><span>QUÉ HAY <i>/</i> ${data.episodic?'SERIES Y EPISODIOS':'PELÍCULAS'}</span></div>
@@ -19,7 +20,6 @@ window.TVDetail = {
             <p class="cinema-synopsis">${esc(item.sinopsis||'Descubre esta historia en Qué Hay.')}</p>
             <div class="cinema-actions" data-row="hero-actions">
               <div class="play-group"><button data-nav id="detail-play" class="circle-play" aria-label="${esc(playLabel)}" ${!data.playable?'disabled':''}><svg aria-hidden="true" viewBox="0 0 32 32"><path d="M11 6 26 16 11 26Z"/></svg></button><span class="play-label">${data.playable?esc(playLabel):'No disponible'}<small>${first?esc(first.titulo||'Episodio '+first.numero):'Disfrútala en tu pantalla'}</small></span></div>
-              ${seasons.length?'<button data-nav id="detail-episodes" class="detail-secondary">☷ Episodios</button>':''}
               <button data-nav id="detail-save" class="detail-secondary save-title" aria-pressed="${Boolean(data.saved)}" aria-label="${data.saved?'Quitar de Mi lista':'Añadir a Mi lista'}"><span aria-hidden="true">${data.saved?'✓':'＋'}</span> Mi lista</button>
             </div>
             ${status?`<p class="availability-note" role="status">${esc(status)}</p>`:''}
@@ -27,8 +27,8 @@ window.TVDetail = {
           <aside class="cinema-poster" aria-label="Afiche"><img src="${image(item.imagen_url,'w500')}" alt="Afiche de ${esc(item.titulo)}"><div class="poster-foot"><span>QUÉ HAY</span><span>${esc(item.año||'CINE')}</span></div></aside>
         </div>
       </section>
-      ${data.episodic?`<section class="episode-section cinema-episodes"><div class="section-heading"><div><p class="eyebrow">LA HISTORIA CONTINÚA</p><h2>Temporadas y episodios</h2></div><span>Elige tu próximo capítulo</span></div>${seasons.length?`<div class="season-tabs" data-row="seasons">${seasons.map(s=>`<button data-nav data-season="${s.id}" id="season-${s.id}" aria-pressed="false">${s.numero===0?'Especiales':'Temporada '+s.numero}<small>${s.episodios} episodios</small></button>`).join('')}</div><div id="episode-results"><p class="loading">Cargando episodios…</p></div>`:'<div class="missing-episodes"><h3>Aún no hay capítulos disponibles</h3><p>Puedes explorar otras series mientras se completa este título.</p><button data-nav id="detail-other-series">Explorar series →</button></div>'}</section>`:''}
-      ${data.related?.length?`<section class="shelves detail-related"><div class="section-heading"><h2>Más para tu próxima sesión</h2><span>Sigue explorando</span></div><div class="rail" data-row="related">${data.related.map(card).join('')}</div></section>`:''}
+      ${data.episodic?`<section class="episode-section cinema-episodes"><div class="series-section-tabs" data-row="series-sections"><button data-nav id="series-tab-episodes" aria-pressed="true">Episodios</button><button data-nav id="series-tab-related">También te puede gustar</button></div>${seasons.length?`<div class="season-tabs" data-row="seasons">${seasons.map(s=>`<button data-nav data-season="${s.id}" id="season-${s.id}" aria-pressed="false">${s.numero===0?'Especiales':'Temporada '+s.numero}</button>`).join('')}</div><div id="episode-results"><p class="loading">Cargando episodios…</p></div>`:'<div class="missing-episodes"><h3>Aún no hay capítulos disponibles</h3><p>Puedes explorar otras series mientras se completa este título.</p><button data-nav id="detail-other-series">Explorar series →</button></div>'}</section>`:''}
+      ${data.related?.length?`<section class="shelves detail-related" id="detail-related"><div class="section-heading"><h2>Más para tu próxima sesión</h2><span>Sigue explorando</span></div><div class="rail" data-row="related">${data.related.map(card).join('')}</div></section>`:''}
     </article>`;
   }
 };

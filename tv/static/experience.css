@@ -1,0 +1,90 @@
+/* TV-only polish: stable dimensions, large-screen home and compact series. */
+.home-feature{position:relative;isolation:isolate;min-height:calc(100vh - 5rem);padding:4rem 5.5vw 7rem;display:flex;align-items:center;overflow:hidden;background:#0c1929}
+.home-feature-art{position:absolute;inset:0;z-index:-2}
+.home-feature-art img{height:100%;width:100%;object-fit:cover;object-position:70% 30%}
+.home-feature:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#050d19f5 0%,#050d19d6 30%,#050d1950 64%,#050d1915),linear-gradient(0deg,#070e18,transparent 65%)}
+.home-feature-content{width:52%;max-width:43rem}
+.home-feature h1{font-size:clamp(2.4rem,4vw,4.2rem);line-height:1.04;letter-spacing:-.045em;margin:.8rem 0 1.2rem;text-wrap:balance}
+.home-feature .synopsis{font-size:.85rem;max-width:34rem;line-height:1.65;-webkit-line-clamp:3}
+.home-feature .actions{margin-top:1.7rem}.home-feature .actions button{font-size:.85rem;padding:.85rem 1.4rem}
+.feature-bottom{position:absolute;bottom:3.3rem;left:5.5vw;right:5.5vw;display:flex;align-items:center;justify-content:space-between}
+.feature-bottom>span{font-size:.5rem;letter-spacing:.19em;color:#b4c6db}
+.feature-indicators{display:flex;gap:.5rem;align-items:center}
+.feature-indicators [data-slide]{padding:.6rem .3rem;background:transparent;border-radius:.2rem}
+.feature-indicators [data-slide] span{display:block;width:1.4rem;height:.15rem;background:#8192a6;border-radius:1rem}
+.feature-indicators [aria-pressed=true] span{width:2.5rem;background:#b4e2ff;box-shadow:0 0 8px #6ccaff66}
+#feature-pause{font-size:.75rem;border-radius:50%;padding:.4rem .65rem;background:#101c2b99;margin-left:.8rem}
+.home-shelves{padding-top:1.6rem}
+/* Intrinsic caption widths must never resize a poster or stretch its focus frame. */
+.rail{align-items:flex-start;gap:.7rem;padding-top:.6rem;padding-bottom:.8rem}
+.rail>.poster{flex:0 0 10.4rem;width:10.4rem;min-width:0;display:block;align-self:flex-start}
+.poster img{aspect-ratio:2/3;height:auto;width:100%;object-fit:cover;display:block}
+.poster .caption{min-width:0;max-width:100%;font-size:.76rem;margin:.6rem 0 .25rem}
+.poster small{display:block;font-size:.6rem;line-height:1.4}
+.poster:focus,.poster:focus-visible,.collection .poster:focus{outline:0!important;box-shadow:none;transform:none}
+.poster:focus>img,.poster:focus .rank-cover img{outline:3px solid #c4e7ff;outline-offset:4px;box-shadow:0 0 0 6px #75bcf51a}
+.top-ten .rail{gap:.65rem}
+.top-ten .ranked-poster{flex-basis:13.9rem;width:13.9rem;padding-left:3.5rem}
+.top-ten .ranked-poster:last-child{flex-basis:16.2rem;width:16.2rem;padding-left:5.8rem}
+.rank-number{font-size:9rem;font-weight:900;color:transparent;-webkit-text-stroke:2px #7acbff;text-shadow:none;filter:drop-shadow(0 0 4px #43abff80);bottom:1.8rem}
+.ranked-poster:focus .rank-number{color:transparent;-webkit-text-stroke-color:#c1eeff}
+.ranked-poster:last-child .rank-number{font-size:8rem}
+.collection-row{gap:.85rem;margin-bottom:1.4rem}
+.stream-status{color:#9eb4ca;font-size:.7rem;min-height:1px;text-align:center;grid-column:1/-1}
+.stream-status:empty{height:1px;min-height:1px}
+.stream-status:not(:empty){padding:1rem}
+.rail>.stream-status,.episodes>.stream-status{flex:0 0 2px;width:2px;align-self:center}
+.rail>.stream-status:not(:empty),.episodes>.stream-status:not(:empty){flex-basis:9rem;width:9rem}
+.stream-status button{font-size:.75rem}
+.detail-series{position:relative;isolation:isolate}
+.series-atmosphere{position:fixed;inset:5rem 0 0;z-index:-1;pointer-events:none;background:#070e18}
+.series-atmosphere img{height:100%;width:100%;object-fit:cover;object-position:70% 25%;opacity:.42}
+.series-atmosphere:after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#070e18e6,#070e1899 45%,#070e1844),linear-gradient(0deg,#070e18ba,transparent)}
+.detail-series .cinema-background,.detail-series .cinema-hero:after,.detail-series .cinema-poster{display:none}
+.detail-series .cinema-hero{min-height:0;padding-bottom:.6rem}
+.detail-series .detail-breadcrumb{margin-bottom:.5rem}
+.detail-series .cinema-layout{display:block;padding:1rem 0 .5rem}
+.detail-series .cinema-copy{max-width:44rem;width:62%}
+.detail-series .cinema-copy>.eyebrow{display:none}
+.detail-series h1{font-size:2.6rem;margin:.3rem 0 .8rem}
+.detail-series .meta{margin:.5rem 0;font-size:.7rem}
+.detail-series .genre-chips{margin:.5rem 0}.detail-series .genre-chips span{padding:.2rem .45rem;font-size:.6rem}
+.detail-series .series-count{margin:.5rem 0;font-size:.65rem}
+.detail-series .cinema-synopsis{font-size:.78rem;line-height:1.5;max-width:42rem}
+.detail-series .cinema-actions{margin:1rem 0 .4rem;gap:1rem}
+.detail-series .circle-play{height:3.4rem;width:3.4rem}.detail-series .circle-play svg{width:1.5rem}
+.detail-series .play-label{font-size:.8rem}.detail-series .play-label small{font-size:.6rem}
+.detail-series .detail-secondary{font-size:.7rem;min-height:2.6rem;padding:.5rem .9rem}
+.series-section-tabs{display:flex;gap:1.1rem;margin:.2rem 0 .7rem}
+.series-section-tabs button{font-size:.8rem;background:transparent;padding:.5rem .8rem;border-radius:2rem}
+#series-tab-episodes{border-color:#a1bfd499}
+.detail-series .season-tabs{margin:0 0 .5rem;padding:.4rem .3rem .7rem;border-bottom:1px solid #9ab9d340}
+.detail-series .season-tabs button{padding:.35rem .65rem;font-size:.7rem;background:transparent;border-radius:.25rem}
+.detail-series .season-tabs button[aria-pressed=true]{background:#c6e3ff;color:#101e30}
+.detail-series .cinema-episodes{padding-top:.4rem}
+.episodes{align-items:flex-start;gap:.8rem;min-width:0;padding:.5rem .4rem .7rem}
+.episode{flex:0 0 calc((100% - 3.2rem)/4.4);width:calc((100% - 3.2rem)/4.4);min-width:0;display:block;background:transparent;overflow:visible;border:0}
+.episode-image{border-radius:.35rem;overflow:hidden}
+.episode-image img{display:block}
+.episode-content{min-height:0;padding:.55rem .1rem}
+.episode h3{font-size:.72rem;margin:0 0 .3rem}.episode small{float:none;font-size:.6rem;color:#aebfd1}
+.episode:focus{outline:0!important;box-shadow:none}
+.episode:focus .episode-image{outline:3px solid #c4e7ff;outline-offset:4px}
+.episode-peek{min-height:4.5rem;padding:.7rem 0;color:#b7c8da;max-width:47rem}
+.episode-peek>span{font-size:.75rem;color:#e2ebf6;font-weight:600}
+.episode-peek p{font-size:.7rem;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:.4rem 0}
+@media(max-width:1000px){.home-feature-content{width:65%}.home-feature{padding-top:2rem}.detail-series .cinema-copy{width:75%}}
+@media(prefers-reduced-motion:reduce){.rank-number{filter:none}}
+
+.home-feature [data-nav]{scroll-margin:1rem}
+.poster img.poster-fallback{object-fit:contain;padding:2rem;background:#14263b}
+
+/* When the remote enters episodes, give the season and rail the stage. */
+.episodes-focused .detail-breadcrumb,.episodes-focused .cinema-copy>:not(h1){display:none}
+.episodes-focused .cinema-hero{padding-top:1.1rem;padding-bottom:0}
+.episodes-focused .cinema-layout{padding:.3rem 0}
+.episodes-focused .cinema-copy{width:100%}
+.episodes-focused h1{font-size:1.8rem;margin:.4rem 0}
+.episodes-focused .cinema-episodes{min-height:calc(100vh - 12rem)}
+.episodes-focused .season-tabs{margin-top:.65rem}
+.episodes-focused .episode-peek{margin-top:.3rem}

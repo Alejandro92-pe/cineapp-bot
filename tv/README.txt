@@ -140,3 +140,38 @@ y retirado; Carrie guardada y acceso a temporada con seis episodios visibles.
 Ficha comprobada a 720p/1080p, sin sinopsis duplicada ni errores de consola.
 Capturas: .local/tv/detail-immersive-720.png, series-immersive-1080.png,
 top10-behind-720.png. Sigue pendiente mando físico y aprobación para empaquetar.
+
+INICIO CINEMATOGRÁFICO Y EXPLORACIÓN CONTINUA (29/10/2026)
+Esta revisión sustituye la paginación visible descrita en las fases anteriores.
+El servidor mantiene límites de 12 títulos y 6 episodios por petición; stream.js
+acumula resultados al avanzar con el control o acercarse al final de la sección.
+Conserva filtros y fichas cargadas al regresar, evita peticiones simultáneas,
+descarta respuestas de vistas abandonadas y ofrece recuperación ante errores.
+La recuperación conserva el foco; no es virtualización de todo el catálogo.
+
+home.js presenta tres destacados (película, serie y anime con portada) en una
+primera pantalla completa. Alterna cada 20 segundos, admite selección y pausa,
+respeta movimiento reducido y detiene la rotación al salir de la zona visible.
+La selección usa bloques de tres días y se revisa al volver a renderizar Inicio.
+No consulta proveedores durante la rotación; precarga la siguiente imagen.
+Carátulas uniformes y más próximas, foco alrededor de la imagen y Top 10 con
+trazo azul luminoso, relleno transparente y números parcialmente detrás.
+
+Series: cabecera compacta, temporadas y fila de episodios más pequeños. Al entrar
+en episodios se reduce la cabecera al título; Atrás recupera la ficha completa.
+Descripción del episodio seleccionado debajo de la fila. Películas conservan
+su ficha amplia. Mi lista, cuentas y reproducción mantienen sus controles previos.
+
+Validación: 16 pruebas Python y 6 Node aprobadas. QA Edge sin interfaz a 720p/1080p:
+Series 12 a 24 fichas sin duplicados; regreso conserva las fichas; Carrie 6 a 8
+episodios; rotación automática, pausa, error 503 simulado y recuperación del foco.
+Sin errores JavaScript en el recorrido principal. Evidencia en .local/tv:
+experience-qa.json, home-cinematic-1080.png, top10-neon-720.png,
+series-compact-720.png y series-compact-episodes-720.png.
+
+Disponibilidad: la copia tiene 519 películas disponibles en catálogo; 295 tienen
+fuente canal y carecen de TMDB. No disponen de fuente compatible en esta vista TV.
+Las otras 224 tienen configuración vimeus, pero esto NO verifica su reproducción
+real ni la disponibilidad actual de los proveedores. Empaquetar no corrige fuentes.
+No se han modificado producción, la web móvil, la APK, cuentas ni descargas.
+Queda pendiente la revisión del usuario y la prueba física de mando/proveedores.
