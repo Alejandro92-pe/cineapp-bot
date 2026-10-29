@@ -1629,53 +1629,7 @@ function actualizarBtnLike(btn, liked) {
 }
 
 function compartirContenido() {
-  const item = contenidoSeleccionado;
-  if (!item) return;
-
-  const sinCorta = item.sinopsis ? item.sinopsis.slice(0, 120) + (item.sinopsis.length > 120 ? '...' : '') : '';
-  const tipoParts = [item.tipo, item.año].filter(Boolean).join(' · ');
-  const texto = `🎬 *${escapeHtml(item.titulo)}*\n${tipoParts}\n\n${sinCorta}\n\n📲 Míralo en QuehayApp:\nhttps://t.me/${TELEGRAM_BOT_USERNAME}?start=miniapp`;
-  const textoPlano = texto.replace(/\*/g, '');
-
-  try {
-    const isInTelegram = !!(tg?.initDataUnsafe?.user);
-    if (isInTelegram) {
-      const copyOk = (() => {
-        try {
-          const el = document.createElement('textarea');
-          el.value = textoPlano;
-          el.style.position = 'fixed'; el.style.opacity = '0';
-          document.body.appendChild(el);
-          el.select(); el.setSelectionRange(0, 99999);
-          document.execCommand('copy');
-          document.body.removeChild(el);
-          return true;
-        } catch { return false; }
-      })();
-      tg.showPopup({
-        title: '¡Copiado!',
-        message: copyOk
-          ? `El texto de "${escapeHtml(item.titulo)}" fue copiado. Pégalo en cualquier chat de Telegram.`
-          : `Comparte "${escapeHtml(item.titulo)}" con tus amigos en Telegram.`,
-        buttons: [
-          { id: 'abrir_bot', type: 'default', text: '📲 Abrir bot para compartir' },
-          { id: 'cerrar', type: 'cancel', text: 'Cerrar' }
-        ]
-      }, (btnId) => {
-        if (btnId === 'abrir_bot') {
-          tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/${TELEGRAM_BOT_USERNAME}%3Fstart%3Dminiapp&text=${encodeURIComponent(textoPlano)}`);
-        }
-      });
-    } else if (navigator.share) {
-      navigator.share({ title: item.titulo, text: textoPlano, url: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=miniapp` });
-    } else {
-      navigator.clipboard?.writeText(textoPlano).then(() => {
-        alert('¡Copiado! Pega el texto donde quieras compartirlo.');
-      });
-    }
-  } catch(e) {
-    try { navigator.clipboard?.writeText(textoPlano); } catch {}
-  }
+  return window.QueHayShare?.share(contenidoSeleccionado);
 }
 
 // Season and episode interaction lives in static/catalog/episodes.js.

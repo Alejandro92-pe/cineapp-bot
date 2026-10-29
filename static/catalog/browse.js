@@ -32,7 +32,7 @@
     const open=button('',()=>abrirModalContenido(item),'cine-poster');open.setAttribute('aria-label','Ver detalles de '+item.titulo);
     open.append(image(item));
     const score=Number(item.rating);if(Number.isFinite(score)&&score>0&&score<=10){const rating=el('span','★ '+score.toFixed(1),'cine-rating '+(score>=7?'green':score>=5?'yellow':'red'));rating.setAttribute('aria-label',`Puntuación ${score.toFixed(1)} de 10`);open.append(rating);}
-    if(item.has_download&&!['serie','anime'].includes(item.tipo))open.append(el('span','↓ Descarga','cine-download-tag'));
+    if(item.has_download&&!['serie','anime'].includes(item.tipo)){const tag=el('span',null,'cine-download-tag');tag.setAttribute('aria-label','Descarga disponible');tag.title='Descarga disponible';open.append(tag);}
     const mark=el('span','Ver detalles','cine-card-hover');open.append(mark);
     const save=button(esFavorito(item.id)?'✓':'+',()=>{const active=toggleFavorito(item);save.textContent=active?'✓':'+';save.setAttribute('aria-pressed',String(active));if(currentView==='guardados')mount('guardados');},'cine-save');
     save.dataset.contentId=String(item.id);save.setAttribute('aria-label','Guardar '+item.titulo);save.setAttribute('aria-pressed',String(esFavorito(item.id)));

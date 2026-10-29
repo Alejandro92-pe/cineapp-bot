@@ -1,0 +1,21 @@
+/* Download availability marker, not a nested download button. */
+.cine-poster .cine-download-tag{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;padding:0;border:1px solid #52769b;background:#10263eee;color:#bdddfc;font-size:0;opacity:1}
+.cine-poster:hover .cine-download-tag{opacity:1}
+.cine-download-tag::before{content:"";display:block;width:17px;height:17px;background:currentColor;mask:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'/%3E%3C/svg%3E")}
+.cine-header .user-chip.is-signed-in .uc-info{display:flex;flex-direction:column;min-width:0;gap:3px}
+.cine-header .user-chip.is-signed-in .uc-name{display:block;max-width:145px;font-size:12px}
+@media(max-width:700px){
+  .cine-header{gap:10px;padding-inline:14px}
+  .cine-header-actions{gap:9px}
+  .cine-header .user-chip.is-signed-in{gap:7px;min-width:0}
+  .cine-header .user-chip.is-signed-in .uc-name{max-width:100px;font-size:11px}
+  .cine-header .user-chip.is-signed-in .uc-badge{display:none}
+  .cine-header .cine-membership-link{font-size:10px}
+  .cine-header:has(.user-chip.is-signed-in) .cine-header-actions{display:grid;grid-template-columns:1fr;justify-items:end;gap:3px}
+  .cine-header .user-chip.is-signed-in{order:1}
+  .cine-header:has(.user-chip.is-signed-in) .cine-membership-link{order:2;font-size:9px}
+}
+@media(max-width:370px){
+  .cine-header .user-chip.is-signed-in .uc-name{max-width:75px}
+  .cine-header:has(.user-chip.is-signed-in) .cine-brand small{display:none}
+}
