@@ -13,13 +13,14 @@ window.TVDetail = {
         <div class="detail-breadcrumb" data-row="detail-back"><button data-nav id="detail-back" aria-label="Volver al catálogo">← Volver</button><span>QUÉ HAY <i>/</i> ${data.episodic?'SERIES Y EPISODIOS':'PELÍCULAS'}</span></div>
         <div class="cinema-layout">
           <div class="cinema-copy"><p class="eyebrow">UNA HISTORIA PARA TU GRAN PANTALLA</p>
-            <h1>${esc(item.titulo)}</h1>${meta(item)}
+            <h1>${esc(item.titulo)}</h1>${meta(item,false)}
+            <div class="genre-chips">${genres.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
             ${data.episodic&&seasons.length?`<div class="series-count">${seasons.length} ${seasons.length===1?'temporada':'temporadas'} <span>·</span> ${count} episodios</div>`:''}
             <p class="cinema-synopsis">${esc(item.sinopsis||'Descubre esta historia en Qué Hay.')}</p>
             <div class="cinema-actions" data-row="hero-actions">
               <div class="play-group"><button data-nav id="detail-play" class="circle-play" aria-label="${esc(playLabel)}" ${!data.playable?'disabled':''}><svg aria-hidden="true" viewBox="0 0 32 32"><path d="M11 6 26 16 11 26Z"/></svg></button><span class="play-label">${data.playable?esc(playLabel):'No disponible'}<small>${first?esc(first.titulo||'Episodio '+first.numero):'Disfrútala en tu pantalla'}</small></span></div>
               ${seasons.length?'<button data-nav id="detail-episodes" class="detail-secondary">☷ Episodios</button>':''}
-              <button data-nav id="detail-info" class="detail-secondary">ⓘ Sinopsis</button>
+              <button data-nav id="detail-save" class="detail-secondary save-title" aria-pressed="${Boolean(data.saved)}" aria-label="${data.saved?'Quitar de Mi lista':'Añadir a Mi lista'}"><span aria-hidden="true">${data.saved?'✓':'＋'}</span> Mi lista</button>
             </div>
             ${status?`<p class="availability-note" role="status">${esc(status)}</p>`:''}
           </div>
@@ -27,7 +28,6 @@ window.TVDetail = {
         </div>
       </section>
       ${data.episodic?`<section class="episode-section cinema-episodes"><div class="section-heading"><div><p class="eyebrow">LA HISTORIA CONTINÚA</p><h2>Temporadas y episodios</h2></div><span>Elige tu próximo capítulo</span></div>${seasons.length?`<div class="season-tabs" data-row="seasons">${seasons.map(s=>`<button data-nav data-season="${s.id}" id="season-${s.id}" aria-pressed="false">${s.numero===0?'Especiales':'Temporada '+s.numero}<small>${s.episodios} episodios</small></button>`).join('')}</div><div id="episode-results"><p class="loading">Cargando episodios…</p></div>`:'<div class="missing-episodes"><h3>Aún no hay capítulos disponibles</h3><p>Puedes explorar otras series mientras se completa este título.</p><button data-nav id="detail-other-series">Explorar series →</button></div>'}</section>`:''}
-      <section class="cinema-story" id="detail-story"><div><p class="eyebrow">DETRÁS DEL TÍTULO</p><h2>La historia</h2></div><div><p>${esc(item.sinopsis||'Sinopsis no disponible.')}</p><div class="genre-chips">${genres.map(g=>`<span>${esc(g)}</span>`).join('')}</div><button data-nav id="story-back" class="detail-secondary">↑ Volver a la ficha</button></div></section>
       ${data.related?.length?`<section class="shelves detail-related"><div class="section-heading"><h2>Más para tu próxima sesión</h2><span>Sigue explorando</span></div><div class="rail" data-row="related">${data.related.map(card).join('')}</div></section>`:''}
     </article>`;
   }

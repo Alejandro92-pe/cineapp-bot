@@ -10,7 +10,7 @@
  function image(url,size='w780'){
   try{const u=new URL(url);if(u.origin==='https://image.tmdb.org'&&u.pathname.startsWith('/t/p/')){u.pathname=u.pathname.replace(/\/t\/p\/[^/]+\//,'/t/p/'+size+'/');return esc(u.href);}}catch(_){}return '/tv/brand';
  }
- function meta(item){return `<div class="meta">${item.rating?`<span class="rating">★ ${esc(Number(item.rating).toFixed(1))}</span>`:''}<span>${esc(item.año||'')}</span><span>${esc(labels[item.tipo]||'')}</span><span>${esc((item.genero||'').split(',')[0])}</span></div>`;}
+ function meta(item,includeGenre=true){return `<div class="meta">${item.rating?`<span class="rating">★ ${esc(Number(item.rating).toFixed(1))}</span>`:''}<span>${esc(item.año||'')}</span><span>${esc(labels[item.tipo]||'')}</span>${includeGenre?`<span>${esc((item.genero||'').split(',')[0])}</span>`:''}</div>`;}
  function card(item){return `<button data-nav class="poster" id="title-${item.id}" data-title="${item.id}"><img loading="lazy" src="${image(item.imagen_url,'w342')}" alt=""><span class="caption">${esc(item.titulo)}</span><small>${esc(item.año||labels[item.tipo]||'')} ${item.rating?' · ★ '+esc(Number(item.rating).toFixed(1)):''}</small></button>`;}
  function topTen(data){if(!data?.items.length)return '';const ranked=data.mode==='ranked';return `<section class="shelf top-ten"><div class="section-heading"><h2>${ranked?'Top 10 películas de la semana':'10 películas para descubrir'}</h2><span>${ranked?'Las más vistas por nuestra comunidad':'Tu próxima noche de cine'}</span></div><div class="rail" data-row="top10">${data.items.map((item,i)=>`<button data-nav class="poster ranked-poster" id="top-title-${item.id}" data-title="${item.id}" aria-label="${ranked?'Puesto':'Selección'} ${i+1}: ${esc(item.titulo)}"><span class="rank-number" aria-hidden="true">${i+1}</span><div class="rank-cover"><img loading="lazy" src="${image(item.imagen_url,'w342')}" alt=""><span class="caption">${esc(item.titulo)}</span></div></button>`).join('')}</div></section>`;}
  function hero(item,full=false){return `<section class="hero"><div class="hero-art"><img src="${image(item.backdrop_url||item.imagen_url,'w1280')}" alt=""></div><div class="hero-copy"><p class="eyebrow">${full?'QUÉ HAY · '+esc(labels[item.tipo]):'UNA GRAN HISTORIA. TU MEJOR PANTALLA.'}</p><h1>${esc(item.titulo)}</h1>${meta(item)}<p class="synopsis">${esc(item.sinopsis||'Encuentra tu próxima historia en Qué Hay.')}</p><div class="actions" data-row="hero-actions">${full?`<button data-nav class="primary" id="detail-play">▶ ${detail.seasons.length?'Ver episodios':'Reproducir'}</button><button data-nav id="detail-back" class="secondary">Volver</button>`:`<button data-nav class="primary" id="hero-open" data-title="${item.id}">Descubrir película →</button><button data-nav class="secondary" id="hero-browse">Explorar catálogo</button>`}</div></div></section>`;}
@@ -42,13 +42,31 @@
   const focus=browseFocus==='results'?screen.querySelector('.collection-results [data-nav]'):$(browseFocus);
   TVFocus.focus(focus||(lastFocus?$(lastFocus):null)||(!state.kind?$('search-input'):$('collection-feature'))||$('genre-all'));browseFocus=null;
  }
+ async function saveTitle(data,rev){
+  const button=$('detail-save');if(button.getAttribute('aria-busy')==='true')return;button.setAttribute('aria-busy','true');
+  try{await refreshMe();if(rev!==revision)return;if(!me.linked){openAccount();return;}
+   const result=await api('list',{id:data.item.id,saved:!data.saved},me.csrf);if(rev!==revision)return;
+   data.saved=result.saved;button.setAttribute('aria-pressed',String(result.saved));button.setAttribute('aria-label',result.saved?'Quitar de Mi lista':'Añadir a Mi lista');
+   button.innerHTML='<span aria-hidden="true">'+(result.saved?'✓':'＋')+'</span> Mi lista';toast(result.saved?'Añadido a Mi lista.':'Quitado de Mi lista.');
+  }catch(e){if(rev===revision)toast(e.message);}finally{button.removeAttribute('aria-busy');}
+ }
+ async function savedView(params,rev){
+  activateNav('list');$('list-nav').classList.add('active');await refreshMe();if(rev!==revision)return;
+  if(!me.linked){screen.innerHTML='<section class="saved-library"><p class="eyebrow">TUS HISTORIAS</p><h1>Mi lista</h1><p>Vincula tu cuenta desde el celular para guardar lo que quieres ver.</p><button data-nav id="list-link" class="primary">Vincular cuenta</button></section>';$('list-link').onclick=openAccount;TVFocus.focus($('list-link'));return;}
+  const data=await api('list?page='+(Number(params.get('page'))||1));if(rev!==revision)return;
+  const rows=[];for(let i=0;i<data.items.length;i+=6)rows.push('<div class="collection-row" data-row="saved-'+i+'">'+data.items.slice(i,i+6).map(card).join('')+'</div>');
+  screen.innerHTML='<section class="saved-library"><p class="eyebrow">TUS HISTORIAS, A TU RITMO</p><h1>Mi lista</h1><p>'+ (data.total?data.total+(data.total===1?' título':' títulos')+' para volver cuando quieras.':'Tu próxima historia empieza aquí. Guarda películas y series con ＋ Mi lista.')+'</p><div class="saved-results">'+rows.join('')+'</div>'+(data.total?'<div class="pages" data-row="saved-pages"><button data-nav id="saved-prev" '+(data.page===1?'disabled':'')+'>← Anteriores</button><span>Página '+data.page+' de '+data.pages+'</span><button data-nav id="saved-next" '+(!data.has_next?'disabled':'')+'>Más títulos →</button></div>':'<button data-nav id="list-explore" class="primary">Explorar catálogo</button>')+'</section>';
+  bindCards();if($('list-explore'))$('list-explore').onclick=()=>go('kind=pelicula');
+  if($('saved-prev'))$('saved-prev').onclick=()=>{lastFocus=null;go('list=1&page='+(data.page-1));};
+  if($('saved-next'))$('saved-next').onclick=()=>{lastFocus=null;go('list=1&page='+(data.page+1));};
+  TVFocus.focus($(lastFocus)||screen.querySelector('.saved-results [data-nav]')||$('list-explore'));
+ }
  async function titleView(cid,rev){const data=await api('title/'+cid);if(rev!==revision)return;detail=data;activateNav(data.item.tipo);season=data.seasons.find(s=>s.id===data.first_episode?.temporada_id)||data.seasons.find(s=>s.episodios>0);episodePage=1;
   screen.innerHTML=TVDetail.render(data,image,esc,meta,card);
   $('detail-back').onclick=()=>go(returnHash);
   $('detail-play').onclick=()=>play(data.item,data.first_episode);
   if($('detail-episodes'))$('detail-episodes').onclick=()=>TVFocus.focus($('season-'+season.id));
-  $('detail-info').onclick=()=>TVFocus.focus($('story-back'));
-  $('story-back').onclick=()=>TVFocus.focus(data.playable?$('detail-play'):$('detail-back'));
+  $('detail-save').onclick=()=>saveTitle(data,rev);
   if($('detail-other-series'))$('detail-other-series').onclick=()=>go('kind=serie');
   screen.querySelectorAll('[data-title]').forEach(b=>b.onclick=()=>{returnHash='kind='+data.item.tipo;go('title='+b.dataset.title);});
   screen.querySelectorAll('[data-season]').forEach(b=>b.onclick=()=>{season=data.seasons.find(s=>s.id===Number(b.dataset.season));episodePage=1;loadEpisodes(rev,true).catch(e=>toast(e.message));});
@@ -63,16 +81,16 @@
   if(focus)TVFocus.focus(screen.querySelector('[data-episode]')||$('season-'+sid));
  }
  async function render(){const rev=++revision;seasonRevision++;window.scrollTo({top:0,behavior:'instant'});screen.innerHTML='<p class="loading">Preparando tus historias…</p>';
-  try{const params=new URLSearchParams(location.hash.slice(1));if(params.has('title'))await titleView(Number(params.get('title')),rev);else if(params.has('kind')||params.has('search')||params.has('q'))await browse(params,rev);else await home(rev);}
+  try{const params=new URLSearchParams(location.hash.slice(1));if(params.has('title'))await titleView(Number(params.get('title')),rev);else if(params.has('list'))await savedView(params,rev);else if(params.has('kind')||params.has('search')||params.has('q'))await browse(params,rev);else await home(rev);}
   catch(e){if(rev===revision){screen.innerHTML='<div class="empty"><h1>No pudimos cargar esta pantalla.</h1><p>'+esc(e.message)+'</p><div data-row="retry"><button data-nav id="retry-view">Volver a intentar</button></div></div>';$('retry-view').onclick=render;TVFocus.focus($('retry-view'));}}
  }
  function closeAccount(){pairRevision++;clearTimeout(pollTimer);$('account-dialog').close();TVFocus.focus($('account-nav'));}
  async function openAccount(){const rev=++pairRevision;clearTimeout(pollTimer);$('account-body').innerHTML='<p>Comprobando tu cuenta…</p>';$('account-dialog').showModal();TVFocus.focus($('account-close'));
   try{await refreshMe();if(rev!==pairRevision)return;
-   if(me.linked){$('account-body').innerHTML=`<p class="eyebrow">TU CUENTA EN ESTA PANTALLA</p><h2>Hola, ${esc(me.name.split(' ')[0])}.</h2><p class="account-state">${me.active?'Tu acceso está activo. Elige algo y disfruta.':'Tu cuenta no tiene acceso activo. Revísala desde tu celular.'}</p><div data-row="account-actions"><button data-nav id="unlink-tv">Desvincular este televisor</button></div>`;$('unlink-tv').onclick=async()=>{try{await api('unlink',{},me.csrf);closeAccount();await refreshMe();toast('Televisor desvinculado.');}catch(e){toast(e.message);}};TVFocus.focus($('account-close'));return;}
+   if(me.linked){$('account-body').innerHTML=`<p class="eyebrow">TU CUENTA EN ESTA PANTALLA</p><h2>Hola, ${esc(me.name.split(' ')[0])}.</h2><p class="account-state">${me.active?'Tu acceso está activo. Elige algo y disfruta.':'Tu cuenta no tiene acceso activo. Revísala desde tu celular.'}</p><div data-row="account-actions"><button data-nav id="unlink-tv">Desvincular este televisor</button></div>`;$('unlink-tv').onclick=async()=>{try{await api('unlink',{},me.csrf);closeAccount();await refreshMe();if(new URLSearchParams(location.hash.slice(1)).has('list')||new URLSearchParams(location.hash.slice(1)).has('title'))render();toast('Televisor desvinculado.');}catch(e){toast(e.message);}};TVFocus.focus($('account-close'));return;}
    const pair=await api('pair/start',{});if(rev!==pairRevision)return;
    $('account-body').innerHTML=`<p class="eyebrow">TUS HISTORIAS, EN UNA PANTALLA MÁS GRANDE</p><h2>Vincula desde tu celular.</h2><p>Abre esta dirección, inicia sesión y confirma el código que ves aquí.</p><p class="pair-url">${esc(pair.url)}</p><div class="pair-code">${esc(pair.code)}</div><p id="pair-state">Este código vence en 10 minutos.</p><p class="pair-note">Vista local: puedes comprobar la pantalla del celular en otra pestaña de esta computadora.</p>`;
-   const poll=async()=>{if(rev!==pairRevision)return;try{const d=await api('pair/poll',{});if(rev!==pairRevision)return;if(d.state==='linked'){await refreshMe();closeAccount();toast('Cuenta vinculada. Bienvenido a Qué Hay.');return;}if(d.state==='expired'){expired();return;}pollTimer=setTimeout(poll,3000);}catch(e){if(rev!==pairRevision)return;$('pair-state').textContent=e.message;pollTimer=setTimeout(poll,10000);}};
+   const poll=async()=>{if(rev!==pairRevision)return;try{const d=await api('pair/poll',{});if(rev!==pairRevision)return;if(d.state==='linked'){await refreshMe();closeAccount();if(new URLSearchParams(location.hash.slice(1)).has('list')||new URLSearchParams(location.hash.slice(1)).has('title'))render();toast('Cuenta vinculada. Bienvenido a Qué Hay.');return;}if(d.state==='expired'){expired();return;}pollTimer=setTimeout(poll,3000);}catch(e){if(rev!==pairRevision)return;$('pair-state').textContent=e.message;pollTimer=setTimeout(poll,10000);}};
    function expired(){$('pair-state').textContent='El código venció. Genera otro para continuar.';const b=document.createElement('button');b.dataset.nav='';b.textContent='Generar otro código';b.onclick=()=>{closeAccount();openAccount();};$('account-body').append(b);TVFocus.focus(b);}
    pollTimer=setTimeout(poll,3000);TVFocus.focus($('account-close'));
   }catch(e){$('account-body').innerHTML='<h2>No pudimos vincular la cuenta.</h2><p>'+esc(e.message)+'</p>';}
@@ -87,7 +105,7 @@
  function closePlayer(){playRevision++;$('player-frame').src='about:blank';$('player').hidden=true;document.querySelector('.topbar').inert=false;screen.inert=false;TVFocus.focus((playing?.ep?$('episode-'+playing.ep.id):null)||$('detail-play'));playing=null;next=null;}
  rootBack();function rootBack(){window.TVBack=()=>{if($('account-dialog').open){closeAccount();return true;}if(!$('player').hidden){closePlayer();return true;}if(location.hash){go(location.hash.includes('title=')?returnHash:'');return true;}TVFocus.focus(document.querySelector('[data-view="home"]'));return false;};}
  window.addEventListener('popstate',()=>{if(!$('player').hidden)closePlayer();render();});
- document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{lastFocus=null;browseFocus=null;go('kind='+b.dataset.kind);});document.querySelector('[data-view="home"]').onclick=()=>go('');$('search-nav').onclick=()=>go('search=1');$('account-nav').onclick=openAccount;$('account-close').onclick=closeAccount;$('account-dialog').addEventListener('cancel',e=>{e.preventDefault();closeAccount();});
+ document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{lastFocus=null;browseFocus=null;go('kind='+b.dataset.kind);});document.querySelector('[data-view="home"]').onclick=()=>go('');$('list-nav').onclick=()=>{lastFocus=null;go('list=1');};$('search-nav').onclick=()=>go('search=1');$('account-nav').onclick=openAccount;$('account-close').onclick=closeAccount;$('account-dialog').addEventListener('cancel',e=>{e.preventDefault();closeAccount();});
  $('player-close').onclick=closePlayer;$('player-enter').onclick=()=>{$('player-message').textContent='';$('player-frame').focus();};$('player-next').onclick=()=>{if(next&&playing)play(playing.item,next);};
  refreshMe().catch(()=>{});render();
 })();

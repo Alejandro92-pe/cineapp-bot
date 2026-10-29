@@ -118,3 +118,25 @@ Verificados búsqueda vacía, quitar filtros, flechas entre controles y tarjetas
 sin desbordamiento horizontal ni errores de consola durante la revisión.
 Capturas: .local/tv/catalog-series-1080.png y catalog-biblico-cards.png.
 Pendiente revisión del usuario y mando físico. No se ha generado ningún paquete.
+
+FICHA INMERSIVA Y MI LISTA (29/10/2026)
+La portada de la ficha ocupa la primera pantalla bajo el menú. Una sola sinopsis,
+géneros en la cabecera y recomendaciones/episodios al bajar; retirados Sinopsis,
+Detrás del título, La historia y Volver a la ficha. Top 10: números gruesos
+parcialmente detrás del afiche, incluyendo espacio específico para el número 10.
+
+Mi lista permite añadir/quitar desde la ficha y abrir los guardados desde el menú.
+Reutiliza services.profiles.Profiles sin modificarlo, sobre preview.sqlite local.
+No hay escritura en Supabase ni en las cuentas de producción. Una futura integración
+usará la identidad real de la cuenta; esta prueba usa solo cuentas de demostración.
+GET/POST /tv/api/list exige dispositivo vinculado; POST verifica CSRF y origen.
+Guardar no requiere membresía activa; reproducir sigue comprobando el acceso.
+Las listas son privadas por cuenta, admiten 200 títulos y páginas de 12 fichas.
+
+16 pruebas TV y dos de navegación aprobadas: aislamiento de cuentas, persistencia
+entre dispositivos vinculados, duplicados, quitar, paginación, revocación y CSRF.
+QA de navegador: Matchbox guardado, conservado tras recargar, visible en Mi lista
+y retirado; Carrie guardada y acceso a temporada con seis episodios visibles.
+Ficha comprobada a 720p/1080p, sin sinopsis duplicada ni errores de consola.
+Capturas: .local/tv/detail-immersive-720.png, series-immersive-1080.png,
+top10-behind-720.png. Sigue pendiente mando físico y aprobación para empaquetar.

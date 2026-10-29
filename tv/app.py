@@ -11,6 +11,7 @@ from security import password_ok, owner_access
 from billing.store import BillingStore
 from services.popularity import Popularity
 from tv.discovery import Discovery, GENRES
+from services.profiles import Profiles
 
 ROOT = Path(__file__).resolve().parent
 PHONE_COOKIE, TV_COOKIE, PAIR_COOKIE = 'qh_tv_phone_local', 'qh_tv_device_local', 'qh_tv_pair_local'
@@ -24,6 +25,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
     app.config.update(MAX_CONTENT_LENGTH=8192)
     pairing, catalog, billing = PairingStore(security), Catalog(database), BillingStore(security)
     discovery = Discovery(database)
+    profiles = Profiles(security)
     app.extensions.update(tv_pairing=pairing,tv_catalog=catalog)
 
     def error(text,status):return jsonify(error=text),status
@@ -45,9 +47,9 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
             if not g.phone:return error('Inicia sesión desde tu celular.',401)
             if request.method=='POST' and not hmac.compare_digest(request.headers.get('X-CSRF-Token',''),g.phone['csrf']):
                 return error('Actualiza la sesión del celular.',403)
-        if request.path in ('/tv/api/play','/tv/api/unlink'):
+        if request.path in ('/tv/api/play','/tv/api/unlink','/tv/api/list'):
             if not g.device:return error('Vincula tu cuenta para continuar.',401)
-            if not hmac.compare_digest(request.headers.get('X-CSRF-Token',''),g.device['csrf']):return error('Actualiza la sesión del televisor.',403)
+            if request.method=='POST' and not hmac.compare_digest(request.headers.get('X-CSRF-Token',''),g.device['csrf']):return error('Actualiza la sesión del televisor.',403)
 
     @app.after_request
     def harden(r):
@@ -125,7 +127,25 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
     @app.get('/tv/api/title/<int:cid>')
     def title(cid):
         result=catalog.details(cid)
+        if result:result['saved']=bool(g.device and cid in profiles.snapshot(g.device['account_id'])['saved_ids'])
         return jsonify(result) if result else error('Título no disponible.',404)
+
+    @app.get('/tv/api/list')
+    def saved_list():
+        page=request.args.get('page',1,type=int)
+        if page is None or not 1<=page<=17:return error('Página no válida.',400)
+        ids=profiles.snapshot(g.device['account_id'])['saved_ids']
+        return jsonify(catalog.saved_titles(ids,page))
+
+    @app.post('/tv/api/list')
+    def save_title():
+        if not limit('list',60):return error('Espera unos segundos antes de cambiar tu lista.',429)
+        body=request.get_json();cid=body.get('id');saved=body.get('saved')
+        if type(cid) is not int or cid<=0 or type(saved) is not bool:return error('Título no válido.',400)
+        if saved and not catalog.item(cid):return error('Título no disponible.',404)
+        try:profiles.mutate(g.device['account_id'],items=[(cid,saved)])
+        except ValueError as exc:return error(str(exc),400)
+        return jsonify(saved=saved)
     @app.get('/tv/api/episodes/<int:cid>/<int:sid>')
     def episodes(cid,sid):
         page=request.args.get('page',1,type=int)

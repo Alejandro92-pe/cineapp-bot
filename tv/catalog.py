@@ -25,6 +25,15 @@ class Catalog:
         rows = self.db.table('contenido').select(FIELDS).eq('id', cid).eq('disponible', True).limit(1).execute().data
         return rows[0] if rows else None
 
+    def saved_titles(self, ids, page=1):
+        rows = self.db.table('contenido').select(FIELDS).eq('disponible',True).in_('id',ids).execute().data if ids else []
+        by_id = {r['id']:r for r in rows}
+        ordered = [by_id[cid] for cid in ids if cid in by_id]
+        total = len(ordered)
+        pages = max(1,(total+11)//12)
+        page = min(page,pages)
+        return {'items':ordered[(page-1)*12:page*12], 'total':total, 'page':page, 'pages':pages, 'has_next':page<pages}
+
     def top_movies(self, scores):
         items = []
         if scores:

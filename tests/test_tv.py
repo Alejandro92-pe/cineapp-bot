@@ -214,3 +214,56 @@ def test_biblical_formats_and_metadata_cache(tv):
     clock[0]=71
     assert discovery.browse('biblico')['total']==3
     assert '_genres' not in str(serial) and 'descarga' not in serial['items'][0]
+
+
+def test_tv_saved_list_requires_session_csrf_and_stays_private(tv):
+    from services.profiles import Profiles
+    app,security,account,db=tv
+    anonymous=app.test_client()
+    assert get(anonymous,'list').status_code==401
+    assert post(anonymous,'list',{'id':1,'saved':True}).status_code==401
+    c,cell,csrf=linked(app)
+    assert post(c,'list',{'id':1,'saved':True}).status_code==403
+    for data in ({'id':True,'saved':True},{'id':1,'saved':'true'},{'id':-1,'saved':True}):
+        assert post(c,'list',data,csrf).status_code==400
+    assert post(c,'list',{'id':999,'saved':True},csrf).status_code==404
+    before=copy.deepcopy(db.rows)
+    assert post(c,'list',{'id':1,'saved':True},csrf).status_code==200
+    assert post(c,'list',{'id':1,'saved':True},csrf).status_code==200
+    result=get(c,'list').json
+    assert result['total']==1 and result['items'][0]['id']==1
+    assert all('descarga' not in row for row in result['items']) and 'private.test' not in str(result)
+    assert get(c,'title/1').json['saved'] is True
+    assert get(anonymous,'title/1').json['saved'] is False
+    # Same account on another paired device sees persisted entries.
+    second,_,second_csrf=linked(app)
+    assert get(second,'list').json['total']==1
+    other=security.create_account('Other','other@example.test',password_hash('Other-Test-2026!'))
+    token,code=app.extensions['tv_pairing'].start()[:2]
+    app.extensions['tv_pairing'].approve(code,other['id'])
+    _,device=app.extensions['tv_pairing'].poll(token)
+    outsider=app.test_client();outsider.set_cookie(TV_COOKIE,device,domain='127.0.0.1',path='/tv')
+    assert get(outsider,'list').json['total']==0
+    with security.engine.begin() as con:con.execute(access.update().where(access.c.account_id==account['id']).values(expires_at=0))
+    assert post(second,'list',{'id':2,'saved':True},second_csrf).status_code==200
+    assert post(second,'play',{'id':2,'episode':1},second_csrf).status_code==403
+    assert post(c,'list',{'id':1,'saved':False},csrf).status_code==200
+    assert Profiles(security).snapshot(account['id'])['saved_ids']==[2]
+    assert get(second,'title/1').json['saved'] is False
+    assert db.rows==before
+    assert post(cell,'phone/revoke',{},get(cell,'phone/me').json['csrf']).status_code==200
+    assert get(second,'list').status_code==401
+
+
+def test_saved_list_pages_and_unavailable_entries(tv):
+    from services.profiles import Profiles
+    app,security,account,db=tv
+    seed=db.rows['contenido'][0]
+    db.rows['contenido']=[{**seed,'id':n,'disponible':n!=14} for n in range(1,15)]
+    Profiles(security).mutate(account['id'],items=[(n,True) for n in range(1,15)])
+    c,_,csrf=linked(app)
+    first=get(c,'list').json;last=get(c,'list?page=2').json
+    assert first['total']==13 and len(first['items'])==12 and first['has_next']
+    assert len(last['items'])==1 and not last['has_next']
+    assert get(c,'list?page=0').status_code==400
+    assert post(c,'list',{'id':14,'saved':False},csrf).status_code==200
