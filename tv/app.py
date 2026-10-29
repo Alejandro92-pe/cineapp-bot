@@ -10,6 +10,7 @@ from tv.catalog import Catalog, KINDS
 from security import password_ok, owner_access
 from billing.store import BillingStore
 from services.popularity import Popularity
+from tv.discovery import Discovery, GENRES
 
 ROOT = Path(__file__).resolve().parent
 PHONE_COOKIE, TV_COOKIE, PAIR_COOKIE = 'qh_tv_phone_local', 'qh_tv_device_local', 'qh_tv_pair_local'
@@ -22,6 +23,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
     app=Flask(__name__,static_folder=str(ROOT/'static'),static_url_path='/tv/assets')
     app.config.update(MAX_CONTENT_LENGTH=8192)
     pairing, catalog, billing = PairingStore(security), Catalog(database), BillingStore(security)
+    discovery = Discovery(database)
     app.extensions.update(tv_pairing=pairing,tv_catalog=catalog)
 
     def error(text,status):return jsonify(error=text),status
@@ -116,7 +118,10 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
     def search():
         kind=request.args.get('kind') or None;page=request.args.get('page',1,type=int)
         if kind not in (None,*KINDS) or page is None or not 1<=page<=500:return error('Página no válida.',400)
-        return jsonify(catalog.titles(kind,request.args.get('q','')[:80],page))
+        genre=request.args.get('genre','');order=request.args.get('sort','recent');form=request.args.get('format','')
+        if genre not in ('',*GENRES) or order not in ('recent','rating','az') or form not in ('','movies','series') or (form and kind!='biblico'):
+            return error('Filtro no válido.',400)
+        return jsonify(discovery.browse(kind,request.args.get('q','')[:80],genre,order,form,page))
     @app.get('/tv/api/title/<int:cid>')
     def title(cid):
         result=catalog.details(cid)

@@ -173,3 +173,44 @@ def test_tv_snapshot_deduplicates_and_excludes_private_fields(tmp_path):
     assert 'SECRET' not in json.dumps(data) and 'accounts' not in data
     assert data['episodios'][0]['titulo'] == 'Uno'
     assert report['public_gets'] == 0 and not report['missing']
+
+
+def test_collection_filters_full_catalog_and_preserves_category(tv):
+    app, _, _, db = tv
+    seed = db.rows['contenido'][0]
+    db.rows['contenido'] = [{**seed,'id':n,'titulo':f'Drama {n}','genero':'Drama','rating':n/10} for n in range(1,22)]
+    db.rows['contenido'] += [{**seed,'id':23,'titulo':'Último terror','genero':'Terror, Suspense','rating':9},
+        {**seed,'id':24,'titulo':'Oculta','genero':'Terror','disponible':False},
+        {**seed,'id':25,'titulo':'Anime','genero':'Action & Adventure, Sci-Fi & Fantasy','tipo':'anime'}]
+    c=app.test_client()
+    result=get(c,'catalog?kind=pelicula&genre=drama&sort=az&page=2').json
+    assert result['total']==21 and len(result['items'])==9 and not result['has_next']
+    result=get(c,'catalog?kind=pelicula&genre=suspenso&q=ultimo').json
+    assert result['total']==1 and result['items'][0]['id']==23
+    assert result['featured']['id']==23
+    genres={x['id']:x['count'] for x in result['genres']}
+    assert genres['terror']==1 and genres['drama']==21
+    result=get(c,'catalog?kind=pelicula&sort=rating').json
+    assert result['items'][0]['id']==23
+    anime=get(c,'catalog?kind=anime&genre=aventura').json
+    assert anime['total']==1 and anime['items'][0]['id']==25
+    assert get(c,'catalog?kind=pelicula&genre=drama&q=no-existe').json['total']==0
+    for query in ('genre=inventado','sort=unknown','kind=serie&format=movies'):
+        assert get(c,'catalog?'+query).status_code==400
+
+
+def test_biblical_formats_and_metadata_cache(tv):
+    from tv.discovery import Discovery
+    _, _, _, db=tv
+    db.rows['contenido'][0]['tipo']='biblico'
+    db.rows['contenido'][1]['tipo']='biblico'
+    clock=[10];discovery=Discovery(db,lambda:clock[0])
+    serial=discovery.browse('biblico',form='series')
+    assert [x['id'] for x in serial['items']]==[2]
+    assert serial['items'][0]['format']=='series'
+    assert discovery.browse('biblico',form='movies')['items'][0]['id']==1
+    db.rows['contenido'].append({**db.rows['contenido'][0],'id':3})
+    assert discovery.browse('biblico')['total']==2
+    clock[0]=71
+    assert discovery.browse('biblico')['total']==3
+    assert '_genres' not in str(serial) and 'descarga' not in serial['items'][0]

@@ -23,15 +23,24 @@
   screen.innerHTML=(film?hero(film):'')+'<div class="shelves">'+topTen(homeData.top10)+homeData.rows.filter(r=>r.items.length).map(r=>`<section class="shelf"><div class="section-heading"><h2>${esc(r.title)}</h2><span>Desliza con el control →</span></div><div class="rail" data-row="${r.kind}">${r.items.map(card).join('')}</div></section>`).join('')+'</div>';
   bindCards();if($('hero-browse'))$('hero-browse').onclick=()=>go('kind=pelicula');TVFocus.focus($(lastFocus)||$('hero-open')||$('account-nav'));
  }
- async function browse(params,rev){const kind=params.get('kind')||'',q=params.get('q')||'',page=Number(params.get('page'))||1;activateNav(kind);
-  const data=await api('catalog?'+new URLSearchParams({kind,q,page}));if(rev!==revision)return;
-  const heading=params.has('search')?'Tu próxima historia empieza aquí':labels[kind]||'Explorar catálogo';
-  screen.innerHTML=`<section class="browse"><p class="eyebrow">ENCUENTRA ALGO QUE TE ATRAPE</p><h1>${esc(heading)}</h1><form class="search-form" id="search-form" data-row="search"><input data-nav id="search-input" aria-label="Buscar título" placeholder="Busca una película, serie o anime" maxlength="80" value="${esc(q)}"><button data-nav class="primary">Buscar</button></form><div class="browse-grid">${data.items.map(card).join('')}</div><div class="pages" data-row="pages"><button data-nav id="catalog-prev" ${page===1?'disabled':''}>← Anteriores</button><span>Página ${page}</span><button data-nav id="catalog-next" ${!data.has_next?'disabled':''}>Más títulos →</button></div>${data.items.length?'':'<p class="empty">No encontramos ese título. Prueba con otro nombre.</p>'}</section>`;
-  // Grid rows are explicit so Up/Down retain the nearest column with a remote.
-  const grid=screen.querySelector('.browse-grid');const cards=[...grid.querySelectorAll('.poster')];grid.replaceChildren();
-  for(let i=0;i<cards.length;i+=6){const row=document.createElement('div');row.className='result-row';row.dataset.row='results';cards.slice(i,i+6).forEach(c=>row.append(c));grid.append(row);}
-  $('search-form').onsubmit=e=>{e.preventDefault();go(new URLSearchParams({search:'1',q:$('search-input').value.trim()}).toString());};
-  $('catalog-prev').onclick=()=>go(new URLSearchParams({kind,q,page:page-1}).toString());$('catalog-next').onclick=()=>go(new URLSearchParams({kind,q,page:page+1}).toString());bindCards();TVFocus.focus(params.has('search')&&!q?$('search-input'):cards[0]||$('search-input'));
+ let browseFocus=null;
+ async function browse(params,rev){
+  const state={kind:params.get('kind')||'',q:params.get('q')||'',page:Number(params.get('page'))||1,genre:params.get('genre')||'',sort:params.get('sort')||'recent',format:params.get('format')||''};
+  activateNav(state.kind);
+  const data=await api('catalog?'+new URLSearchParams(state));if(rev!==revision)return;
+  state.page=data.page;screen.innerHTML=TVBrowse.render(data,state,image,esc,card);
+  const navigate=(changes,focus)=>{browseFocus=focus;const updated={...state,...changes};const query=new URLSearchParams(updated);if(!updated.kind)query.set('search','1');go(query.toString());};
+  bindCards();
+  if($('collection-explore'))$('collection-explore').onclick=()=>TVFocus.focus($('format-all')||$('genre-all'));
+  screen.querySelectorAll('[data-genre]').forEach(b=>b.onclick=()=>navigate({genre:b.dataset.genre,page:1},b.id));
+  screen.querySelectorAll('[data-format]').forEach(b=>b.onclick=()=>navigate({format:b.dataset.format,page:1},b.id));
+  screen.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>navigate({sort:b.dataset.sort,page:1},b.id));
+  $('search-form').onsubmit=e=>{e.preventDefault();navigate({q:$('search-input').value.trim(),page:1},'results');};
+  if($('collection-reset'))$('collection-reset').onclick=()=>navigate({genre:'',format:'',q:'',page:1},'genre-all');
+  if($('catalog-prev'))$('catalog-prev').onclick=()=>navigate({page:state.page-1},'results');
+  if($('catalog-next'))$('catalog-next').onclick=()=>navigate({page:state.page+1},'results');
+  const focus=browseFocus==='results'?screen.querySelector('.collection-results [data-nav]'):$(browseFocus);
+  TVFocus.focus(focus||(lastFocus?$(lastFocus):null)||(!state.kind?$('search-input'):$('collection-feature'))||$('genre-all'));browseFocus=null;
  }
  async function titleView(cid,rev){const data=await api('title/'+cid);if(rev!==revision)return;detail=data;activateNav(data.item.tipo);season=data.seasons.find(s=>s.id===data.first_episode?.temporada_id)||data.seasons.find(s=>s.episodios>0);episodePage=1;
   screen.innerHTML=TVDetail.render(data,image,esc,meta,card);
@@ -78,7 +87,7 @@
  function closePlayer(){playRevision++;$('player-frame').src='about:blank';$('player').hidden=true;document.querySelector('.topbar').inert=false;screen.inert=false;TVFocus.focus((playing?.ep?$('episode-'+playing.ep.id):null)||$('detail-play'));playing=null;next=null;}
  rootBack();function rootBack(){window.TVBack=()=>{if($('account-dialog').open){closeAccount();return true;}if(!$('player').hidden){closePlayer();return true;}if(location.hash){go(location.hash.includes('title=')?returnHash:'');return true;}TVFocus.focus(document.querySelector('[data-view="home"]'));return false;};}
  window.addEventListener('popstate',()=>{if(!$('player').hidden)closePlayer();render();});
- document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>go('kind='+b.dataset.kind));document.querySelector('[data-view="home"]').onclick=()=>go('');$('search-nav').onclick=()=>go('search=1');$('account-nav').onclick=openAccount;$('account-close').onclick=closeAccount;$('account-dialog').addEventListener('cancel',e=>{e.preventDefault();closeAccount();});
+ document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{lastFocus=null;browseFocus=null;go('kind='+b.dataset.kind);});document.querySelector('[data-view="home"]').onclick=()=>go('');$('search-nav').onclick=()=>go('search=1');$('account-nav').onclick=openAccount;$('account-close').onclick=closeAccount;$('account-dialog').addEventListener('cancel',e=>{e.preventDefault();closeAccount();});
  $('player-close').onclick=closePlayer;$('player-enter').onclick=()=>{$('player-message').textContent='';$('player-frame').focus();};$('player-next').onclick=()=>{if(next&&playing)play(playing.item,next);};
  refreshMe().catch(()=>{});render();
 })();

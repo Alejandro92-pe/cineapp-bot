@@ -96,3 +96,25 @@ Detalle: .local/tv/catalog-report.json. Se conservaron las portadas horizontales
 Carrie tiene una temporada de ocho capítulos; primera página 1–6 y segunda 7–8.
 El play circular abrió VideoAPI T1E1; retorno, sinopsis y navegación comprobados.
 No se ha empaquetado, publicado ni modificado la web o APK móvil.
+
+COLECCIONES TV (29/10/2026)
+static/browse.js y browse.css presentan películas, series, anime y bíblicos
+con cabecera propia, filtros de géneros reales y búsqueda dentro de la categoría.
+Orden por recién añadidos, puntuación existente o nombre. Doce títulos por página;
+se conservan filtro, orden, página y foco al volver desde una ficha.
+Bíblicos: tarjetas horizontales grandes y filtros Películas / Por episodios.
+La clasificación por episodios utiliza temporadas existentes, sin inventarlas.
+
+discovery.py trabaja con metadatos públicos en caché durante 60 segundos.
+Los filtros abarcan toda la categoría, no solo la página visible. No carga listas
+de episodios para explorar; consulta como máximo 10.000 fichas por categoría.
+Este servicio sigue siendo exclusivo de la vista local, sin escritura en Supabase.
+
+14 pruebas TV y dos de navegación aprobadas. QA en navegador a 720p y 1080p:
+86 películas de terror, segunda página ordenada por puntuación, regreso a Christine
+con foco y filtros conservados; 108 series de drama; 10 animes de aventura A–Z.
+Bíblicos: 28 fichas, 27 películas y una con temporadas en la copia local.
+Verificados búsqueda vacía, quitar filtros, flechas entre controles y tarjetas;
+sin desbordamiento horizontal ni errores de consola durante la revisión.
+Capturas: .local/tv/catalog-series-1080.png y catalog-biblico-cards.png.
+Pendiente revisión del usuario y mando físico. No se ha generado ningún paquete.
