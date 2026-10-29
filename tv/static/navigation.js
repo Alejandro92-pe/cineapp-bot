@@ -12,7 +12,7 @@
  let uid=0;const doc=root.document;
  function scope(){return doc.querySelector('dialog[open]')||(!doc.getElementById('player').hidden?doc.getElementById('player'):doc.body);}
  function elements(){return [...scope().querySelectorAll('[data-nav]')].filter(e=>!e.disabled&&e.getClientRects().length&&!e.closest('[hidden]'));}
- function focus(e){if(!e)return;elements().forEach(x=>x.tabIndex=-1);e.tabIndex=0;e.focus({preventScroll:true});e.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});}
+ function focus(e){if(!e)return;elements().forEach(x=>x.tabIndex=-1);e.tabIndex=0;e.focus({preventScroll:true});if(!e.closest('.topbar'))e.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});}
  root.TVFocus={focus,first:()=>focus(elements()[0])};
  doc.addEventListener('focusin',e=>{if(e.target.matches('[data-nav]')){elements().forEach(x=>x.tabIndex=x===e.target?0:-1);}});
  doc.addEventListener('keydown',e=>{

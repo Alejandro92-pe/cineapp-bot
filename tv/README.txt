@@ -175,3 +175,14 @@ Las otras 224 tienen configuración vimeus, pero esto NO verifica su reproducci�
 real ni la disponibilidad actual de los proveedores. Empaquetar no corrige fuentes.
 No se han modificado producción, la web móvil, la APK, cuentas ni descargas.
 Queda pendiente la revisión del usuario y la prueba física de mando/proveedores.
+
+MENÚ PERSISTENTE TV (29/10/2026)
+Corregido el desplazamiento del menú mostrado en menu.mp4: la barra superior
+permanece visible al explorar Inicio, categorías y fichas. El scroll reserva
+su altura para que la selección no quede debajo. Enfocar el menú no mueve
+la posición de lectura del catálogo. El reproductor conserva su capa superior
+para ocultar el menú durante el video.
+QA local a 720p y 1080p: rueda, flechas, selección de carátulas y episodios,
+retorno al menú sin salto y capa de reproducción. Dos pruebas de navegación
+aprobadas. Evidencia: .local/tv/menu-fixed-qa.json y menu-fixed-*.png.
+Solo archivos TV; sin empaquetado ni cambios en producción.

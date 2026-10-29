@@ -1,4 +1,7 @@
 /* TV-only polish: stable dimensions, large-screen home and compact series. */
+/* Keep navigation visible; reserve its space when the remote scrolls a target. */
+html{scroll-padding-top:5.75rem;scroll-padding-bottom:3rem}
+.topbar{position:sticky;top:0;z-index:10;background:#070e18;box-shadow:0 1px 0 #26384d66}
 .home-feature{position:relative;isolation:isolate;min-height:calc(100vh - 5rem);padding:4rem 5.5vw 7rem;display:flex;align-items:center;overflow:hidden;background:#0c1929}
 .home-feature-art{position:absolute;inset:0;z-index:-2}
 .home-feature-art img{height:100%;width:100%;object-fit:cover;object-position:70% 30%}
