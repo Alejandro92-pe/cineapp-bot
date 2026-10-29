@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Qué Hay · TV</title><link rel="stylesheet" href="/tv/assets/tv.css"><script src="/tv/assets/navigation.js" defer></script><script src="/tv/assets/tv.js" defer></script></head>
+<body>
+<header class="topbar" data-row="navigation"><a href="/tv" class="brand" aria-label="Qué Hay TV, inicio"><img src="/tv/brand" alt=""><span>QUÉ HAY<small>EN PANTALLA GRANDE</small></span></a><nav aria-label="Catálogo"><button data-nav data-view="home">Inicio</button><button data-nav data-kind="pelicula">Películas</button><button data-nav data-kind="serie">Series</button><button data-nav data-kind="anime">Anime</button><button data-nav data-kind="biblico">Bíblicos</button><button data-nav id="search-nav" aria-label="Buscar">⌕</button></nav><button data-nav id="account-nav" class="account">Vincular cuenta <span class="profile-dot">☺</span></button></header>
+<main id="screen" tabindex="-1"><div class="loading">Preparando tus historias…</div></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="account-dialog" aria-label="Vincular y gestionar la cuenta de TV"><div id="account-body"></div><div data-row="dialog-actions"><button data-nav id="account-close" class="secondary">Volver al catálogo</button></div></dialog>
+<section id="player" hidden aria-label="Reproductor"><div id="player-toolbar" data-row="player-actions"><button data-nav id="player-close">← Volver</button><strong id="player-title"></strong><button data-nav id="player-enter">Controles del video</button><button data-nav id="player-next" hidden>Siguiente episodio →</button></div><div id="player-message" role="status"></div><iframe id="player-frame" title="Video" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe></section>
+<footer class="remote-hint"><span>↔ ↕ Explorar</span><span><b>OK</b> Seleccionar</span><span>↶ Volver</span><span class="tv-label">QUÉ HAY / TV</span></footer>
+</body></html>
