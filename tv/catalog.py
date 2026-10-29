@@ -25,6 +25,17 @@ class Catalog:
         rows = self.db.table('contenido').select(FIELDS).eq('id', cid).eq('disponible', True).limit(1).execute().data
         return rows[0] if rows else None
 
+    def top_movies(self, scores):
+        items = []
+        if scores:
+            rows = self.db.table('contenido').select(FIELDS).eq('disponible', True).eq('tipo', 'pelicula').in_('id', [s['content_id'] for s in scores]).execute().data
+            by_id = {r['id']: r for r in rows}
+            items = [by_id[s['content_id']] for s in scores if s['content_id'] in by_id][:10]
+        ranked = bool(items)
+        if not ranked:
+            items = self.db.table('contenido').select(FIELDS).eq('disponible', True).eq('tipo', 'pelicula').order('id', desc=True).limit(10).execute().data
+        return {'items': items, 'mode': 'ranked' if ranked else 'discovery', 'window_days': 7}
+
     def seasons(self, cid):
         return self.db.table('temporadas').select('id,numero,episodios').eq('contenido_id',cid).order('numero').limit(100).execute().data
 

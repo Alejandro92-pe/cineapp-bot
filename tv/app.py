@@ -9,6 +9,7 @@ from tv.store import PairingStore
 from tv.catalog import Catalog, KINDS
 from security import password_ok, owner_access
 from billing.store import BillingStore
+from services.popularity import Popularity
 
 ROOT = Path(__file__).resolve().parent
 PHONE_COOKIE, TV_COOKIE, PAIR_COOKIE = 'qh_tv_phone_local', 'qh_tv_device_local', 'qh_tv_pair_local'
@@ -110,7 +111,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020'):
     def revoke():pairing.revoke_account(g.phone['account']['id']);return jsonify(success=True)
 
     @app.get('/tv/api/home')
-    def feed():return jsonify(rows=[{'kind':k,'title':title,**catalog.titles(k)} for k,title in KINDS.items()])
+    def feed():return jsonify(top10=catalog.top_movies(Popularity(security).ranking()), rows=[{'kind':k,'title':title,**catalog.titles(k)} for k,title in KINDS.items()])
     @app.get('/tv/api/catalog')
     def search():
         kind=request.args.get('kind') or None;page=request.args.get('page',1,type=int)

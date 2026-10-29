@@ -65,3 +65,12 @@ PENDIENTES PARA LA SIGUIENTE FASE
 
 Guía de navegación consultada:
 https://developer.android.com/training/tv/get-started/navigation
+
+TOP 10 (revisión posterior)
+Primera fila debajo del hero, con números grandes y navegación horizontal.
+Solo películas disponibles. Lee el ranking semanal del servicio Popularity,
+que cuenta aperturas autorizadas, no minutos vistos. Sin estadísticas muestra
+una selección de diez películas recientes, identificada como descubrimiento.
+No se copiaron estadísticas de producción ni se inventaron reproducciones.
+La prueba local nueva comprueba orden, filtro de series/no disponibles y límite.
+10 pruebas TV aprobadas. Captura adicional: .local/tv/top10.png.

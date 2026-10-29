@@ -113,3 +113,25 @@ def test_next_episode_uses_numeric_order_and_crosses_seasons(tv):
     assert catalog.next_episode(2,14)=={'id':15,'numero':1,'titulo':None,'season':2}
     assert catalog.next_episode(1,14) is None
     assert catalog.next_episode(2,15) is None
+
+
+def test_tv_top10_movies_filters_and_preserves_weekly_order(tv):
+    from services.popularity import Popularity
+    app, security, account, db = tv
+    seed = db.rows['contenido'][0]
+    db.rows['contenido'] += [{**seed, 'id': n, 'titulo': f'Película {n}'} for n in range(3, 16)]
+    db.rows['contenido'].append({**seed, 'id': 16, 'disponible': False})
+    client = app.test_client()
+    discovery = get(client, 'home').json['top10']
+    assert discovery['mode'] == 'discovery'
+    assert len(discovery['items']) == 10
+    assert all(r['tipo'] == 'pelicula' and r['id'] != 16 for r in discovery['items'])
+    popularity = Popularity(security)
+    for cid in (2, 5, 3, 16):
+        popularity.record(account['id'], cid)
+    other = security.create_account('Otro', 'otro@example.test', password_hash('Otra-Clave-2026!'))
+    popularity.record(other['id'], 5)
+    ranked = get(client, 'home').json['top10']
+    assert ranked['mode'] == 'ranked'
+    assert [r['id'] for r in ranked['items']] == [5, 3]
+    assert all('descarga' not in row for row in ranked['items'])
