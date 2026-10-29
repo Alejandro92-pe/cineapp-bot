@@ -61,7 +61,7 @@ CANALES_VIP = [
 
 # ============ URLs ============
 # Mini App
-MINIAPP_URL = "https://cineapp-bot.onrender.com"
+MINIAPP_URL = os.getenv("APP_ORIGIN", "https://cineapp-bot.onrender.com").rstrip("/")
 
 # Buy Me A Coffee
 BMC_URL = "https://buymeacoffee.com/quehay/extras"

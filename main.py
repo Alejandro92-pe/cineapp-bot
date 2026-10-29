@@ -120,7 +120,7 @@ def paypal_crear_orden(plan: str, telegram_id: int, email: str = "") -> dict:
     if not precio:
         raise ValueError(f"Plan desconocido: {plan}")
     token = paypal_get_token()
-    render_url = os.getenv("RENDER_EXTERNAL_URL", "https://cineapp-bot.onrender.com")
+    render_url = MINIAPP_URL
     body = {
         "intent": "CAPTURE",
         "purchase_units": [{
@@ -192,7 +192,7 @@ def paypal_crear_suscripcion(plan: str, telegram_id: int, email: str = "") -> di
             f"Agrega la variable PAYPAL_PLAN_ID_{plan.upper()} en Render."
         )
     token = paypal_get_token()
-    render_url = os.getenv("RENDER_EXTERNAL_URL", "https://cineapp-bot.onrender.com")
+    render_url = MINIAPP_URL
     body = {
         "plan_id":   plan_id,
         "custom_id": f"{telegram_id}|{plan}",

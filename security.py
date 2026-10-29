@@ -74,6 +74,23 @@ def telegram_identity(raw, bot_token, now=None):
     return user
 
 
+def trusted_origins(origin, aliases='', local=False):
+    """Explicit same-host origins for a domain cutover; never a wildcard CORS list."""
+    result = {}
+    if local and aliases.strip():
+        raise RuntimeError('Los alias de dominio no se permiten en modo local.')
+    for value in [origin, *(s.strip() for s in aliases.split(',') if s.strip())]:
+        parsed = urlsplit(value)
+        if (not parsed.hostname or parsed.username or parsed.password or parsed.query
+                or parsed.fragment or parsed.path or '*' in parsed.netloc
+                or parsed.scheme not in ({'http', 'https'} if local else {'https'})):
+            raise RuntimeError('Configura únicamente orígenes HTTPS exactos, sin rutas ni credenciales.')
+        if parsed.netloc in result and result[parsed.netloc] != value:
+            raise RuntimeError('Un dominio no puede tener dos orígenes diferentes.')
+        result[parsed.netloc] = value
+    return result
+
+
 def install_security(app, membership_checker):
     local = os.getenv("APP_MODE") == "local"
     preview = local and os.getenv("TELEGRAM_PREVIEW") == "true"
@@ -86,6 +103,7 @@ def install_security(app, membership_checker):
         validate_preview_origin(origin)
     if local and not preview and parsed.hostname not in ("localhost", "127.0.0.1", "::1"):
         raise RuntimeError("El modo local solo permite loopback.")
+    origins = trusted_origins(origin, os.getenv('APP_ORIGIN_ALIASES', ''), local)
     db_url = os.getenv("SECURITY_DATABASE_URL", "")
     if not db_url:
         raise RuntimeError("Configura SECURITY_DATABASE_URL; no se usan credenciales implícitas.")
@@ -125,7 +143,8 @@ def install_security(app, membership_checker):
     @app.before_request
     def boundary():
         # Host validation also prevents DNS rebinding of the local preview.
-        if request.host != parsed.netloc:
+        request_origin = origins.get(request.host)
+        if request_origin is None:
             return error("Origen no permitido.", 403)
         path = request.path
         if preview and (path.startswith('/cron/') or path.startswith('/webhook/') or path == '/'+os.getenv('BOT_TOKEN', '__unset__')):
@@ -163,7 +182,7 @@ def install_security(app, membership_checker):
         if request.method == "OPTIONS":
             return error("Solicitudes entre orígenes deshabilitadas.", 403)
         if request.method not in ("GET", "HEAD"):
-            if request.headers.get("Origin") != origin or not request.is_json:
+            if request.headers.get("Origin") != request_origin or not request.is_json:
                 return error("Origen o formato no permitido.", 403)
             if not isinstance(request.get_json(silent=True), dict):
                 return error("Se requiere un objeto JSON.", 400)
