@@ -34,32 +34,48 @@ class DurableQueue:
         if not hasattr(store, 'catalog_lock'):
             store.catalog_lock = threading.Lock()
         self.local_lock = store.catalog_lock
+        self._batch_settings = threading.local()
 
     @contextmanager
     def lock(self):
         if self.local:
             acquired = self.local_lock.acquire(blocking=False)
+            if acquired: self._batch_settings.timers = {}
             try: yield acquired
             finally:
-                if acquired: self.local_lock.release()
+                if acquired:
+                    del self._batch_settings.timers
+                    self.local_lock.release()
             return
         # Session lock survives intermediate commits; released on disconnect/restart.
         with self.engine.connect() as connection:
             acquired = connection.execute(text('SELECT pg_try_advisory_lock(812194760123)')).scalar_one()
+            if acquired: self._batch_settings.timers = {}
             try: yield acquired
             finally:
-                if acquired: connection.execute(text('SELECT pg_advisory_unlock(812194760123)'))
+                if acquired:
+                    del self._batch_settings.timers
+                    connection.execute(text('SELECT pg_advisory_unlock(812194760123)'))
 
     def get_setting(self, key):
+        # Only the request gate is reused, and only while this thread owns the
+        # batch lock. A new batch always observes the persisted reservation.
+        timers = getattr(self._batch_settings, 'timers', None) if key == 'next_request' else None
         key = self.namespace + key
+        if timers is not None and key in timers: return timers[key]
         with self.engine.connect() as c:
-            return c.execute(select(settings.c.value).where(settings.c.key == key)).scalar_one_or_none() or 0
+            value = c.execute(select(settings.c.value).where(settings.c.key == key)).scalar_one_or_none() or 0
+        if timers is not None: timers[key] = value
+        return value
 
     def set_setting(self, key, value):
+        timers = getattr(self._batch_settings, 'timers', None) if key == 'next_request' else None
         key = self.namespace + key
         stmt = self.insert(settings).values(key=key, value=value)
         with self.engine.begin() as c:
             c.execute(stmt.on_conflict_do_update(index_elements=['key'], set_={'value': value}))
+        # Still commit every reservation/backoff BEFORE making the HTTP request.
+        if timers is not None: timers[key] = value
 
     def cached(self, key):
         with self.engine.connect() as c:
