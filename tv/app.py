@@ -1,4 +1,4 @@
-"""Local-only TV application. Deliberately not mounted on main.py or Render."""
+"""Isolated TV HTTP boundary; optional shared-account integration via tv.server."""
 import hmac
 import time
 import ipaddress
@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, send_from_directory, g
 from werkzeug.exceptions import HTTPException
 from tv.store import PairingStore
 from tv.catalog import Catalog, KINDS
-from security import password_ok, owner_access
+from security import password_ok, owner_access, COOKIE
 from billing.store import BillingStore
 from services.popularity import Popularity
 from tv.discovery import Discovery, GENRES
@@ -16,6 +16,7 @@ from services.profiles import Profiles
 
 ROOT = Path(__file__).resolve().parent
 PHONE_COOKIE, TV_COOKIE, PAIR_COOKIE = 'qh_tv_phone_local', 'qh_tv_device_local', 'qh_tv_pair_local'
+LIVE_TV_COOKIE, LIVE_PAIR_COOKIE = 'qh_tv_device', 'qh_tv_pair'
 
 
 def private_lan(host):
@@ -26,11 +27,15 @@ def private_lan(host):
         return False
 
 
-def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_preview=False):
+def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_preview=False, integrated=False, legacy_expiry=None):
     parsed=urlsplit(origin)
     allowed_host=parsed.hostname in ('127.0.0.1','localhost') or (lan_preview and private_lan(parsed.hostname))
-    if not security.local or not allowed_host or parsed.scheme!='http' or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
+    valid_mode=(allowed_host and parsed.scheme=='http') if security.local else (integrated and parsed.scheme=='https' and bool(parsed.hostname) and not lan_preview)
+    if not valid_mode or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
         raise RuntimeError('TV de prueba requiere base aislada y loopback, o una IP privada LAN explícita.')
+    device_cookie=LIVE_TV_COOKIE if integrated else TV_COOKIE
+    pair_cookie=LIVE_PAIR_COOKIE if integrated else PAIR_COOKIE
+    phone_cookie=COOKIE if integrated else PHONE_COOKIE
     app=Flask(__name__,static_folder=str(ROOT/'static'),static_url_path='/tv/assets')
     app.config.update(MAX_CONTENT_LENGTH=8192)
     pairing, catalog, billing = PairingStore(security), Catalog(database), BillingStore(security)
@@ -39,9 +44,9 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
     app.extensions.update(tv_pairing=pairing,tv_catalog=catalog)
 
     def error(text,status):return jsonify(error=text),status
-    def active(account):return bool(account and (owner_access(account) or billing.expiry(account['id'])>time.time()))
+    def active(account):return bool(account and (owner_access(account) or billing.expiry(account['id'])>time.time() or (legacy_expiry and legacy_expiry(account['id'])>time.time())))
     def cookie(response,name,value,age):
-        response.set_cookie(name,value,max_age=age,httponly=True,samesite='Strict',secure=False,path='/tv')
+        response.set_cookie(name,value,max_age=age,httponly=True,samesite='Strict',secure=not security.local,path='/tv')
         return response
     def limit(key,count,seconds=60):return security.allow_attempt('tv:'+key+':'+(request.remote_addr or ''),count,seconds)
 
@@ -49,8 +54,9 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
     def boundary():
         if request.host != parsed.netloc:return error('Origen no permitido.',403)
         if lan_preview and request.remote_addr not in ('127.0.0.1','::1') and not private_lan(request.remote_addr):return error('Solo disponible en la red local.',403)
-        g.device=pairing.session(request.cookies.get(TV_COOKIE))
-        g.phone=security.session(request.cookies.get(PHONE_COOKIE))
+        needs_device=request.path in ('/tv/api/me','/tv/api/play','/tv/api/list','/tv/api/unlink') or request.path.startswith('/tv/api/title/')
+        g.device=pairing.session(request.cookies.get(device_cookie)) if needs_device else None
+        g.phone=security.session(request.cookies.get(phone_cookie)) if request.path.startswith('/tv/api/phone/') else None
         if request.method not in ('GET','HEAD'):
             if request.headers.get('Origin')!=origin or not request.is_json or not isinstance(request.get_json(silent=True),dict):
                 return error('Solicitud no permitida.',403)
@@ -69,6 +75,9 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
         r.headers['X-Content-Type-Options']='nosniff'
         r.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://image.tmdb.org; connect-src 'self'; frame-src https://videoapi.la https://ok.ru; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         r.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
+        if integrated and request.path=='/tv/vincular':
+            r.headers['Content-Security-Policy']=r.headers['Content-Security-Policy'].replace("script-src 'self'", "script-src 'self' https://telegram.org").replace("frame-ancestors 'none'", "frame-ancestors 'self' https://web.telegram.org")
+        if not security.local:r.headers['Strict-Transport-Security']='max-age=31536000'
         return r
 
     @app.errorhandler(Exception)
@@ -81,34 +90,39 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
     @app.get('/tv/')
     def home():return send_from_directory(ROOT/'static','index.html')
     @app.get('/tv/vincular')
-    def phone_page():return send_from_directory(ROOT/'static','link.html')
+    def phone_page():
+        if not integrated:return send_from_directory(ROOT/'static','link.html')
+        html=(ROOT/'static'/'link-account.html').read_text(encoding='utf8')
+        if security.local:html=html.replace('https://telegram.org/js/telegram-web-app.js','/static/telegram-local.js')
+        return html
     @app.get('/tv/brand')
     def brand():return send_from_directory(ROOT.parent/'static','logo-que-hay-live.png')
     @app.get('/tv/api/me')
     def me():
-        account=security.account(id=g.device['account_id']) if g.device else None
-        return jsonify(linked=bool(account),name=account['name'] if account else None,active=active(account),csrf=g.device['csrf'] if account else None)
+        account=g.device['account'] if g.device else None
+        return jsonify(linked=bool(account),name=account['name'] if account else None,active=active(account),permanent=owner_access(account),csrf=g.device['csrf'] if account else None)
 
     @app.post('/tv/api/pair/start')
     def start():
         if not limit('start',10,600):return error('Espera unos minutos antes de generar otro código.',429)
-        token,code,expiry=pairing.start(request.cookies.get(PAIR_COOKIE))
-        return cookie(jsonify(code=code,expires_at=expiry,url=origin+'/tv/vincular'),PAIR_COOKIE,token,600)
+        token,code,expiry=pairing.start(request.cookies.get(pair_cookie))
+        return cookie(jsonify(code=code,expires_at=expiry,url=origin+'/tv/vincular',demo=not integrated),pair_cookie,token,600)
     @app.post('/tv/api/pair/poll')
     def poll():
         if not limit('poll',40):return error('Espera unos segundos.',429)
-        state,token=pairing.poll(request.cookies.get(PAIR_COOKIE))
+        state,token=pairing.poll(request.cookies.get(pair_cookie))
         r=jsonify(state=state)
         if token:
-            cookie(r,TV_COOKIE,token,604800)
-            r.delete_cookie(PAIR_COOKIE,path='/tv')
+            cookie(r,device_cookie,token,604800)
+            r.delete_cookie(pair_cookie,path='/tv',secure=not security.local,httponly=True,samesite='Strict')
         return r
     @app.post('/tv/api/unlink')
     def unlink():
-        pairing.revoke(request.cookies.get(TV_COOKIE));r=jsonify(success=True);r.delete_cookie(TV_COOKIE,path='/tv');return r
+        pairing.revoke(request.cookies.get(device_cookie));r=jsonify(success=True);r.delete_cookie(device_cookie,path='/tv',secure=not security.local,httponly=True,samesite='Strict');return r
 
     @app.post('/tv/api/phone/login')
     def login():
+        if integrated:return error('Usa el inicio de sesión de tu cuenta Qué Hay.',404)
         if not limit('login',8,900):return error('Demasiados intentos. Espera unos minutos.',429)
         body=request.get_json();email=str(body.get('email','')).strip().lower()
         account=security.account(email=email)
@@ -165,7 +179,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
         return jsonify(result) if result else error('Temporada no disponible.',404)
     @app.post('/tv/api/play')
     def play():
-        if not active(security.account(id=g.device['account_id'])):return error('Tu cuenta no tiene acceso activo. Revísala desde tu celular.',403)
+        if not active(g.device['account']):return error('Tu cuenta no tiene acceso activo. Revísala desde tu celular.',403)
         body=request.get_json();cid=body.get('id');eid=body.get('episode')
         if type(cid) is not int or (eid is not None and type(eid) is not int):return error('Título o episodio no válido.',400)
         source=catalog.source(cid,eid)

@@ -1,0 +1,93 @@
+INTEGRACIÓN TV CON CUENTAS EXISTENTES — PREPARADA, SIN PUBLICAR
+29/10/2026
+
+ARQUITECTURA
+tv.server:app es el punto de entrada propuesto para el MISMO Web Service Render.
+Importa main sin modificarlo y compone dos aplicaciones WSGI. Únicamente /tv y
+/tv/* se atienden con la frontera de seguridad TV. Las demás rutas pasan a la
+aplicación original, con sus handlers y cabeceras originales.
+TV_ENABLED=false por defecto: tv.server devuelve exactamente la app original.
+No requiere otro servicio ni otra base. No hay cambios en main.py, security.py,
+security_store.py, static/ de la web o android/ del APK móvil.
+
+CUENTAS Y PERMISOS
+TV utiliza el mismo SecurityStore existente (cine_security en PostgreSQL/Supabase)
+y el mismo cliente del catálogo. Reutiliza BillingStore y account_legacy_expiry.
+El acceso se verifica en cada petición de reproducción: propietario verificado,
+acceso mensual o membresía antigua de Telegram todavía vigente.
+Solo el ID 5824989040 verificado en la cuenta conserva acceso permanente; los
+IDs antiguos y los IDs enviados en un JSON por el cliente no conceden acceso.
+La duración de la sesión autenticada de TV sigue siendo siete días, aunque el
+propietario no necesite comprar membresía. Una sesión no es un permiso perpetuo.
+
+La página /tv/vincular reutiliza cine_session de la web/PWA. Si no hay sesión,
+llama al login existente /api/auth/login; dentro de una Mini App también admite
+initData firmado a través del endpoint existente /api/auth/telegram. No inventa
+cuentas ni acepta IDs de Telegram sin firma. La cuenta de Telegram debe abrir
+la página dentro del contexto Mini App o tener una sesión válida en ese navegador;
+un navegador externo no hereda automáticamente la sesión de Telegram.
+En esta fase no se cambia el menú del bot ni se añade un acceso en la web móvil.
+
+La TV recibe cookies separadas qh_tv_device y qh_tv_pair, Path=/tv, HttpOnly,
+SameSite=Strict y Secure en HTTPS. No recibe cine_session, contraseñas, el token
+del bot, claves de Supabase ni elevación de administrador.
+Códigos de un solo uso, 10 minutos, y secretos guardados como hashes.
+El cambio de contraseña o de Telegram vinculado invalida las sesiones TV y los
+códigos ya aprobados mediante una huella de la identidad; no modifica el login web.
+Revocar desde el celular invalida sus televisores sin cerrar la sesión del celular.
+Mi lista comparte services.profiles con la cuenta; no se duplica el catálogo.
+
+MIGRACIÓN PREPARADA: migrations/017_tv_pairing.sql
+Solo crea tv_pairings y tv_devices dentro de cine_security y sus índices.
+Claves foráneas a accounts con eliminación en cascada de las vinculaciones.
+RLS habilitado y sin acceso directo para PUBLIC, anon o authenticated.
+No altera cuentas, membresías, pagos, contenido, episodios ni enlaces de descarga.
+No hay DDL automático en PostgreSQL. Las antiguas bases SQLite de demostración
+reciben únicamente la columna de huella que falta; pueden necesitar revinculación.
+
+PRUEBA LOCAL
+python -m tv.integration_preview
+http://127.0.0.1:5022/tv
+http://127.0.0.1:5022/tv/vincular
+El servidor existente de prueba 5020/5021 y el emulador no se sustituyen.
+Base aislada: .local/tv-integration/accounts.sqlite. Tráfico saliente bloqueado.
+Credenciales sintéticas (NO usar contraseñas reales):
+propietario.tv@example.test / Integracion-TV-2026!
+miembro.tv@example.test / Integracion-TV-2026!
+sinacceso.tv@example.test / Integracion-TV-2026!
+La cuenta propietario de esta base es una muestra local con el mismo ID, no una
+copia de la sesión o credenciales del propietario en producción.
+
+EVIDENCIA
+163 pruebas Python aprobadas: TV, LAN, integración, seguridad, continuidad de
+sesión, propietario, perfiles, pagos y descargas. Solo 20 avisos de dependencias
+existentes (dateutil/Pydantic), sin fallos.
+8 pruebas Node de navegación, carga progresiva, hero y adaptador de mando.
+Migración ejecutada DOS veces en PostgreSQL WASM/PGlite local: idempotencia,
+cuentas intactas, RLS, rechazo a roles públicos, estados válidos, FK y cascada.
+No equivale a una validación de concurrencia en el PostgreSQL remoto de Supabase.
+Prueba de navegador a 390x844 y 1280x720: login en /cuenta original, reuso de
+sesión en /tv/vincular, código confirmado, acceso permanente y sesión tras recarga.
+El iframe de VideoAPI se simuló en esta prueba de autorización: no se afirma
+nueva validación de reproducción remota. Esa reproducción ya se probó aparte
+por el usuario en el emulador; sigue pendiente la TV física.
+Capturas y resumen: .local/tv-integration/.
+
+PUBLICACIÓN FUTURA — REQUIERE APROBACIÓN
+1. Revisar el diff y confirmar la migración 017; verificar con qué rol de BD
+   se conecta SECURITY_DATABASE_URL sin imprimir claves.
+2. Aplicar la migración aditiva a Supabase, conservando el código anterior.
+3. Desplegar estos archivos al mismo Render con TV_ENABLED=false inicialmente.
+4. Conservar parámetros actuales de Gunicorn, cambiando solo main:app por
+   tv.server:app. Confirmar /health, web, pagos, bot y descargas.
+5. Activar TV_ENABLED=true con APP_ORIGIN=https://app.quehay.live. Verificar
+   /tv, HTTPS/cookies, login real, propietario, membresía y Mi lista.
+6. Preparar un APK TV nuevo con origen HTTPS público. El build TV actual sigue
+   restringido a la red privada y NO es el paquete de producción. La APK móvil
+   no se modifica. No publicar en tiendas ni modificar el dominio.
+7. Probar en TV física: reproductores, audio, mando, suspensión y revocación.
+
+REVERSIÓN
+TV_ENABLED=false o volver a main:app desactiva TV conservando la web original.
+No borrar las tablas ni cuentas para revertir; la migración es aditiva.
+No se ejecutó ninguno de estos pasos en Render/Supabase durante esta fase.
