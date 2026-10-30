@@ -1,0 +1,54 @@
+QUÉ HAY TV — EMULADOR EN ESTA PC (29/10/2026)
+
+LISTO SIN REINICIAR
+Emulador oficial Android 37.2.13 y Android TV 16, API 36, x86_64.
+Perfil QueHay_TV_720: 1280x720, 2 núcleos, 3072 MB RAM, GPU host.
+La comprobación directa WHPX y el arranque confirmaron aceleración operativa.
+No se entró a UEFI ni se cambiaron características de Windows, firewall o DNS.
+No fue necesario reiniciar. No se instaló Android Studio ni un emulador móvil.
+
+ABRIR DESPUÉS DE REINICIAR
+En Descargas\QueHay-TV-0.1, ejecutar Abrir-TV-Emulador.cmd.
+También hay un acceso directo en el Escritorio: Que Hay TV - Emulador.
+El lanzador inicia el servidor LAN si falta, abre el emulador, espera a que
+Android termine de arrancar, instala/actualiza solo live.quehay.tv.preview
+conservando sus datos, y abre Qué Hay TV. No toca la APK móvil.
+Si solo quieres la página de prueba, usa Abrir-TV-Local.cmd.
+Los procesos se detienen al apagar la PC; catálogo, cuentas demo, sesiones
+y datos del emulador permanecen en disco. No hay arranque automático al encender.
+
+CONTROLES
+Haz clic una vez dentro de la ventana del emulador para darle el teclado.
+Flechas: mover selección; Enter: OK. Back de la barra lateral: volver.
+F1 abre la ayuda de atajos del emulador. Los controles de proveedores dentro
+del video siguen pendientes de pruebas de reproducción específicas.
+Cerrar la ventana detiene el emulador. El servidor local puede seguir abierto.
+
+VINCULAR
+Elige Vincular cuenta en la TV virtual y confirma el código desde el celular:
+http://192.168.100.3:5021/tv/vincular
+Cuenta demo: tv@example.test / Televisor-Local-2026!
+PC y celular en la misma red. No introduzcas credenciales reales.
+Si cambia la IP de esta PC, el lanzador avisará y habrá que ajustar la prueba.
+
+AISLAMIENTO
+AVD, configuración, datos y logs: .local/tv-emulator/ dentro de este checkout.
+El directorio sdk allí es un enlace de directorio al SDK local existente.
+ADB se dirige exclusivamente a emulator-5560 y verifica el nombre del AVD
+antes de instalar el APK. No borra otros dispositivos ni sus datos.
+Servidor: .local/tv/preview-lan.sqlite, sin conexión a Supabase ni producción.
+APK sin cambios: .local/tv-apk/QueHay-TV-0.1.apk.
+Arranque repetible: scripts/start_tv_emulator.ps1.
+
+VALIDACIÓN REALIZADA
+Boot completado en Android 16; WebView 143.0.7499.24 habilitado.
+Instalación APK: Success; actividad de Qué Hay TV en primer plano.
+Catálogo LAN cargado con imágenes; eventos D-pad derecha/abajo/OK abrieron
+Películas y la ficha de un título; Back regresó al catálogo.
+Evidencias: .local/tv-emulator/catalog.png y remote-navigation.png.
+Esto prueba el APK en Android emulado; no certifica televisores físicos ni
+la reproducción de todos los proveedores.
+
+Documentación oficial:
+https://developer.android.com/studio/run/emulator-acceleration
+https://developer.android.com/studio/run/emulator
