@@ -1,12 +1,18 @@
 /* TV presentation only; values and image URLs are escaped by the shared helpers. */
 window.TVDetail = {
   pending(item,image,esc,meta){
-    return `<article class="detail detail-cinema detail-pending" aria-busy="true"><section class="cinema-hero">
+    const episodic=['serie','anime'].includes(item.tipo)||item.format==='series';
+    const genres=(item.genero||'').split(',').map(s=>s.trim()).filter(Boolean).slice(0,4);
+    return `<article class="detail detail-cinema detail-pending ${episodic?'detail-series':'detail-movie'}" aria-busy="true">
+      ${episodic?`<div class="series-atmosphere"><img src="${image(item.backdrop_url||item.imagen_url,'w1280')}" alt=""></div>`:''}
+      <section class="cinema-hero">
       <div class="cinema-background"><img src="${image(item.backdrop_url||item.imagen_url,'w1280')}" alt=""></div>
-      <div class="detail-breadcrumb" data-row="detail-back"><button data-nav id="detail-back">← Volver</button></div>
-      <div class="cinema-layout"><div class="cinema-copy"><h1>${esc(item.titulo)}</h1>${meta(item)}<p class="cinema-synopsis">${esc(item.sinopsis||'')}</p>
+      <div class="detail-breadcrumb" data-row="detail-back"><button data-nav id="detail-back" aria-label="Volver al catálogo">← Volver</button><span>QUÉ HAY <i>/</i> ${episodic?'SERIES Y EPISODIOS':'PELÍCULAS'}</span></div>
+      <div class="cinema-layout"><div class="cinema-copy"><p class="eyebrow">UNA HISTORIA PARA TU GRAN PANTALLA</p><h1>${esc(item.titulo)}</h1>${meta(item,false)}
+      <div class="genre-chips">${genres.map(g=>`<span>${esc(g)}</span>`).join('')}</div>
+      <p class="cinema-synopsis">${esc(item.sinopsis||'Descubre esta historia en Qué Hay.')}</p>
       <p role="status">Cargando opciones de reproducción…</p></div>
-      <aside class="cinema-poster" aria-label="Afiche"><img src="${image(item.imagen_url,'w342')}" alt="Afiche de ${esc(item.titulo)}"></aside></div>
+      ${episodic?'':`<aside class="cinema-poster" aria-label="Afiche"><img src="${image(item.imagen_url,'w500')}" alt="Afiche de ${esc(item.titulo)}"><div class="poster-foot"><span>QUÉ HAY</span><span>${esc(item.año||'CINE')}</span></div></aside>`}</div>
       </section></article>`;
   },
   render(data, image, esc, meta, card) {
