@@ -78,6 +78,7 @@
     const wrap = document.getElementById('detalleTemporadasWrap');
     const play = document.getElementById('btnVerAhora');
     if (!wrap || !play) return;
+    root.CatalogSynopsis?.dispose(wrap);
     wrap.replaceChildren(); wrap.style.display = state.item && !(state.item.tipo==='biblico'&&!state.loading&&!state.seasons.length) ? 'block' : 'none';
     play.disabled = Boolean(state.item && (state.loading || state.selected?.has_playback===false || (!state.selected && !['vimeus','okru'].includes(state.item.fuente))));
     const download=document.getElementById('btnDescargar');if(download&&state.item?.tipo==='biblico')download.style.display=state.seasons.length?'none':state.item.has_download?'inline-flex':'none';
@@ -113,13 +114,14 @@
       const info = document.createElement('span'); info.className = 'episode-info';
       const title = document.createElement('strong'); title.textContent = ep.titulo; info.append(title);
       const small = document.createElement('span'); small.textContent = ep.has_playback===false ? 'Vídeo pendiente' : ep.duracion ? `${ep.duracion} min` : `Temporada ${state.season.numero}`; info.append(small);
-      if (ep.sinopsis) { const synopsis = document.createElement('span'); synopsis.className = 'episode-synopsis'; synopsis.textContent = ep.sinopsis; info.append(synopsis); }
       const icon = document.createElement('span'); icon.textContent = state.selected?.id === ep.id ? '✓' : '▷'; icon.setAttribute('aria-hidden', 'true');
       button.append(thumb, info, icon); row.append(button);
       const actions=document.createElement('div');actions.className='episode-actions';
       if(ep.has_download){const download=actionButton(`Descargar episodio ${ep.numero}`,'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5');download.onclick=()=>root.EpisodeDownloads.download(state.item.id,ep.id);actions.append(download);}
       if(root.AccountSession?.state.is_admin){const edit=actionButton(`Editar descarga del episodio ${ep.numero}`,'m14 5 5 5M4 20l4-1L20 7a2 2 0 0 0-4-4L4 15z');edit.onclick=()=>root.EpisodeDownloads.edit(state.item.id,ep,()=>controller.render(controller.state));actions.append(edit);}
-      if(actions.children.length)row.append(actions);grid.append(row);
+      if(actions.children.length)row.append(actions);
+      if(ep.sinopsis){const synopsis=document.createElement('div');row.append(synopsis);root.CatalogSynopsis.set(synopsis,ep.sinopsis,{title:`Episodio ${ep.numero}: ${ep.titulo}`,episode:true});}
+      grid.append(row);
     });
     wrap.append(grid);
     if (state.has_next || state.error) {

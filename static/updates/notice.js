@@ -1,5 +1,7 @@
 /* Never reload or touch the provider iframe without a deliberate user action. */
 (()=>{'use strict';
+ // Presentation detection only; account/access validation always stays server-side.
+ if(!/(?:^|\s)QueHay(?:Android|TV)\/\d/.test(navigator.userAgent))return;
  const meta=document.querySelector('meta[name="qh-release"]');if(!meta)return;
  const endpoint=new URL(meta.dataset.endpoint,location.href);if(endpoint.origin!==location.origin)return;
  const tv=!!document.querySelector('.topbar[data-row="navigation"]');

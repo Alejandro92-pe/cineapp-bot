@@ -27,6 +27,8 @@ def migrated(system, monkeypatch):
     def cron():
         return jsonify(ok=True)
 
+    from services.canonical_origin import CanonicalDocuments
+    app.wsgi_app = CanonicalDocuments(app.wsgi_app, origin=NEW, local=False, mode='temporary')
     return app.test_client()
 
 

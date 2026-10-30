@@ -1145,5 +1145,8 @@ install_release_notice(app)
 if os.getenv('TV_ENABLED', 'false').lower() == 'true':
     install_tv(app, supabase_service, security_store, account_legacy_expiry)
 
+from services.canonical_origin import install as install_canonical_documents
+install_canonical_documents(app)
+
 if __name__ == "__main__":
     raise RuntimeError("Usa scripts/run_local.py en local o gunicorn main:app en producción. No se registran webhooks automáticamente.")

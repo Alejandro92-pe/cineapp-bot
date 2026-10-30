@@ -9,14 +9,14 @@ test('opening two details shares lazy loads; a failed asset alone can retry',asy
  vm.runInNewContext(fs.readFileSync('static/catalog/detail-loader.js','utf8'),context);
  assert.equal(nodes.length,0);
  const first=context.window.DetailAssets.ready(),second=context.window.DetailAssets.ready();
- assert.equal(nodes.length,6);
+ assert.equal(nodes.length,7);
  const results=Promise.allSettled([first,second]);
  nodes[0].onerror();for(const n of nodes.slice(1))n.onload();
  assert.ok((await results).every(r=>r.status==='rejected'));
  const retry=context.window.DetailAssets.ready();
- assert.equal(nodes.length,7);assert.equal(nodes[6].src,nodes[0].src);
- nodes[6].onload();await retry;
- await context.window.DetailAssets.ready();assert.equal(nodes.length,7);
+ assert.equal(nodes.length,8);assert.equal(nodes[7].src,nodes[0].src);
+ nodes[7].onload();await retry;
+ await context.window.DetailAssets.ready();assert.equal(nodes.length,8);
 });
 
 test('home starts while account sync is pending; no legacy startup requests',async()=>{
@@ -42,6 +42,7 @@ test('detail is visible before chapters finish and does not wait for account syn
  const context={document:doc,detalleOpenRevision:0,contenidoSeleccionado:null,detallePreviousFocus:null,
   fetch:async()=>({ok:true,json:async()=>({data:[{id:7,titulo:'Historia',tipo:'anime'}]})}),
   DetailAssets:{ready:async()=>{}},AccountSession:{ready:new Promise(()=>{})},InlinePlayback:{close(){}},
+  CatalogArtwork:{detail(){}},CatalogSynopsis:{set(){}},
   _resetTemporadas(){},safeImageSrc:()=>'',safeImageUrl:()=>'',escapeHtml:x=>x,esFavorito:()=>false,
   actualizarBtnFav(){},actualizarBtnLike(){},localStorage:{getItem:()=>null},cargarRelacionados(){},
   cargarTemporadas:()=>new Promise(r=>release=r),alert:message=>{throw Error(message)}};

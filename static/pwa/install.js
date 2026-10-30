@@ -2,7 +2,7 @@
  * offer. Registration never caches a login, a payment or an access decision. */
 (function(){
   const $=id=>document.getElementById(id);
-  let offer=null,installed=false,accepted=false,registration=null,reloadForUpdate=false;
+  let offer=null,installed=false,accepted=false;
   const standalone=window.matchMedia('(display-mode: standalone)');
   const inTelegram=()=>!!window.Telegram?.WebApp?.initData;
   const local=['127.0.0.1','localhost','[::1]'].includes(location.hostname);
@@ -17,15 +17,6 @@
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();offer=event;accepted=false;render();});
   window.addEventListener('appinstalled',()=>{installed=true;offer=null;render();});
   standalone.addEventListener?.('change',render);
-  function updateNotice(){
-    if(!registration?.waiting||document.getElementById('pwa-update'))return;
-    const notice=document.createElement('aside');notice.id='pwa-update';notice.setAttribute('aria-label','Actualización disponible');
-    const text=document.createElement('p');text.textContent='Hay una actualización de QueHay. Actualiza cuando termines lo que estás haciendo.';
-    const update=document.createElement('button');update.textContent='Actualizar ahora';update.type='button';
-    update.onclick=()=>{if(registration.waiting){reloadForUpdate=true;update.disabled=true;registration.waiting.postMessage({type:'ACTIVATE_UPDATE'});}};
-    const dismiss=document.createElement('button');dismiss.textContent='Más tarde';dismiss.type='button';dismiss.onclick=()=>notice.remove();
-    notice.append(text,update,dismiss);document.body.append(notice);
-  }
   async function start(){
     render();
     if($('install-copy'))$('install-copy').onclick=async()=>{try{await navigator.clipboard.writeText(location.origin+'/instalar');$('install-copy').textContent='Dirección copiada';}catch{$('install-status').textContent='Copia la dirección desde la barra de tu navegador.';}};
@@ -37,11 +28,11 @@
     };
     if(!window.isSecureContext||!('serviceWorker' in navigator)){if($('install-runtime'))$('install-runtime').textContent='Puedes seguir usando QueHay desde el navegador.';return;}
     try{
-      registration=await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'});
+      await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'});
       await navigator.serviceWorker.ready;
       if($('install-runtime'))$('install-runtime').textContent='Tu catálogo, a un toque desde la pantalla de inicio.';
-      updateNotice();registration.addEventListener('updatefound',()=>{const worker=registration.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)updateNotice();});});
-      navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloadForUpdate){reloadForUpdate=false;location.reload();}});
+      // Let the browser activate waiting workers after old clients close.
+      // No prompt, skipWaiting or reload while someone may be watching.
     }catch{if($('install-runtime'))$('install-runtime').textContent='No pudimos preparar la pantalla sin conexión. Puedes seguir usando el catálogo y volver a intentarlo.';}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();

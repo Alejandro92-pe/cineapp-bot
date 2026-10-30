@@ -1548,7 +1548,7 @@ async function abrirModalContenido(item) {
   }
 
   const sinEl = document.getElementById('detalleSinopsis');
-  if (sinEl) sinEl.textContent = item.sinopsis || 'Sin sinopsis disponible.';
+  CatalogSynopsis.set(sinEl, item.sinopsis, {title:item.titulo});
 
   const metaEl = document.getElementById('detalleMeta');
   if (metaEl) {

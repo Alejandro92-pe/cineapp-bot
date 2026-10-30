@@ -1,0 +1,8 @@
+.qh-synopsis .qh-synopsis-copy{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;white-space:pre-line;margin:0;line-height:1.7}
+.qh-synopsis.is-expanded .qh-synopsis-copy{display:block;-webkit-line-clamp:unset;overflow:visible}
+.qh-synopsis .qh-synopsis-toggle{display:inline-flex;align-items:center;min-height:44px;padding:4px 0;border:0;background:transparent;color:#b6d9ff;font:inherit;font-weight:600;cursor:pointer}
+.qh-synopsis .qh-synopsis-toggle[hidden]{display:none}
+.qh-synopsis-toggle:focus-visible{outline:2px solid #aed4ff;outline-offset:4px;border-radius:4px}
+.episode-row .qh-synopsis-episode{grid-column:1/-1;min-width:0;padding:0 12px 8px;color:#afc0d8;font-size:12px}
+.qh-synopsis-episode .qh-synopsis-copy{-webkit-line-clamp:2}
+@media(max-width:600px){.episode-row .qh-synopsis-episode{padding:0 10px 8px;font-size:12px}}
