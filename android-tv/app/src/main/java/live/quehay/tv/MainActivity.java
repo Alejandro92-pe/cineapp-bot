@@ -20,7 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-/** Independent TV preview: local demo origin, no credentials or native JS bridge. */
+/** Independent TV application: no bundled credentials or native JS bridge. */
 public final class MainActivity extends Activity {
     private static final String ORIGIN=BuildConfig.TV_ORIGIN;
     private WebView web;
@@ -57,7 +57,7 @@ public final class MainActivity extends Activity {
         s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setMediaPlaybackRequiresUserGesture(true);s.setSafeBrowsingEnabled(true);
         s.setSupportMultipleWindows(true);s.setJavaScriptCanOpenWindowsAutomatically(false);
-        s.setUserAgentString(s.getUserAgentString()+" QueHayTV/0.1");
+        s.setUserAgentString(s.getUserAgentString()+" QueHayTV/"+BuildConfig.VERSION_NAME);
         CookieManager.getInstance().setAcceptCookie(true);CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
         WebView.setWebContentsDebuggingEnabled(false);
         web.setWebViewClient(new WebViewClient(){
@@ -121,8 +121,8 @@ public final class MainActivity extends Activity {
     private void showError(){
         failed=true;progress.setVisibility(View.GONE);if(errorView!=null)return;
         errorView=new LinearLayout(this);errorView.setOrientation(LinearLayout.VERTICAL);errorView.setGravity(Gravity.CENTER);errorView.setPadding(40,30,40,30);errorView.setBackgroundColor(Color.rgb(7,14,24));
-        TextView title=new TextView(this);title.setText("Conecta con tu PC de prueba");title.setTextColor(Color.WHITE);title.setTextSize(24);errorView.addView(title);
-        TextView text=new TextView(this);text.setText("La PC debe estar encendida y en la misma red que el televisor.\nServidor: "+ORIGIN);text.setTextColor(Color.LTGRAY);text.setGravity(Gravity.CENTER);text.setPadding(0,20,0,20);errorView.addView(text);
+        TextView title=new TextView(this);title.setText(BuildConfig.LIVE ? "No pudimos conectar con Qué Hay" : "Conecta con tu PC de prueba");title.setTextColor(Color.WHITE);title.setTextSize(24);errorView.addView(title);
+        TextView text=new TextView(this);text.setText(BuildConfig.LIVE ? "Comprueba la conexión a internet del televisor y vuelve a intentarlo." : "La PC debe estar encendida y en la misma red que el televisor.\nServidor: "+ORIGIN);text.setTextColor(Color.LTGRAY);text.setGravity(Gravity.CENTER);text.setPadding(0,20,0,20);errorView.addView(text);
         Button retry=new Button(this);retry.setText("Volver a intentar");retry.setOnClickListener(v->{hideError();web.requestFocus();web.loadUrl(ORIGIN+"/tv");});errorView.addView(retry);
         root.addView(errorView,new FrameLayout.LayoutParams(-1,-1));retry.requestFocus();
     }

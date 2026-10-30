@@ -1,3 +1,18 @@
+QUÉ HAY TV 0.2 — PRUEBA HTTPS CON CUENTAS REALES
+Paquete independiente live.quehay.tv. Origen https://app.quehay.live/tv.
+No depende de la PC ni de la misma red local; requiere internet.
+Sin pagos ni descargas. No reemplaza la APK móvil ni la antigua prueba LAN.
+Desde el celular: https://app.quehay.live/tv/vincular, iniciar sesión con la
+cuenta existente y confirmar el código de la TV. Una cuenta solo de Telegram
+necesita sesión verificada en el mismo navegador o contexto de Mini App.
+Compilar: powershell -File scripts/build_android_tv.ps1 -Origin https://app.quehay.live
+Salida: .local/tv-apk/QueHay-TV-0.2.apk. Firma de desarrollo para prueba privada,
+depuración deshabilitada y tráfico HTTP bloqueado. No publicar en tiendas.
+Sesión autenticada: siete días, independiente del acceso permanente del propietario.
+El proveedor de video todavía debe validarse en TV física.
+
+DOCUMENTACIÓN HISTÓRICA: PRUEBA LAN 0.1 (NO ES LA APK HTTPS)
+
 QUÉ HAY TV — APK 0.1 PARA PROBAR CON MANDO
 
 Paquete separado: live.quehay.tv.preview. No reemplaza live.quehay.app.preview.

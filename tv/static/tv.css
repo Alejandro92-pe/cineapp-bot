@@ -38,3 +38,5 @@
 .ranked-poster:focus .rank-number { color: #19314d; -webkit-text-stroke-color: #edf6ff; }
 
 .ranked-poster:last-child {padding-left:7rem;flex-basis:18.7rem;}
+/* Leave space for the remote focus ring between account actions. */
+#account-dialog [data-row="dialog-actions"]{margin-top:1.5rem;padding-bottom:.25rem}

@@ -11,7 +11,8 @@ $env:GRADLE_USER_HOME = Join-Path $ToolRoot 'gradle-cache'
 if ($LASTEXITCODE -ne 0) { throw 'La compilación o revisión de Android TV no pasó.' }
 $output = Join-Path $projectRoot '.local/tv-apk'
 New-Item -ItemType Directory -Force $output | Out-Null
-$apk = Join-Path $output 'QueHay-TV-0.1.apk'
+$apkName = if ($Origin -eq 'https://app.quehay.live') { 'QueHay-TV-0.2.apk' } else { 'QueHay-TV-0.2-local.apk' }
+$apk = Join-Path $output $apkName
 Copy-Item -LiteralPath (Join-Path $projectRoot 'android-tv/app/build/outputs/apk/debug/app-debug.apk') -Destination $apk
 & (Join-Path $env:ANDROID_HOME 'build-tools/35.0.0/apksigner.bat') verify --verbose $apk
 if ($LASTEXITCODE -ne 0) { throw 'La firma del APK TV no pudo verificarse.' }

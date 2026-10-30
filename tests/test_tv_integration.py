@@ -6,7 +6,7 @@ from flask import Response
 from werkzeug.test import Client
 from sqlalchemy import event, select
 from conftest import ORIGIN, send, register, tg_login
-from tv.integration import compose
+from tv.integration import compose, install
 from tv.app import create_app, LIVE_TV_COOKIE
 from tv.store import devices, challenges
 from billing.schema import access
@@ -141,3 +141,22 @@ def test_https_integration_cookie_contract_without_remote_database(integrated):
     assert all(x in r.headers['Set-Cookie'] for x in ('Secure','HttpOnly','SameSite=Strict','Path=/tv'))
     assert r.headers['Strict-Transport-Security']=='max-age=31536000'
     with pytest.raises(RuntimeError):create_app(system.supabase_service,adapter,'http://app.quehay.live',integrated=True)
+
+
+def test_install_keeps_main_flask_app_and_existing_routes(system):
+    app=system.app;original=app.wsgi_app
+    before={p:get(app.test_client(),p).data for p in ('/','/cuenta','/health','/membresia')}
+    try:
+        install(app,system.supabase_service,system.security_store,system.account_legacy_expiry)
+        router=app.wsgi_app
+        install(app,system.supabase_service,system.security_store,system.account_legacy_expiry)
+        assert app.wsgi_app is router
+        c=app.test_client()
+        for p,body in before.items():assert get(c,p).data==body
+        assert get(c,'/tv').status_code==200
+        phone,tv=app.test_client(),app.test_client()
+        login=tg_login(phone,5824989040).json
+        pair(tv,phone,login['csrf_token'])
+        assert get(tv,'/tv/api/me').json['permanent'] is True
+    finally:
+        app.wsgi_app=original;app.extensions.pop('tv_router',None)

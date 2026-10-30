@@ -17,6 +17,10 @@ import threading
 from security import OWNER_ID, install_security, admin_authenticated, owner_access
 from urllib.parse import urlencode, urlsplit
 
+# Register TV's private schema before local store initialization when enabled.
+if os.getenv('TV_ENABLED', 'false').lower() == 'true':
+    from tv.integration import install as install_tv
+
 # ============ VARIABLES DE ENTORNO ============
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -1134,6 +1138,9 @@ def webhook_buymeacoffee():
     return jsonify(result), status
 
 # ============ INICIO ============
+
+if os.getenv('TV_ENABLED', 'false').lower() == 'true':
+    install_tv(app, supabase_service, security_store, account_legacy_expiry)
 
 if __name__ == "__main__":
     raise RuntimeError("Usa scripts/run_local.py en local o gunicorn main:app en producción. No se registran webhooks automáticamente.")

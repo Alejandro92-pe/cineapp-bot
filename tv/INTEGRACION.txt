@@ -1,14 +1,13 @@
-INTEGRACIÓN TV CON CUENTAS EXISTENTES — PREPARADA, SIN PUBLICAR
+INTEGRACIÓN TV CON CUENTAS EXISTENTES — PUBLICACIÓN AUTORIZADA
 29/10/2026
 
 ARQUITECTURA
-tv.server:app es el punto de entrada propuesto para el MISMO Web Service Render.
-Importa main sin modificarlo y compone dos aplicaciones WSGI. Únicamente /tv y
-/tv/* se atienden con la frontera de seguridad TV. Las demás rutas pasan a la
-aplicación original, con sus handlers y cabeceras originales.
-TV_ENABLED=false por defecto: tv.server devuelve exactamente la app original.
-No requiere otro servicio ni otra base. No hay cambios en main.py, security.py,
-security_store.py, static/ de la web o android/ del APK móvil.
+El MISMO Web Service mantiene gunicorn main:app. TV_ENABLED=true instala un
+router WSGI que atiende únicamente /tv y /tv/* con la frontera de seguridad TV.
+Las demás rutas pasan al wsgi_app original de Flask, con sus handlers intactos.
+TV_ENABLED=false por defecto conserva el arranque original. tv.server:app queda
+como alias compatible. main.py añade solo el registro y la instalación opcional;
+no cambia seguridad, cuentas, pagos, descargas, static/ web ni android/ móvil.
 
 CUENTAS Y PERMISOS
 TV utiliza el mismo SecurityStore existente (cine_security en PostgreSQL/Supabase)
@@ -73,21 +72,18 @@ nueva validación de reproducción remota. Esa reproducción ya se probó aparte
 por el usuario en el emulador; sigue pendiente la TV física.
 Capturas y resumen: .local/tv-integration/.
 
-PUBLICACIÓN FUTURA — REQUIERE APROBACIÓN
-1. Revisar el diff y confirmar la migración 017; verificar con qué rol de BD
-   se conecta SECURITY_DATABASE_URL sin imprimir claves.
-2. Aplicar la migración aditiva a Supabase, conservando el código anterior.
-3. Desplegar estos archivos al mismo Render con TV_ENABLED=false inicialmente.
-4. Conservar parámetros actuales de Gunicorn, cambiando solo main:app por
-   tv.server:app. Confirmar /health, web, pagos, bot y descargas.
-5. Activar TV_ENABLED=true con APP_ORIGIN=https://app.quehay.live. Verificar
-   /tv, HTTPS/cookies, login real, propietario, membresía y Mi lista.
-6. Preparar un APK TV nuevo con origen HTTPS público. El build TV actual sigue
-   restringido a la red privada y NO es el paquete de producción. La APK móvil
-   no se modifica. No publicar en tiendas ni modificar el dominio.
-7. Probar en TV física: reproductores, audio, mando, suspensión y revocación.
+PUBLICACIÓN AUTORIZADA — 29/10/2026
+1. Migración 017 aditiva en Supabase; comparar huellas de cuentas y descargas.
+2. Añadir solo TV_ENABLED=true a Render, preservando las demás variables.
+3. Subir a main en GitHub; el push dispara el despliegue automático de Render.
+   No cambiar el comando gunicorn main:app ni lanzar un despliegue duplicado.
+4. Verificar el commit live, las rutas web, sesión, propietario, pagos y descargas.
+5. Probar confirmación real desde celular y reproducción autorizada de TV.
+6. APK TV 0.2: live.quehay.tv, origen https://app.quehay.live, solo HTTPS.
+   Compilación de prueba firmada con clave de desarrollo y depuración desactivada;
+   no distribuir en tiendas. No modifica live.quehay.tv.preview ni el APK móvil.
+7. Prueba física pendiente: reproducción prolongada, audio y mando real.
 
 REVERSIÓN
-TV_ENABLED=false o volver a main:app desactiva TV conservando la web original.
-No borrar las tablas ni cuentas para revertir; la migración es aditiva.
-No se ejecutó ninguno de estos pasos en Render/Supabase durante esta fase.
+TV_ENABLED=false y desplegar desactiva TV. Mantener las tablas aditivas y cuentas.
+No borrar datos para revertir. El informe local contiene el resultado del despliegue.
