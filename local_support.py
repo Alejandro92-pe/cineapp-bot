@@ -1,5 +1,6 @@
 """Explicit offline fixtures. Never import in production."""
 import copy
+import re
 import socket
 import threading
 from datetime import datetime, timedelta, timezone
@@ -69,10 +70,15 @@ class Query:
         self.filters, self.operation, self.payload = [], "select", None
         self.columns, self.slice, self.ordering = "*", None, None
         self.negate = False
+        self.embedded_filters, self.embedded_limits = {}, {}
     def select(self, columns="*", **kwargs):
         self.columns = columns
         return self
     def eq(self, key, value):
+        if '.' in key:
+            alias, column = key.split('.', 1)
+            self.embedded_filters.setdefault(alias, []).append((column, value))
+            return self
         self.filters.append(lambda r: str(r.get(key)) == str(value))
         return self
     def neq(self, key, value):
@@ -105,7 +111,10 @@ class Query:
     def order(self, key, desc=False):
         self.ordering = (key, desc)
         return self
-    def limit(self, n):
+    def limit(self, n, foreign_table=None):
+        if foreign_table:
+            self.embedded_limits[foreign_table] = n
+            return self
         self.slice = (0,n)
         return self
     def offset(self, n):
@@ -154,8 +163,23 @@ class Query:
             if self.slice:
                 selected = selected[self.slice[0]:self.slice[1]]
             selected = copy.deepcopy(selected)
-            if self.columns != "*" and "(" not in self.columns:
-                selected = [{k.strip():r.get(k.strip()) for k in self.columns.split(",")} for r in selected]
+            if self.columns != "*":
+                columns = re.split(r',\s*(?![^()]*\))', self.columns)
+                projected = []
+                for row in selected:
+                    output = {}
+                    for column in columns:
+                        match = re.fullmatch(r'(\w+):(\w+)\((\w+)\)', column.strip())
+                        if not match:
+                            output[column.strip()] = row.get(column.strip())
+                            continue
+                        alias, table, field = match.groups()
+                        fk = {('contenido','temporadas'):'contenido_id', ('temporadas','episodios'):'temporada_id'}[(self.name,table)]
+                        children = [r for r in self.db.rows.get(table,[]) if r.get(fk)==row['id'] and
+                                    all(r.get(k)==v for k,v in self.embedded_filters.get(alias,[]))]
+                        output[alias] = [{field:r.get(field)} for r in children[:self.embedded_limits.get(alias,len(children))]]
+                    projected.append(output)
+                selected = projected
             return SimpleNamespace(data=selected, count=count)
 
 

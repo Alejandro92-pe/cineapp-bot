@@ -1,9 +1,9 @@
-"""TV-only discovery over a bounded, cached set of public catalog metadata."""
+"""Compact facet index; full cards are fetched only for the requested page."""
 import time
 import unicodedata
 from collections import Counter
 from threading import RLock
-from tv.catalog import FIELDS
+from tv.metadata import FIELDS, INDEX_FIELDS, public_item, resolve_formats
 
 
 def normalized(value):
@@ -51,23 +51,13 @@ class Discovery:
             if cached and cached[0] > self.clock(): return cached[1]
             rows = []
             for offset in range(0, 10000, 500):
-                q = self.db.table('contenido').select(FIELDS).eq('disponible', True)
+                q = self.db.table('contenido').select(INDEX_FIELDS).eq('disponible', True)
                 if kind: q = q.eq('tipo', kind)
                 batch = q.order('id', desc=True).limit(500).offset(offset).execute().data
                 rows.extend(batch)
                 if len(batch) < 500: break
             else: raise ValueError('El catálogo supera el límite de esta vista local.')
-            episodic = set()
-            if kind == 'biblico':
-                # Fetch only season ownership, in bounded batches, never episodes.
-                for start in range(0, len(rows), 100):
-                    ids = [r['id'] for r in rows[start:start+100]]
-                    for offset in range(0, 10000, 500):
-                        batch = self.db.table('temporadas').select('id,contenido_id').in_('contenido_id',ids).order('id').limit(500).offset(offset).execute().data
-                        episodic.update(r['contenido_id'] for r in batch)
-                        if len(batch)<500: break
-                    else: raise ValueError('Demasiadas temporadas en esta colección.')
-            enriched = [{**row, 'format':'series' if row['id'] in episodic else 'movies', '_genres':genre_keys(row)} for row in rows]
+            enriched = [{**row, '_genres':genre_keys(row)} for row in resolve_formats(self.db,rows)]
             self.cache[kind] = (self.clock()+300, enriched)
             return enriched
 
@@ -75,15 +65,21 @@ class Discovery:
         rows = self._rows(kind)
         counts = Counter(key for row in rows for key in row['_genres'])
         filters = [{'id':key, 'label':GENRES[key][0], 'count':count} for key,count in counts.most_common()]
-        formats = [{'id':key,'label':label,'count':sum(r['format']==key for r in rows)} for key,label in [('movies','Películas'),('series','Por episodios')]] if kind=='biblico' else []
+        formats = [{'id':key,'label':label,'count':sum(r['format']==key for r in rows)} for key,label in [('movies','Películas'),('series','Series bíblicas')]] if kind=='biblico' else []
         matching = [r for r in rows if (not genre or genre in r['_genres']) and (not form or r['format']==form) and (not query or normalized(query) in normalized(r['titulo']))]
         if order == 'rating': matching.sort(key=lambda r: (float(r.get('rating') or 0),r['id']), reverse=True)
         elif order == 'az': matching.sort(key=lambda r: (normalized(r['titulo']),r['id']))
         else: matching.sort(key=lambda r:r['id'], reverse=True)
         total = len(matching)
         page = min(page, max(1, (total+11)//12))
-        def public(row): return {k:v for k,v in row.items() if k != '_genres'}
         feature = next((r for r in matching if r.get('backdrop_url')), matching[0] if matching else None)
-        return {'items':[public(r) for r in matching[(page-1)*12:page*12]],
-                'featured':public(feature) if feature else None,'total':total,'collection_total':len(rows),
+        selected = matching[(page-1)*12:page*12]
+        ids = list(dict.fromkeys([r['id'] for r in selected]+([feature['id']] if feature else [])))
+        cards = self.db.table('contenido').select(FIELDS).eq('disponible',True).in_('id',ids).limit(13).execute().data if ids else []
+        # Reuse the bounded index's season evidence; fresh TMDB metadata on the
+        # cards can still identify a series imported during the index's TTL.
+        formats_by_id = {r['id']:r['format'] for r in matching}
+        by_id = {r['id']:public_item({**r,'format':formats_by_id[r['id']]}) for r in cards}
+        return {'items':[by_id[r['id']] for r in selected if r['id'] in by_id],
+                'featured':by_id.get(feature['id']) if feature else None,'total':total,'collection_total':len(rows),
                 'genres':filters,'formats':formats,'page':page,'pages':max(1,(total+11)//12),'has_next':page*12<total}

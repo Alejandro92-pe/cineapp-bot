@@ -203,6 +203,7 @@ def test_biblical_formats_and_metadata_cache(tv):
     from tv.discovery import Discovery
     _, _, _, db=tv
     db.rows['contenido'][0]['tipo']='biblico'
+    db.rows['contenido'][0]['tmdb_media']='movie'
     db.rows['contenido'][1]['tipo']='biblico'
     clock=[10];discovery=Discovery(db,lambda:clock[0])
     serial=discovery.browse('biblico',form='series')

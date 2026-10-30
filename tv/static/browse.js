@@ -3,7 +3,7 @@ window.TVBrowse = {
   rows(items,kind,image,esc,card,offset=0){
     const data={items};
     const rows=[];const perRow=kind==='biblico'?3:6;
-    function faithCard(item){return `<button data-nav class="faith-card" id="title-${item.id}" data-title="${item.id}"><div class="faith-art"><img loading="lazy" src="${image(item.backdrop_url||item.imagen_url,'w780')}" alt=""><span class="faith-badge">${item.format==='series'?'Por episodios':'Película'}</span><span class="faith-open" aria-hidden="true">↗</span></div><div class="faith-caption"><h3>${esc(item.titulo)}</h3><span>${esc(item.año||'')}${item.rating?' · ★ '+esc(Number(item.rating).toFixed(1)):''}</span></div></button>`;}
+    function faithCard(item){return `<button data-nav class="faith-card" id="title-${item.id}" data-title="${item.id}"><div class="faith-art"><img loading="lazy" src="${image(item.backdrop_url||item.imagen_url,'w780')}" alt=""><span class="faith-badge">${item.format==='series'?'Serie bíblica':item.format==='movies'?'Película':'Bíblico'}</span><span class="faith-open" aria-hidden="true">↗</span></div><div class="faith-caption"><h3>${esc(item.titulo)}</h3><span>${esc(item.año||'')}${item.rating?' · ★ '+esc(Number(item.rating).toFixed(1)):''}</span></div></button>`;}
     for(let i=0;i<data.items.length;i+=perRow)rows.push(`<div class="collection-row ${kind==='biblico'?'faith-row':''}" data-row="collection-${offset+i}">${data.items.slice(i,i+perRow).map(kind==='biblico'?faithCard:card).join('')}</div>`);
     return rows.join('');
   },

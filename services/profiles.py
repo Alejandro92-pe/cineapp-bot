@@ -34,6 +34,12 @@ class Profiles:
             ).order_by(saved_items.c.updated_at.desc(), saved_items.c.content_id)).scalars())
         return {'avatar': avatar or 'tg', 'saved_ids': ids}
 
+    def is_saved(self, account_id, content_id):
+        with self.store.engine.connect() as c:
+            return c.execute(select(saved_items.c.saved).where(
+                saved_items.c.account_id == account_id,
+                saved_items.c.content_id == content_id)).scalar_one_or_none() == 1
+
     def mutate(self, account_id, *, avatar=None, items=None, bootstrap=False):
         with self.store.engine.begin() as c:
             # An account row serializes concurrent device writes on PostgreSQL

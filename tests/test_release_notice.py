@@ -43,6 +43,8 @@ def test_biblical_discovery_batches_seasons_and_reuses_cache():
     db.table=counted;clock=[0];d=Discovery(db,lambda:clock[0])
     result=d.browse('biblico',form='series')
     assert {r['id'] for r in result['items']}=={2,28}
-    assert calls==['contenido','temporadas','temporadas']
-    clock[0]=299;d.browse('biblico');assert len(calls)==3
-    clock[0]=301;d.browse('biblico');assert len(calls)==6
+    # The cached index excludes full cards; hydrate only the current page.
+    assert calls==['contenido','temporadas','temporadas','contenido']
+    clock[0]=299;d.browse('biblico');assert len(calls)==5
+    assert calls[-1]=='contenido'  # no repeated season scan during the TTL
+    clock[0]=301;d.browse('biblico');assert len(calls)==9

@@ -152,7 +152,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
     @app.get('/tv/api/title/<int:cid>')
     def title(cid):
         result=catalog.details(cid)
-        if result:result['saved']=bool(g.device and cid in profiles.snapshot(g.device['account_id'])['saved_ids'])
+        if result:result['saved']=bool(g.device and profiles.is_saved(g.device['account_id'],cid))
         return jsonify(result) if result else error('Título no disponible.',404)
 
     @app.get('/tv/api/list')

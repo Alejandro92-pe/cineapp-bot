@@ -1,0 +1,14 @@
+/* Loaded by TV only; does not alter the mobile/web application. */
+.synopsis-excerpt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere}
+.synopsis-block{margin:.7rem 0 1rem;max-width:42rem}
+.synopsis-block p{margin:0}
+.synopsis-more{display:inline-flex;align-items:center;gap:.55rem;margin-top:.55rem;padding:.35rem .65rem;background:#c4e1ff12;border:1px solid #9bc8f83d;color:#c7e2ff;font-size:.7rem;border-radius:1.5rem}
+.episode-peek .synopsis-block{margin:.4rem 0 0}
+.episode-peek .synopsis-excerpt{-webkit-line-clamp:2}
+#synopsis-dialog{width:min(76vw,60rem);max-width:60rem;max-height:86vh;padding:2.2rem 2.6rem;background:linear-gradient(135deg,#172a42,#0d1727);border:1px solid #718fad}
+#synopsis-dialog h2{font-size:1.7rem;line-height:1.25;margin:0 0 1.5rem;overflow-wrap:anywhere}
+#synopsis-reader-copy{max-height:44vh;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;overflow-wrap:anywhere;padding:.6rem .9rem;font-size:1rem;line-height:1.8;color:#d3dfed;scrollbar-color:#789dc4 transparent;scrollbar-width:thin}
+.reader-actions{display:flex;align-items:center;justify-content:space-between;gap:1.4rem;margin-top:1.8rem}
+.reader-actions button{background:#c9e4ff;color:#14253a;font-size:.85rem;font-weight:700}
+.reader-actions span{font-size:.65rem;color:#a5bdd8}
+@media(max-height:550px){#synopsis-dialog{padding:1.2rem 1.8rem;max-height:93vh}#synopsis-dialog h2{font-size:1.2rem;margin-bottom:.7rem}#synopsis-reader-copy{max-height:38vh}.reader-actions{margin-top:1rem}}

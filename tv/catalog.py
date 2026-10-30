@@ -4,8 +4,8 @@ from providers.okru import embed_url as okru_embed
 import time
 from copy import deepcopy
 from threading import RLock
+from tv.metadata import FIELDS, content_format, public_item, resolve_formats
 
-FIELDS = 'id,titulo,tipo,año,genero,sinopsis,imagen_url,backdrop_url,rating'
 EPISODES = 'id,temporada_id,numero,titulo,sinopsis,imagen_url,duracion'
 KINDS = {'pelicula':'Una noche de películas', 'serie':'Historias para quedarse',
          'anime':'Mundos extraordinarios', 'biblico':'Historias que inspiran'}
@@ -28,18 +28,20 @@ class Catalog:
         if search:
             q = q.ilike('titulo', '%'+search+'%')
         r = q.order('id', desc=True).limit(12).offset((page-1)*12).execute()
-        result = {'items':r.data, 'page':page, 'has_next':page*12 < (r.count or 0)}
+        result = {'items':[public_item(row) for row in resolve_formats(self.db,r.data)], 'page':page, 'has_next':page*12 < (r.count or 0)}
         if cacheable:
             with self._title_lock:self._title_cache[kind] = (time.monotonic()+60,deepcopy(result))
         return result
 
     def item(self, cid):
         rows = self.db.table('contenido').select(FIELDS).eq('id', cid).eq('disponible', True).limit(1).execute().data
-        return rows[0] if rows else None
+        rows = resolve_formats(self.db, rows)
+        return public_item(rows[0]) if rows else None
 
     def saved_titles(self, ids, page=1):
         rows = self.db.table('contenido').select(FIELDS).eq('disponible',True).in_('id',ids).execute().data if ids else []
-        by_id = {r['id']:r for r in rows}
+        rows = resolve_formats(self.db, rows)
+        by_id = {r['id']:public_item(r) for r in rows}
         ordered = [by_id[cid] for cid in ids if cid in by_id]
         total = len(ordered)
         pages = max(1,(total+11)//12)
@@ -55,22 +57,29 @@ class Catalog:
         ranked = bool(items)
         if not ranked:
             items = self.db.table('contenido').select(FIELDS).eq('disponible', True).eq('tipo', 'pelicula').order('id', desc=True).limit(10).execute().data
-        return {'items': items, 'mode': 'ranked' if ranked else 'discovery', 'window_days': 7}
+        return {'items': [public_item(row) for row in items], 'mode': 'ranked' if ranked else 'discovery', 'window_days': 7}
 
-    def seasons(self, cid):
-        return self.db.table('temporadas').select('id,numero,episodios').eq('contenido_id',cid).order('numero').limit(100).execute().data
+    def seasons(self, cid, availability=False):
+        fields = 'id,numero,episodios'+(',available:episodios(id)' if availability else '')
+        q = self.db.table('temporadas').select(fields).eq('contenido_id',cid)
+        if availability:
+            q = q.eq('available.disponible',True).limit(1,foreign_table='available')
+        return q.order('numero').limit(100).execute().data
 
     def details(self, cid):
         rows = self.db.table('contenido').select(FIELDS+',fuente,tmdb_id,playback_url').eq('id',cid).eq('disponible',True).limit(1).execute().data
         if not rows:return None
         content = rows[0]
-        item = {k:content.get(k) for k in FIELDS.split(',')}
-        seasons = self.seasons(cid)
+        seasons = self.seasons(cid, availability=True)
+        item = public_item(content, bool(seasons))
         first, first_private, first_season, initial = None, None, None, None
         ordered = sorted(seasons, key=lambda s: (s['numero'] == 0, s['numero']))
         for s in ordered:
+            if not s['available']:
+                continue
             result = self.db.table('episodios').select(EPISODES+',playback_url',count='exact').eq('temporada_id',s['id']).eq('disponible',True).order('numero').limit(6).execute()
             if result.data:
+                s['episodios'] = result.count
                 first_private, first_season = result.data[0], s
                 items = [self.episode_public(content,ep) for ep in result.data]
                 first = {**items[0], 'season':s['numero']}
@@ -79,8 +88,8 @@ class Catalog:
         related = [r for r in self.titles(item['tipo'])['items'] if r['id'] != cid]
         genres = {g.strip() for g in (item.get('genero') or '').lower().split(',')} - {''}
         related.sort(key=lambda r: not bool(genres & {g.strip() for g in (r.get('genero') or '').lower().split(',')}))
-        episodic = bool(seasons) or item['tipo'] in ('serie','anime')
-        return {'item':item, 'seasons':seasons, 'first_episode':first, 'episodic':episodic,
+        episodic = item['format']=='series'
+        return {'item':item, 'seasons':[{**{k:v for k,v in s.items() if k!='available'}, 'has_episodes':bool(s['available'])} for s in seasons], 'first_episode':first, 'episodic':episodic,
                 'playable':bool(self.resolve_source(content,first_private,first_season)) if (not episodic or first) else False,
                 'initial_episodes':initial, 'related':related[:8]}
 
@@ -98,7 +107,7 @@ class Catalog:
         return {'items':[self.episode_public(content,ep) for ep in rows.data], 'total':rows.count, 'page':page, 'has_next':page*6 < (rows.count or 0)}
 
     def source(self, cid, eid=None):
-        rows = self.db.table('contenido').select('id,tipo,fuente,tmdb_id,playback_url').eq('id',cid).eq('disponible',True).limit(1).execute().data
+        rows = self.db.table('contenido').select('id,tipo,tmdb_media,fuente,tmdb_id,playback_url').eq('id',cid).eq('disponible',True).limit(1).execute().data
         if not rows:
             return None
         item, ep, season = rows[0], None, None
@@ -111,7 +120,7 @@ class Catalog:
             season = next((s for s in seasons if ep and s['id']==ep['temporada_id']),None)
             if not season:
                 return None
-        elif eid or item['tipo'] in ('serie','anime'):
+        elif eid or content_format(item)=='series':
             return None
         return self.resolve_source(item,ep,season)
 
@@ -126,11 +135,12 @@ class Catalog:
         return None
 
     def next_episode(self,cid,eid):
-        seasons=self.seasons(cid)
+        seasons=self.seasons(cid, availability=True)
         ep=self.db.table('episodios').select('temporada_id,numero').eq('id',eid).eq('disponible',True).limit(1).execute().data
         index=next((i for i,s in enumerate(seasons) if ep and s['id']==ep[0]['temporada_id']),None)
         if index is None:return None
         for i,s in enumerate(seasons[index:]):
+            if not s['available']:continue
             q=self.db.table('episodios').select('id,numero,titulo').eq('temporada_id',s['id']).eq('disponible',True)
             if i==0:
                 # The offline query adapter compares gte values as strings. Use
