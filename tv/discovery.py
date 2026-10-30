@@ -40,9 +40,13 @@ def genre_keys(row):
 class Discovery:
     def __init__(self, database, clock=time.monotonic):
         self.db, self.clock, self.cache, self.lock = database, clock, {}, RLock()
+        self.category_locks = {}
 
     def _rows(self, kind):
         with self.lock:
+            category_lock = self.category_locks.setdefault(kind, RLock())
+        # Slow refreshes in one collection must not block another collection.
+        with category_lock:
             cached = self.cache.get(kind)
             if cached and cached[0] > self.clock(): return cached[1]
             rows = []
@@ -55,12 +59,16 @@ class Discovery:
             else: raise ValueError('El catálogo supera el límite de esta vista local.')
             episodic = set()
             if kind == 'biblico':
-                # Only 28 titles in this collection; no episode lists are loaded.
-                for row in rows:
-                    if self.db.table('temporadas').select('id').eq('contenido_id',row['id']).limit(1).execute().data:
-                        episodic.add(row['id'])
+                # Fetch only season ownership, in bounded batches, never episodes.
+                for start in range(0, len(rows), 100):
+                    ids = [r['id'] for r in rows[start:start+100]]
+                    for offset in range(0, 10000, 500):
+                        batch = self.db.table('temporadas').select('id,contenido_id').in_('contenido_id',ids).order('id').limit(500).offset(offset).execute().data
+                        episodic.update(r['contenido_id'] for r in batch)
+                        if len(batch)<500: break
+                    else: raise ValueError('Demasiadas temporadas en esta colección.')
             enriched = [{**row, 'format':'series' if row['id'] in episodic else 'movies', '_genres':genre_keys(row)} for row in rows]
-            self.cache[kind] = (self.clock()+60, enriched)
+            self.cache[kind] = (self.clock()+300, enriched)
             return enriched
 
     def browse(self, kind=None, query='', genre='', order='recent', form='', page=1):

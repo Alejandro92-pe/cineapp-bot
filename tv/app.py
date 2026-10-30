@@ -185,4 +185,6 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
         source=catalog.source(cid,eid)
         if not source:return error('Este video todavía no está disponible en TV.',404)
         return jsonify(**source,next=catalog.next_episode(cid,eid) if eid else None)
+    from services.releases import install as install_release_notice
+    install_release_notice(app, tv=True)
     return app

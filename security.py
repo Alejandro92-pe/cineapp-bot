@@ -159,7 +159,7 @@ def install_security(app, membership_checker):
         public_document = request.method in ('GET', 'HEAD') and (
             request.endpoint == 'static' or path in {
                 '/', '/admin', '/cuenta', '/membresia', '/instalar', '/offline',
-                '/sw.js', '/manifest.webmanifest', '/health'})
+                '/sw.js', '/manifest.webmanifest', '/health', '/version.json'})
         public_catalog = ((request.method in ('GET', 'HEAD') and (path in {'/api/tendencias', '/api/top10', '/api/public/landing'}
                            or request.endpoint in {'api_get_temporadas', 'vimeus.episodes'}))
                           or (request.method == 'POST' and path == '/api/contenido'))
@@ -193,7 +193,7 @@ def install_security(app, membership_checker):
                 if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), g.identity["csrf"]):
                     return error("La sesión necesita actualizarse.", 403, 'csrf_refresh_required')
         if path in {"/", "/admin", "/cuenta", "/membresia", "/instalar", "/offline", "/sw.js", "/manifest.webmanifest", "/api/payments/config", "/health", "/api/planes", "/api/tendencias",
-                    "/api/auth/me", "/api/top10", "/api/public/landing", "/paypal/success", "/paypal/cancel"} or path.startswith(("/static/", "/api/payments/qr/")) or path in PUBLIC_POSTS:
+                      "/api/auth/me", "/api/top10", "/api/public/landing", "/version.json", "/paypal/success", "/paypal/cancel"} or path.startswith(("/static/", "/api/payments/qr/")) or path in PUBLIC_POSTS:
             return None
         if path.startswith("/api/admin/") or path in ADMIN_PATHS:
             if not admin_authenticated():

@@ -1139,6 +1139,9 @@ def webhook_buymeacoffee():
 
 # ============ INICIO ============
 
+from services.releases import install as install_release_notice
+install_release_notice(app)
+
 if os.getenv('TV_ENABLED', 'false').lower() == 'true':
     install_tv(app, supabase_service, security_store, account_legacy_expiry)
 

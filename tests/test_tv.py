@@ -211,7 +211,7 @@ def test_biblical_formats_and_metadata_cache(tv):
     assert discovery.browse('biblico',form='movies')['items'][0]['id']==1
     db.rows['contenido'].append({**db.rows['contenido'][0],'id':3})
     assert discovery.browse('biblico')['total']==2
-    clock[0]=71
+    clock[0]=311
     assert discovery.browse('biblico')['total']==3
     assert '_genres' not in str(serial) and 'descarga' not in serial['items'][0]
 

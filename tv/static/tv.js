@@ -34,7 +34,7 @@
   activateNav(state.kind);
   const key=new URLSearchParams({...state,page:1}).toString();const cached=browseCache.get(key);
   const data=cached&&cached.expires>Date.now()?cached.data:await api('catalog?'+key);if(rev!==revision)return;
-  const remember=value=>{browseCache.delete(key);browseCache.set(key,{data:value,expires:Date.now()+180000});if(browseCache.size>3)browseCache.delete(browseCache.keys().next().value);};remember(data);
+  const remember=value=>{browseCache.delete(key);browseCache.set(key,{data:value,expires:Date.now()+300000});if(browseCache.size>6)browseCache.delete(browseCache.keys().next().value);};remember(data);
   state.page=data.page;screen.innerHTML=TVBrowse.render(data,state,image,esc,card);
   const navigate=(changes,focus)=>{browseFocus=focus;const updated={...state,...changes};const query=new URLSearchParams(updated);query.delete('page');if(!updated.kind)query.set('search','1');go(query.toString());};
   bindCards();
