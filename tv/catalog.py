@@ -1,6 +1,9 @@
 """Read-only adapter for the existing Supabase catalog schema. No download fields."""
 from providers.videoapi import embed_url
 from providers.okru import embed_url as okru_embed
+import time
+from copy import deepcopy
+from threading import RLock
 
 FIELDS = 'id,titulo,tipo,año,genero,sinopsis,imagen_url,backdrop_url,rating'
 EPISODES = 'id,temporada_id,numero,titulo,sinopsis,imagen_url,duracion'
@@ -11,15 +14,24 @@ KINDS = {'pelicula':'Una noche de películas', 'serie':'Historias para quedarse'
 class Catalog:
     def __init__(self, database):
         self.db = database
+        self._title_cache, self._title_lock = {}, RLock()
 
     def titles(self, kind=None, search='', page=1):
+        cacheable = kind in KINDS and not search and page == 1
+        if cacheable:
+            with self._title_lock:
+                cached = self._title_cache.get(kind)
+                if cached and cached[0] > time.monotonic():return deepcopy(cached[1])
         q = self.db.table('contenido').select(FIELDS, count='exact').eq('disponible', True)
         if kind:
             q = q.eq('tipo', kind)
         if search:
             q = q.ilike('titulo', '%'+search+'%')
         r = q.order('id', desc=True).limit(12).offset((page-1)*12).execute()
-        return {'items':r.data, 'page':page, 'has_next':page*12 < (r.count or 0)}
+        result = {'items':r.data, 'page':page, 'has_next':page*12 < (r.count or 0)}
+        if cacheable:
+            with self._title_lock:self._title_cache[kind] = (time.monotonic()+60,deepcopy(result))
+        return result
 
     def item(self, cid):
         rows = self.db.table('contenido').select(FIELDS).eq('id', cid).eq('disponible', True).limit(1).execute().data
@@ -49,32 +61,41 @@ class Catalog:
         return self.db.table('temporadas').select('id,numero,episodios').eq('contenido_id',cid).order('numero').limit(100).execute().data
 
     def details(self, cid):
-        item = self.item(cid)
-        if not item: return None
+        rows = self.db.table('contenido').select(FIELDS+',fuente,tmdb_id,playback_url').eq('id',cid).eq('disponible',True).limit(1).execute().data
+        if not rows:return None
+        content = rows[0]
+        item = {k:content.get(k) for k in FIELDS.split(',')}
         seasons = self.seasons(cid)
-        first = None
+        first, first_private, first_season, initial = None, None, None, None
         ordered = sorted(seasons, key=lambda s: (s['numero'] == 0, s['numero']))
         for s in ordered:
-            rows = self.db.table('episodios').select(EPISODES).eq('temporada_id',s['id']).eq('disponible',True).order('numero').limit(1).execute().data
-            if rows:
-                first = {**rows[0], 'season':s['numero']}
+            result = self.db.table('episodios').select(EPISODES+',playback_url',count='exact').eq('temporada_id',s['id']).eq('disponible',True).order('numero').limit(6).execute()
+            if result.data:
+                first_private, first_season = result.data[0], s
+                items = [self.episode_public(content,ep) for ep in result.data]
+                first = {**items[0], 'season':s['numero']}
+                initial = {'season_id':s['id'],'items':items,'total':result.count,'page':1,'has_next':6<(result.count or 0)}
                 break
         related = [r for r in self.titles(item['tipo'])['items'] if r['id'] != cid]
         genres = {g.strip() for g in (item.get('genero') or '').lower().split(',')} - {''}
         related.sort(key=lambda r: not bool(genres & {g.strip() for g in (r.get('genero') or '').lower().split(',')}))
         episodic = bool(seasons) or item['tipo'] in ('serie','anime')
         return {'item':item, 'seasons':seasons, 'first_episode':first, 'episodic':episodic,
-                'playable':bool(self.source(cid, first['id'] if first else None)), 'related':related[:8]}
+                'playable':bool(self.resolve_source(content,first_private,first_season)) if (not episodic or first) else False,
+                'initial_episodes':initial, 'related':related[:8]}
+
+    @staticmethod
+    def episode_public(content, episode):
+        ep={k:episode.get(k) for k in EPISODES.split(',')}
+        ep['playable'] = bool(okru_embed(episode.get('playback_url'))) if content.get('fuente')=='okru' else bool(content.get('fuente')=='vimeus' and content.get('tmdb_id') and content['tipo'] in ('serie','anime'))
+        return ep
 
     def episodes(self, cid, sid, page):
-        if not self.item(cid) or not any(s['id'] == sid for s in self.seasons(cid)):
-            return None
-        content = self.db.table('contenido').select('fuente,tmdb_id,tipo').eq('id',cid).limit(1).execute().data[0]
+        content = self.db.table('contenido').select('fuente,tmdb_id,tipo').eq('id',cid).eq('disponible',True).limit(1).execute().data
+        if not content or not self.db.table('temporadas').select('id').eq('id',sid).eq('contenido_id',cid).limit(1).execute().data:return None
+        content=content[0]
         rows = self.db.table('episodios').select(EPISODES+',playback_url',count='exact').eq('temporada_id',sid).eq('disponible',True).order('numero').limit(6).offset((page-1)*6).execute()
-        for ep in rows.data:
-            link = ep.pop('playback_url', None)
-            ep['playable'] = bool(okru_embed(link)) if content.get('fuente') == 'okru' else bool(content.get('fuente') == 'vimeus' and content.get('tmdb_id') and content['tipo'] in ('serie','anime'))
-        return {'items':rows.data, 'total':rows.count, 'page':page, 'has_next':page*6 < (rows.count or 0)}
+        return {'items':[self.episode_public(content,ep) for ep in rows.data], 'total':rows.count, 'page':page, 'has_next':page*6 < (rows.count or 0)}
 
     def source(self, cid, eid=None):
         rows = self.db.table('contenido').select('id,tipo,fuente,tmdb_id,playback_url').eq('id',cid).eq('disponible',True).limit(1).execute().data
@@ -92,6 +113,10 @@ class Catalog:
                 return None
         elif eid or item['tipo'] in ('serie','anime'):
             return None
+        return self.resolve_source(item,ep,season)
+
+    @staticmethod
+    def resolve_source(item,ep=None,season=None):
         if item['fuente']=='okru':
             url=okru_embed((ep or item).get('playback_url'))
             return {'url':url,'provider':'okru'} if url else None

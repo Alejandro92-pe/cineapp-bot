@@ -2,11 +2,15 @@
 (()=>{'use strict';
  const $=id=>document.getElementById(id),screen=$('screen');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- let cleanups=[],episodeStream=null,savedCache=null;const browseCache=new Map();
+ let cleanups=[],episodeStream=null,savedCache=null;const browseCache=new Map(),knownTitles=new Map();
+ function rememberTitles(data){
+  const items=[data.item,data.featured,...(data.items||[]),...(data.related||[]),...(data.top10?.items||[]),...(data.rows||[]).flatMap(r=>r.items||[])];
+  for(const item of items){if(!item?.tipo||!item.titulo)continue;knownTitles.delete(item.id);knownTitles.set(item.id,item);if(knownTitles.size>200)knownTitles.delete(knownTitles.keys().next().value);}
+ }
  const labels={pelicula:'Películas',serie:'Series',anime:'Anime',biblico:'Bíblicos'};
  let me={},revision=0,seasonRevision=0,detail=null,season=null,episodePage=1,homeData=null,pollTimer=null,pairRevision=0,lastFocus=null,returnHash="",playing=null,next=null,playRevision=0;
  async function api(path,body,csrf){const options=body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json',...(csrf?{'X-CSRF-Token':csrf}:{})},body:JSON.stringify(body)};
-  const r=await fetch('/tv/api/'+path,options),d=await r.json();if(!r.ok)throw Error(d.error||'No pudimos completar la solicitud.');return d;}
+  const r=await fetch('/tv/api/'+path,options),d=await r.json();if(!r.ok)throw Error(d.error||'No pudimos completar la solicitud.');rememberTitles(d);return d;}
  screen.addEventListener('error',e=>{if(e.target.tagName==='IMG'&&!e.target.src.endsWith('/tv/brand')){e.target.src='/tv/brand';e.target.classList.add('poster-fallback');}},true);
  function toast(text){$('toast').textContent=text;clearTimeout(toast.timer);toast.timer=setTimeout(()=>{$('toast').textContent='';},6000);}
  function image(url,size='w780'){
@@ -70,7 +74,10 @@
   TVFocus.focus($(lastFocus)||screen.querySelector('.saved-results [data-nav]')||$('list-explore'));
  }
 
- async function titleView(cid,rev){const data=await api('title/'+cid);if(rev!==revision)return;detail=data;activateNav(data.item.tipo);season=data.seasons.find(s=>s.id===data.first_episode?.temporada_id)||data.seasons.find(s=>s.episodios>0);episodePage=1;
+ async function titleView(cid,rev){
+  const known=knownTitles.get(cid)||[...(homeData?.top10?.items||[]),...(homeData?.rows||[]).flatMap(r=>r.items),...[...browseCache.values()].flatMap(x=>x.data.items),...(savedCache?.data.items||[])].find(x=>x.id===cid);
+  if(known){screen.innerHTML=TVDetail.pending(known,image,esc,meta);$('detail-back').onclick=()=>go(returnHash);TVFocus.focus($('detail-back'));}
+  const data=await api('title/'+cid);if(rev!==revision)return;detail=data;activateNav(data.item.tipo);season=data.seasons.find(s=>s.id===data.first_episode?.temporada_id)||data.seasons.find(s=>s.episodios>0);episodePage=1;
   screen.innerHTML=TVDetail.render(data,image,esc,meta,card);
   $('detail-back').onclick=()=>go(returnHash);
   $('detail-play').onclick=()=>play(data.item,data.first_episode);
@@ -87,11 +94,11 @@
   if($('detail-other-series'))$('detail-other-series').onclick=()=>go('kind=serie');
   screen.querySelectorAll('[data-title]').forEach(b=>b.onclick=()=>{returnHash='kind='+data.item.tipo;go('title='+b.dataset.title);});
   screen.querySelectorAll('[data-season]').forEach(b=>b.onclick=()=>{season=data.seasons.find(s=>s.id===Number(b.dataset.season));episodePage=1;loadEpisodes(rev,true).catch(e=>toast(e.message));});
-  if(season)await loadEpisodes(rev,false);if(rev===revision)TVFocus.focus(data.playable?$('detail-play'):$('detail-back'));
+  if(season)loadEpisodes(rev,false,data.initial_episodes).catch(e=>{if(rev===revision)toast(e.message);});if(rev===revision)TVFocus.focus(data.playable?$('detail-play'):$('detail-back'));
  }
  function episodeCard(ep){return `<button data-nav class="episode" id="episode-${ep.id}" data-episode="${ep.id}" aria-disabled="${!ep.playable}"><div class="episode-image"><img loading="lazy" decoding="async" alt="" src="${image(ep.imagen_url||detail.item.backdrop_url,'w500')}"><b>${ep.numero}${!ep.playable?' · Sin video':''}</b></div><div class="episode-content"><h3>${esc(ep.titulo||'Episodio '+ep.numero)}</h3><small>${esc(ep.duracion?ep.duracion+' min':'Episodio '+ep.numero)}</small></div></button>`;}
- async function loadEpisodes(rev,focus){episodeStream?.dispose();episodeStream=null;const seq=++seasonRevision,sid=season.id,cid=detail.item.id;
-  const valid=()=>rev===revision&&seq===seasonRevision;const data=await api(`episodes/${cid}/${sid}?page=1`);if(!valid())return;
+ async function loadEpisodes(rev,focus,initial){episodeStream?.dispose();episodeStream=null;const seq=++seasonRevision,sid=season.id,cid=detail.item.id;
+  const valid=()=>rev===revision&&seq===seasonRevision;const data=initial?.season_id===sid?initial:await api(`episodes/${cid}/${sid}?page=1`);if(!valid())return;
   const episodes=new Map(data.items.map(ep=>[ep.id,ep]));
   screen.querySelectorAll('[data-season]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.season)===sid)));
   $('episode-results').innerHTML=`<div class="episodes" data-row="episodes">${data.items.map(episodeCard).join('')}</div><div class="episode-peek" aria-live="off"><span id="episode-peek-title"></span><p id="episode-peek-copy">Elige un episodio para ver su descripción.</p></div>`;

@@ -1,5 +1,14 @@
 /* TV presentation only; values and image URLs are escaped by the shared helpers. */
 window.TVDetail = {
+  pending(item,image,esc,meta){
+    return `<article class="detail detail-cinema detail-pending" aria-busy="true"><section class="cinema-hero">
+      <div class="cinema-background"><img src="${image(item.backdrop_url||item.imagen_url,'w1280')}" alt=""></div>
+      <div class="detail-breadcrumb" data-row="detail-back"><button data-nav id="detail-back">← Volver</button></div>
+      <div class="cinema-layout"><div class="cinema-copy"><h1>${esc(item.titulo)}</h1>${meta(item)}<p class="cinema-synopsis">${esc(item.sinopsis||'')}</p>
+      <p role="status">Cargando opciones de reproducción…</p></div>
+      <aside class="cinema-poster" aria-label="Afiche"><img src="${image(item.imagen_url,'w342')}" alt="Afiche de ${esc(item.titulo)}"></aside></div>
+      </section></article>`;
+  },
   render(data, image, esc, meta, card) {
     const item=data.item, first=data.first_episode;
     const seasons=data.seasons.filter(s=>s.episodios>0);
