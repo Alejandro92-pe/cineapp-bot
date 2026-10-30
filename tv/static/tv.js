@@ -10,7 +10,7 @@
  screen.addEventListener('error',e=>{if(e.target.tagName==='IMG'&&!e.target.src.endsWith('/tv/brand')){e.target.src='/tv/brand';e.target.classList.add('poster-fallback');}},true);
  function toast(text){$('toast').textContent=text;clearTimeout(toast.timer);toast.timer=setTimeout(()=>{$('toast').textContent='';},6000);}
  function image(url,size='w780'){
-  try{const u=new URL(url);if(u.origin==='https://image.tmdb.org'&&u.pathname.startsWith('/t/p/')){u.pathname=u.pathname.replace(/\/t\/p\/[^/]+\//,'/t/p/'+size+'/');return esc(u.href);}}catch(_){}return '/tv/brand';
+  return esc(TVImages.source(url,size));
  }
  function meta(item,includeGenre=true){return `<div class="meta">${item.rating?`<span class="rating">★ ${esc(Number(item.rating).toFixed(1))}</span>`:''}<span>${esc(item.año||'')}</span><span>${esc(labels[item.tipo]||'')}</span>${includeGenre?`<span>${esc((item.genero||'').split(',')[0])}</span>`:''}</div>`;}
  function card(item){return `<button data-nav class="poster" id="title-${item.id}" data-title="${item.id}"><img loading="lazy" decoding="async" src="${image(item.imagen_url,'w342')}" alt=""><span class="caption">${esc(item.titulo)}</span><small>${esc(item.año||labels[item.tipo]||'')} ${item.rating?' · ★ '+esc(Number(item.rating).toFixed(1)):''}</small></button>`;}

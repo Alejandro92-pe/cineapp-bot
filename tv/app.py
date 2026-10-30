@@ -73,7 +73,7 @@ def create_app(database, security, origin='http://127.0.0.1:5020', *, lan_previe
         r.headers['Cache-Control']='no-store'
         r.headers['Referrer-Policy']='origin'
         r.headers['X-Content-Type-Options']='nosniff'
-        r.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://image.tmdb.org; connect-src 'self'; frame-src https://videoapi.la https://ok.ru; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        r.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://image.tmdb.org https://static.wixstatic.com; connect-src 'self'; frame-src https://videoapi.la https://ok.ru; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         r.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
         if integrated and request.path=='/tv/vincular':
             r.headers['Content-Security-Policy']=r.headers['Content-Security-Policy'].replace("script-src 'self'", "script-src 'self' https://telegram.org").replace("frame-ancestors 'none'", "frame-ancestors 'self' https://web.telegram.org")
