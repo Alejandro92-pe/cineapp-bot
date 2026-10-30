@@ -55,12 +55,12 @@ test('asset query strings do not alias the public cache',async()=>{
   const w=worker();await w.lifecycle('install');assert.equal(await w.dispatch('/static/pwa/icons/icon-192.png?secret=private'),null);
 });
 
-function installer({standalone=false,telegram=false,secure=true,sw=true}={}){
+function installer({standalone=false,telegram=false,secure=true,sw=true,userAgent='',platform='',maxTouchPoints=0}={}){
   const handlers={},elements={},calls={register:0,prompt:0};
   for(const id of ['install-button','install-status','install-local-help','install-guide','install-copy','install-runtime'])elements[id]={hidden:false,textContent:'',disabled:false};
   const registration={waiting:null,addEventListener(){}};
   const document={readyState:'complete',getElementById(id){return elements[id]||null}};
-  const navigator={clipboard:{async writeText(){}},...(sw?{serviceWorker:{register:async()=>{calls.register++;return registration},ready:Promise.resolve(registration),addEventListener(){}}}:{})};
+  const navigator={userAgent,platform,maxTouchPoints,clipboard:{async writeText(value){calls.copied=value;}},...(sw?{serviceWorker:{register:async()=>{calls.register++;return registration},ready:Promise.resolve(registration),addEventListener(){}}}:{})};
   const window={isSecureContext:secure,matchMedia:()=>({matches:standalone,addEventListener(){}}),addEventListener(name,fn){handlers[name]=fn},Telegram:{WebApp:{initData:telegram?'verified-data':''}}};
   const context={document,navigator,window,location:{hostname:'127.0.0.1',origin:ORIGIN},console};vm.createContext(context);vm.runInContext(fs.readFileSync('static/pwa/install.js','utf8'),context);
   function offer(outcome){handlers.beforeinstallprompt({preventDefault(){},async prompt(){calls.prompt++},userChoice:Promise.resolve({outcome})});}
@@ -75,8 +75,19 @@ test('dismissing the native prompt never claims that the app is installed',async
   const i=installer();i.offer('dismissed');await i.elements['install-button'].onclick();assert.match(i.elements['install-status'].textContent,/más adelante/);assert(!i.elements['install-guide'].hidden);
 });
 test('standalone and Telegram contexts receive appropriate installation guidance',()=>{
-  const app=installer({standalone:true});assert(app.elements['install-button'].hidden);assert.match(app.elements['install-status'].textContent,/como aplicación/);
+  const app=installer({standalone:true});assert(app.elements['install-button'].hidden);assert.match(app.elements['install-status'].textContent,/pantalla de inicio/);
   const mini=installer({telegram:true});mini.offer('accepted');assert(mini.elements['install-button'].hidden);assert.match(mini.elements['install-status'].textContent,/Chrome/);
+});
+
+test('iPhone and touch iPad get Safari guidance, Telegram keeps the external-browser step',()=>{
+  for(const options of [{userAgent:'Mozilla iPhone'},{platform:'MacIntel',maxTouchPoints:5}]){
+    const i=installer(options);assert.match(i.elements['install-status'].textContent,/Safari/);assert(i.elements['install-button'].hidden);assert.equal(i.calls.prompt,0);
+    const t=installer({...options,telegram:true});assert.match(t.elements['install-status'].textContent,/navegador externo/);assert.equal(t.calls.prompt,0);
+  }
+});
+
+test('copy installation link points to the browser guide without account information',async()=>{
+  const i=installer();await i.elements['install-copy'].onclick();assert.equal(i.calls.copied,ORIGIN+'/instalar#navegador');
 });
 test('insecure or unsupported contexts keep browsing available without a service worker',()=>{
   const insecure=installer({secure:false});assert.equal(insecure.calls.register,0);assert.match(insecure.elements['install-status'].textContent,/HTTPS/);

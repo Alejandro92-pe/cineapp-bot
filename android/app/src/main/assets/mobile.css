@@ -1,0 +1,38 @@
+/* All selectors are APK-scoped; the existing web/Telegram UI stays untouched. */
+.quehay-android {color-scheme:dark;-webkit-tap-highlight-color:transparent}
+.quehay-android #player-provider-label,.quehay-android #player-retry,.quehay-android .cine-install-promo,.quehay-android a[href="/instalar"]{display:none!important}
+.quehay-android #player-fullscreen{display:grid!important}
+.quehay-android button,.quehay-android select{touch-action:manipulation}
+.quehay-android .episodes-grid{grid-template-columns:1fr;gap:8px}
+.quehay-android .episode-row[hidden]{display:none!important}
+.quehay-android .episode-row{background:#101e30;border:1px solid #23394f;border-radius:14px;overflow:hidden}
+.quehay-android .episode-row .episode-card{background:transparent;border:0;box-shadow:none;border-radius:0;min-height:72px;padding:8px;gap:10px}
+.quehay-android .episode-row .episode-card[aria-pressed=true]{background:#1a334e;box-shadow:inset 3px 0 #8ec8ff}
+.quehay-android .episode-row .episode-thumb{width:82px;min-width:82px;border-radius:8px}
+.quehay-android .episode-row .episode-info strong{font-size:13px;line-height:1.3}
+.quehay-android .episode-row .episode-synopsis{display:none}
+.quehay-android .episode-actions{padding:4px 6px 4px 0;gap:0}
+.quehay-android .episode-actions button{min-width:44px;min-height:44px;background:transparent;border:0}
+.quehay-android .episodes-toolbar{gap:12px;margin-bottom:10px}
+.quehay-android .episodes-toolbar h2{font-size:20px}
+.quehay-android .episodes-toolbar label{font-size:11px;max-width:70%}
+.quehay-android .episodes-toolbar select{padding:10px;font-size:13px;border-radius:12px;max-width:100%}
+.quehay-android .episodes-status{margin-bottom:12px;font-size:12px}
+.quehay-android .android-episode-pages{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:16px;color:#c4d6ee;font-size:13px}
+.quehay-android .android-episode-pages button{width:44px;height:44px;font-size:25px;border:1px solid #35516d;border-radius:50%;background:#14263b;color:#d7eaff}
+.quehay-android .android-episode-pages button:disabled{opacity:.35}
+.quehay-android .player-heading{padding:10px 0;gap:8px}
+.quehay-android .player-heading strong{font-size:12px;line-height:1.4}
+.quehay-android .player-heading-actions button{width:44px;height:44px;border-radius:50%;padding:11px}
+.quehay-android #android-player-retry{font-size:23px;line-height:1}
+.quehay-android .player-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.quehay-android #player-download{width:44px;min-width:44px;height:44px;padding:11px;border-radius:50%}
+.quehay-android #player-download span{display:none}
+.quehay-android #player-next{min-height:44px;border-radius:24px;padding:10px 16px;font-size:13px}
+.quehay-android.android-fullscreen #inline-player{position:fixed;inset:0;z-index:15000;background:#000;width:100%;height:100dvh;max-width:none;margin:0;padding:0;border:0;border-radius:0}
+.quehay-android.android-fullscreen #iframeReproductor{position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;aspect-ratio:auto}
+.quehay-android.android-fullscreen .player-heading{position:absolute;right:12px;top:12px;z-index:3;padding:0}
+.quehay-android.android-fullscreen .player-identity,.quehay-android.android-fullscreen #player-close,.quehay-android.android-fullscreen #android-player-retry,.quehay-android.android-fullscreen .player-toolbar,.quehay-android.android-fullscreen .player-ad-note{display:none!important}
+.quehay-android.android-fullscreen #player-fullscreen{background:#102139aa;border:1px solid #7896b166}
+.quehay-android.android-fullscreen #player-status:not([hidden]){position:absolute;bottom:18px;left:16px;right:16px;background:#102139e6;padding:12px;border-radius:10px}
+@media(orientation:landscape) and (max-height:520px){.quehay-android #inline-player:not([hidden]) #iframeReproductor{min-height:65vh}}

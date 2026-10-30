@@ -1,4 +1,5 @@
 from io import BytesIO
+import re
 from PIL import Image
 import pytest
 from conftest import send
@@ -38,7 +39,7 @@ def test_public_entry_pages_include_install_metadata(client,path):
     assert response.status_code==200
     markup=response.get_data(as_text=True)
     assert 'href="/manifest.webmanifest"' in markup
-    assert 'src="/static/pwa/install.js"' in markup
+    assert re.search(r'src="/static/pwa/install\.js(?:\?v=[^"\s]+)?"',markup)
     assert 'viewport-fit=cover' in markup
     assert 'theme-color' in markup
 

@@ -12,14 +12,15 @@
     button.hidden=!offer||running||installed||inTelegram();
     $('install-local-help').hidden=!local;
     $('install-guide').hidden=running||installed;
-    status.textContent=running?'Estás usando QueHay como aplicación.':installed?'El navegador confirmó la instalación. Busca QueHay en tu dispositivo.':accepted?'Solicitud aceptada. Espera la confirmación de tu dispositivo.':inTelegram()?'Abre esta página en Chrome para instalarla en Android.':!window.isSecureContext?'Abre QueHay mediante su dirección HTTPS para instalarla.':offer?'Tu navegador ofrece instalar QueHay. Pulsa el botón para continuar.':'Si no aparece un botón, revisa el menú de tu navegador y sigue los pasos de abajo.';
+    const apple=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    status.textContent=running?'Ya estás usando Qué Hay desde tu pantalla de inicio.':installed?'El navegador confirmó la instalación. Busca Qué Hay en tu dispositivo.':accepted?'Solicitud aceptada. Espera la confirmación de tu dispositivo.':inTelegram()?'Abre esta página en un navegador externo: Chrome en Android o Safari en iPhone.':!window.isSecureContext?'Abre Qué Hay mediante su dirección HTTPS para instalarla.':offer?'Tu navegador permite añadir Qué Hay. Pulsa el botón para continuar.':apple?'En Safari, abre Compartir y elige «Añadir a pantalla de inicio».':'Busca la opción de instalar en el menú de tu navegador. También puedes seguir usando la web.';
   }
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();offer=event;accepted=false;render();});
   window.addEventListener('appinstalled',()=>{installed=true;offer=null;render();});
   standalone.addEventListener?.('change',render);
   async function start(){
     render();
-    if($('install-copy'))$('install-copy').onclick=async()=>{try{await navigator.clipboard.writeText(location.origin+'/instalar');$('install-copy').textContent='Dirección copiada';}catch{$('install-status').textContent='Copia la dirección desde la barra de tu navegador.';}};
+    if($('install-copy'))$('install-copy').onclick=async()=>{try{await navigator.clipboard.writeText(location.origin+'/instalar#navegador');$('install-copy').textContent='Dirección copiada';}catch{$('install-status').textContent='Copia la dirección desde la barra de tu navegador.';}};
     if($('install-button'))$('install-button').onclick=async()=>{
       if(!offer)return;const event=offer;offer=null;$('install-button').disabled=true;
       try{await event.prompt();const choice=await event.userChoice;accepted=choice.outcome==='accepted';render();if(!accepted)$('install-status').textContent='Puedes instalarla más adelante desde el menú del navegador.';}

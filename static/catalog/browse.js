@@ -80,12 +80,20 @@
     for(const [title,description,result,kind] of [['Una noche de películas','Encuentra algo que te atrape.',movies,'pelicula'],['Una historia, muchos capítulos','Explora temporadas y episodios.',series,'serie'],['El universo del anime','Nuevos mundos por descubrir.',anime,'anime'],['Historias que inspiran','Explora nuestra sección de bíblicos.',biblical,'biblico']]){
       if(result.data.length)container.append(section(title,description,result.data,kind));
     }
-    const promo=el('aside',null,'cine-install-promo');promo.setAttribute('aria-label','Instalar QueHay en Android');
-    const promoCopy=el('div',null,'install-promo-copy');promoCopy.append(el('p','QUEHAY VA CONTIGO','install-promo-eyebrow'),el('h2','Tu cine. A un toque.'),el('p','Lleva QueHay a la pantalla de inicio de tu Android. Tus películas, series y bíblicos, siempre a mano.','install-promo-description'));
-    const install=el('a','Instalar en mi Android  ↗','install-promo-cta');install.href='/instalar';promoCopy.append(install,el('span','Sin buscar enlaces. Vuelve directo a tu catálogo.','install-promo-note'));
-    const phone=el('div',null,'install-promo-phone');phone.setAttribute('aria-hidden','true');const phoneHeader=el('div',null,'install-promo-brand');const icon=el('img');icon.src='/static/logo-que-hay-live.png';icon.alt='';phoneHeader.append(icon,el('span','QUEHAY'));
-    const screen=el('div',null,'install-promo-screen');const art=el('img');art.alt='';art.loading='lazy';CatalogArtwork.hero(art,{backdrop_url:slides[0]?.backdrop_url?safeImageSrc(slides[0].backdrop_url):'',imagen_url:safeImageSrc(slides[0]?.imagen_url)});screen.append(art,el('span','UNA HISTORIA TE ESPERA'));
-    const mini=el('div',null,'install-promo-posters');mini.append(...movies.data.slice(0,3).map(item=>image(item,'')));phone.append(phoneHeader,screen,mini);promo.append(promoCopy,phone);container.append(promo);
+    const promo=el('aside',null,'cine-install-promo qh-apps');promo.id='tus-pantallas';promo.setAttribute('aria-labelledby','apps-title');
+    promo.append(el('p','QUÉ HAY VA CONTIGO','app-kicker'));
+    const appTitle=el('h2',null,'app-heading');appTitle.id='apps-title';appTitle.append(document.createTextNode('Tu pantalla. Tu momento.'),el('br'),el('em','Tu Qué Hay.'));promo.append(appTitle,el('p','Del celular al sofá, con tu misma cuenta. Elige dónde empieza tu próxima historia.','app-intro'));
+    const platforms=el('div',null,'app-grid');
+    for(const [key,label,hint,shape,title,description,cta] of [
+      ['android','APK MÓVIL','Para llevar','mobile','Android','Tu próxima maratón va contigo. Entra con tu cuenta y sigue explorando.','Instalar en Android'],
+      ['tv','APK TV','Para el sofá','television','Android TV / Google TV','Pantalla grande, control remoto y tu cuenta vinculada desde el celular.','Instalar en mi TV'],
+      ['navegador','DESDE TU NAVEGADOR','Sin archivo APK','browser','A un toque','Añade Qué Hay a tu pantalla de inicio. Menos vueltas para volver a tus historias.','Cómo añadirla']]){
+      const tile=el('article',null,'app-card '+key),labelRow=el('div',null,'app-label');labelRow.append(el('span',label),el('span',hint));
+      const stage=el('div',null,'app-device-stage');stage.setAttribute('aria-hidden','true');const device=el('div',null,'app-device '+shape),face=el('img');face.src='/static/logo-que-hay-live.png';face.alt='';face.width=42;face.height=42;face.loading='lazy';device.append(face);stage.append(device);
+      const link=el('a',cta,'app-link');link.href='/instalar#'+key;const arrow=el('span','↗');arrow.setAttribute('aria-hidden','true');link.append(arrow);
+      tile.append(labelRow,stage,el('h3',title),el('p',description),link);platforms.append(tile);
+    }
+    const appNote=el('p',null,'app-footnote');appNote.append(el('strong','La misma cuenta. Tus favoritos contigo.'),el('span','Instalar no activa ni renueva una membresía.'));promo.append(platforms,appNote);container.append(promo);
     const foot=el('footer',null,'cine-page-footer');foot.append(el('strong','QUEHAY CINE'),el('span','Historias que nos acompañan.'),el('a','Descubre la membresía'));foot.lastChild.href='/membresia';container.append(foot);
   }
   function browse(container,token,focus){

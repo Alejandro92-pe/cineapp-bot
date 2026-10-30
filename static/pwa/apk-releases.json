@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "published": true,
+  "releases": {
+    "android": {
+      "version": "0.5.0",
+      "versionCode": 5,
+      "package": "live.quehay.app.preview",
+      "filename": "QueHay-Android-0.5.0.apk",
+      "url": "https://quehay.live/apps/QueHay-Android-0.5.0.apk",
+      "bytes": 36907,
+      "sha256": "31c219bc782095049f11aa916c4014a14b08987fd6cb0e504190567f988bad73",
+      "signerSha256": "8b9eb1ea50e568ea54ba1dd1859fcef647edd3f78a4dd88abc0928508decf681",
+      "minAndroid": 8
+    },
+    "tv": {
+      "version": "0.3.0",
+      "versionCode": 3,
+      "package": "live.quehay.tv",
+      "filename": "QueHay-TV-0.3.0.apk",
+      "url": "https://quehay.live/apps/QueHay-TV-0.3.0.apk",
+      "bytes": 28982,
+      "sha256": "cd29deb77c59fd5ea56b9355299a5710fcc9e388bed85ab904f8426d59fea9c0",
+      "signerSha256": "8b9eb1ea50e568ea54ba1dd1859fcef647edd3f78a4dd88abc0928508decf681",
+      "minAndroid": 8
+    }
+  }
+}

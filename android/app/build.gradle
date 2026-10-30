@@ -1,0 +1,39 @@
+plugins { id 'com.android.application' }
+def startupCheck = providers.gradleProperty('startupCheck').getOrElse('false') == 'true'
+android {
+    namespace 'live.quehay.app'
+    compileSdk 35
+    sourceSets.main.java.srcDir('../../android-common/src/main/java')
+    sourceSets.main.res.srcDir('../../android-common/src/main/res')
+    sourceSets.androidTest.java.srcDir('../../android-common/src/androidTest/java')
+    defaultConfig {
+        testInstrumentationRunner 'live.quehay.startup.StartupChecks'
+        applicationId startupCheck ? 'live.quehay.app.startupcheck' : 'live.quehay.app.preview'
+        minSdk 26
+        targetSdk 35
+        versionCode 5
+        versionName '0.5.0'
+        buildConfigField 'String', 'APP_ORIGIN', startupCheck ? '"http://127.0.0.1:5031"' : '"https://app.quehay.live"'
+    }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        debug { debuggable false }
+        release { minifyEnabled false }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError true }
+}
+
+// Package the exact same sharing module as the web, without copying backend assets.
+android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/shareAssets'))
+tasks.register('generateShareAssets', Copy) {
+    from('../../static/catalog/share.js', '../../static/catalog/identity.js', '../../static/catalog/identity.css')
+    into(layout.buildDirectory.dir('generated/shareAssets'))
+}
+tasks.named('preBuild').configure { dependsOn('generateShareAssets') }
+
+// Isolated emulator variant only. Shipping packages keep HTTPS and the original ID.
+if (startupCheck) {
+    android.sourceSets.main.manifest.srcFile('src/startupCheck/AndroidManifest.xml')
+    android.sourceSets.main.res.srcDir('src/startupCheck/res')
+}

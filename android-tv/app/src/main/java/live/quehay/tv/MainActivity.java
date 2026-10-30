@@ -1,6 +1,7 @@
 package live.quehay.tv;
 
 import android.app.Activity;
+import live.quehay.startup.StartupOverlay;
 import android.app.AlertDialog;
 import android.graphics.Color;
 import android.net.Uri;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 /** Independent TV application: no bundled credentials or native JS bridge. */
 public final class MainActivity extends Activity {
     private static final String ORIGIN=BuildConfig.TV_ORIGIN;
+    private StartupOverlay startup;
     private WebView web;
     private FrameLayout root;
     private LinearLayout errorView;
@@ -67,6 +69,9 @@ public final class MainActivity extends Activity {
                 return !firstParty(req.getUrl());
             }
             @Override public void onPageStarted(WebView v,String url,android.graphics.Bitmap icon){failed=false;hideError();progress.setVisibility(View.VISIBLE);}
+            @Override public void onPageCommitVisible(WebView v,String url){
+                if(startup!=null && firstParty(Uri.parse(url)))startup.firstFrame(v);
+            }
             @Override public void onPageFinished(WebView v,String url){
                 progress.setVisibility(View.GONE);
                 if(onOurPage()&&!failed){web.evaluateJavascript(remoteScript,null);CookieManager.getInstance().flush();web.requestFocus();}
@@ -75,7 +80,7 @@ public final class MainActivity extends Activity {
             @Override public void onReceivedHttpError(WebView v,WebResourceRequest req,WebResourceResponse r){if(req.isForMainFrame()&&r.getStatusCode()>=400)showError();}
             @Override public void onReceivedSslError(WebView v,SslErrorHandler h,SslError e){h.cancel();}
             @Override public boolean onRenderProcessGone(WebView v,RenderProcessGoneDetail d){
-                destroyed=true;root.removeView(web);web.destroy();
+                destroyed=true;if(startup!=null)startup.dispose();root.removeView(web);web.destroy();
                 new AlertDialog.Builder(MainActivity.this).setMessage("El reproductor se cerró. Vuelve a abrir Qué Hay TV.")
                     .setPositiveButton("Cerrar",(dialog,which)->finish()).setCancelable(false).show();return true;
             }
@@ -92,6 +97,7 @@ public final class MainActivity extends Activity {
         });
         // This TV package deliberately has no download flow or external browser intents.
         web.setDownloadListener((url,ua,disposition,mime,length)->{});
+        startup = new StartupOverlay(this, root, state, R.drawable.qh_startup_face);
         immersive();web.requestFocus();web.loadUrl(ORIGIN+"/tv");
     }
     private String remoteKey(int code){
@@ -119,6 +125,7 @@ public final class MainActivity extends Activity {
     private void hideCustom(){if(customView!=null){root.removeView(customView);customView=null;customCallback.onCustomViewHidden();customCallback=null;web.setVisibility(View.VISIBLE);web.requestFocus();immersive();}}
     private void hideError(){if(errorView!=null){root.removeView(errorView);errorView=null;}}
     private void showError(){
+        if(startup!=null)startup.dispose();
         failed=true;progress.setVisibility(View.GONE);if(errorView!=null)return;
         errorView=new LinearLayout(this);errorView.setOrientation(LinearLayout.VERTICAL);errorView.setGravity(Gravity.CENTER);errorView.setPadding(40,30,40,30);errorView.setBackgroundColor(Color.rgb(7,14,24));
         TextView title=new TextView(this);title.setText(BuildConfig.LIVE ? "No pudimos conectar con Qué Hay" : "Conecta con tu PC de prueba");title.setTextColor(Color.WHITE);title.setTextSize(24);errorView.addView(title);
@@ -127,12 +134,13 @@ public final class MainActivity extends Activity {
         root.addView(errorView,new FrameLayout.LayoutParams(-1,-1));retry.requestFocus();
     }
     @Override public void onBackPressed(){
+        if(startup!=null)startup.dispose();
         if(customView!=null){hideCustom();return;}
         if(!destroyed && errorView==null && onOurPage())web.evaluateJavascript("Boolean(window.TVBack && window.TVBack())",handled->{if(!"true".equals(handled))confirmExit();});
         else confirmExit();
     }
     private void confirmExit(){new AlertDialog.Builder(this).setMessage("¿Salir de Qué Hay TV?").setNegativeButton("Seguir aquí",null).setPositiveButton("Salir",(d,w)->finish()).show();}
-    @Override protected void onPause(){if(web!=null&&!destroyed){CookieManager.getInstance().flush();web.onPause();}super.onPause();}
+    @Override protected void onPause(){if(startup!=null)startup.dispose();if(web!=null&&!destroyed){CookieManager.getInstance().flush();web.onPause();}super.onPause();}
     @Override protected void onResume(){super.onResume();if(web!=null&&!destroyed){web.onResume();immersive();}}
-    @Override protected void onDestroy(){if(web!=null&&!destroyed){destroyed=true;web.stopLoading();web.destroy();}super.onDestroy();}
+    @Override protected void onDestroy(){if(startup!=null)startup.dispose();if(web!=null&&!destroyed){destroyed=true;web.stopLoading();web.destroy();}super.onDestroy();}
 }

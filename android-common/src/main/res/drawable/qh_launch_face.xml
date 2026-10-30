@@ -1,0 +1,3 @@
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:inset="48dp">
+    <bitmap android:src="@drawable/qh_startup_face" android:gravity="fill" android:filter="true" />
+</inset>

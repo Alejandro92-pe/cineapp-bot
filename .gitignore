@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 .local/
+/static/_design-preview/
 __pycache__/
 .pytest_cache/
 *.pyc
