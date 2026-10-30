@@ -34,6 +34,9 @@
   }
   function render() {
     const state = AccountSession.state;
+    const telegramAvailable=Boolean(window.Telegram?.WebApp?.initData);
+    $('telegram-login').hidden=!telegramAvailable;
+    $('telegram-entry-help').textContent=telegramAvailable?'Continúa con tu cuenta de Telegram.':'¿Tu cuenta nació en Telegram? Abre Qué Hay desde el bot y ve a Mi cuenta → Añadir correo y contraseña. Después vuelve aquí e inicia sesión con esos datos. No necesitas crear otra cuenta.';
     $('account-loading').hidden=true;
     document.body.classList.toggle('account-authenticated',state.authenticated);
     $('forms').hidden=state.authenticated; $('signed-in').hidden=!state.authenticated;
@@ -45,6 +48,10 @@
       $('identity').textContent = state.user.email || 'Cuenta vinculada con Telegram';
       $('telegram-status').textContent = state.user.telegram_id ? 'ID '+state.user.telegram_id+' · Verificado' : 'Sin vincular';
       $('link-telegram').hidden=!!state.user.telegram_id;
+      $('email-access-panel').hidden=!(state.user.telegram_id&&!state.user.email&&!state.user.email_login_enabled);
+      $('change-password-panel').hidden=!state.user.email_login_enabled;
+      $('email-access-form').hidden=!telegramAvailable;
+      $('email-access-help').textContent=telegramAvailable?'Confirma estos datos desde tu cuenta verificada de Telegram.':'Para activar este acceso, abre Qué Hay desde el bot de Telegram y vuelve a esta sección.';
       $('role').textContent=state.is_admin?'Administrador':'Usuario';
       $('admin-link').hidden=!state.is_admin;
     }
@@ -72,6 +79,16 @@
   async function link(){try{await AccountSession.telegram();render();feedback('Telegram verificado.',true);if(new URLSearchParams(location.search).get('next')==='membership')location.href='/membresia';}catch(error){feedback(error.message);}}
   $('telegram-login').onclick=link;$('link-telegram').onclick=link;
   $('password-form').onsubmit=async event=>{event.preventDefault();try{await post('/api/auth/password',Object.fromEntries(new FormData(event.target)));event.target.reset();feedback('Contraseña actualizada. Las otras sesiones se cerraron.',true);}catch(error){feedback(error.message);}};
+  $('email-access-form').onsubmit=async event=>{
+    event.preventDefault();const form=event.target,button=$('email-access-submit'),status=$('email-access-status');
+    const body=Object.fromEntries(new FormData(form));status.textContent='';
+    if(body.password!==body.password_confirmation){status.textContent='Las contraseñas no coinciden.';return;}
+    button.disabled=true;
+    try{
+      await post('/api/auth/email-access',{...body,init_data:window.Telegram?.WebApp?.initData||''});
+      form.reset();render();feedback('Acceso con correo activado. Usa esos datos en la app del celular. Conservas tu cuenta y membresía.',true);
+    }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+  };
   function updateProfile(){
     if(!AccountSession.state.authenticated)return;
     const count=AccountLibrary.saved().length;

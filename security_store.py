@@ -126,6 +126,16 @@ class SecurityStore:
             c.execute(update(accounts).where(accounts.c.id == account_id).values(password_hash=password_hash))
             c.execute(delete(sessions).where(sessions.c.account_id == account_id))
 
+    def add_email_credentials(self, account_id, telegram_id, email, password_hash):
+        """Attach a first login to the same verified account, never merge identities."""
+        with self.engine.begin() as c:
+            result = c.execute(update(accounts).where(accounts.c.id == account_id,
+                accounts.c.telegram_id == telegram_id, accounts.c.email.is_(None),
+                accounts.c.password_hash.is_(None)).values(email=email,password_hash=password_hash))
+            if result.rowcount != 1:return False
+            c.execute(delete(sessions).where(sessions.c.account_id == account_id))
+        return True
+
     def allow_attempt(self, key, maximum=10, seconds=900):
         window = int(time.time()) // seconds
         ins = sqlite_insert if self.local else pg_insert

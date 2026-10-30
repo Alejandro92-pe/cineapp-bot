@@ -34,7 +34,7 @@
       </form>
       <div class="separator"><span>¿Ya usabas la Mini App?</span></div>
       <button id="telegram-login" class="secondary" type="button">Continuar con Telegram</button>
-      <p class="hint">Si ya usas QueHay en Telegram, entra desde el bot para conservar tu acceso.</p>
+      <p class="hint" id="telegram-entry-help">Si ya usas Qué Hay en Telegram, entra desde el bot para conservar tu acceso.</p>
     </div>
     <div id="signed-in" hidden>
       <div class="account-profile-head"><div id="profile-avatar" class="profile-avatar" aria-label="Tu avatar"></div><div><p class="eyebrow">TU ESPACIO PERSONAL</p><h2 id="welcome">Tu cuenta está lista.</h2><p id="identity" class="muted"></p></div></div>
@@ -42,11 +42,26 @@
       <p id="profile-sync-status" class="hint" role="status"></p><a class="account-library-link" href="/?vista=guardados"><span>＋ Mi lista</span><small id="saved-count">Tus títulos guardados</small><span aria-hidden="true">→</span></a><section class="profile-membership" aria-label="Mi membresía"><span id="membership-badge" class="membership-badge">Consultando</span><p class="eyebrow">TU ACCESO</p><h3 id="membership-state">Comprobando membresía…</h3><p id="membership-expiry"></p><p id="membership-pending" class="membership-pending" hidden></p><p id="membership-terms" class="hint">30 días por compra. Sin renovación automática.</p><a id="membership-action" class="secondary link-button" href="/membresia">Ver membresía</a><button id="refresh-membership" class="logout" type="button">Actualizar estado</button></section>
       <details class="account-disclosure" id="purchases"><summary>Mis compras y solicitudes <span id="orders-count"></span></summary><div id="membership-orders" aria-live="polite"></div></details>
       <a href="/" class="primary link-button">Volver a ver <span aria-hidden="true">→</span></a>
+      <a id="link-tv" href="/tv/vincular" class="secondary link-button">Vincular televisor <span aria-hidden="true"> →</span></a>
+      <p class="hint">Introduce el código de tu TV desde esta misma cuenta.</p>
+      <details class="account-disclosure" id="email-access-panel" hidden><summary>Añadir correo y contraseña</summary>
+        <p class="hint">Entra también desde la app del celular, el navegador o la TV. Conservas tu cuenta, acceso y Mi lista. Telegram seguirá vinculado.</p>
+        <p id="email-access-help" class="hint"></p>
+        <form id="email-access-form">
+          <label>Tu correo electrónico<input id="access-email" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+          <label>Crea una contraseña<input name="password" type="password" autocomplete="new-password" minlength="12" required></label>
+          <p class="hint">Usa al menos 12 caracteres. Puedes usar una frase.</p>
+          <label>Repite la contraseña<input name="password_confirmation" type="password" autocomplete="new-password" minlength="12" required></label>
+          <p class="hint">Comprueba tu correo antes de guardar. Después podrás usarlo para iniciar sesión. Las otras sesiones deberán volver a identificarse.</p>
+          <button id="email-access-submit" class="primary" type="submit">Activar acceso con correo</button>
+        </form>
+        <p id="email-access-status" class="feedback" role="status" aria-live="polite"></p>
+      </details>
       <details class="account-disclosure"><summary>Seguridad y conexiones</summary>
       <div class="account-detail"><span>Telegram</span><strong id="telegram-status">Sin vincular</strong></div>
       <div class="account-detail"><span>Permisos</span><strong id="role">Usuario</strong></div>
       <button id="link-telegram" type="button" class="secondary">Vincular mi Telegram</button>
-      <details><summary>Cambiar contraseña</summary><form id="password-form"><label>Contraseña actual<input type="password" name="current_password" autocomplete="current-password" required></label><label>Nueva contraseña<input type="password" name="password" autocomplete="new-password" minlength="12" required></label><button class="secondary" type="submit">Actualizar y cerrar otras sesiones</button></form></details>
+      <details id="change-password-panel"><summary>Cambiar contraseña</summary><form id="password-form"><label>Contraseña actual<input type="password" name="current_password" autocomplete="current-password" required></label><label>Nueva contraseña<input type="password" name="password" autocomplete="new-password" minlength="12" required></label><button class="secondary" type="submit">Actualizar y cerrar otras sesiones</button></form></details>
       </details>
       <a href="/admin" id="admin-link" class="secondary link-button" hidden>Administración</a>
       <button id="logout" type="button" class="logout">Cerrar sesión</button>

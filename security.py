@@ -127,7 +127,8 @@ def install_security(app, membership_checker):
                 store.allow_attempt("identity:"+str(identifier).lower(), 10))
 
     def account_view(account):
-        return {k: account.get(k) for k in ("id", "email", "name", "telegram_id")}
+        return {**{k: account.get(k) for k in ("id", "email", "name", "telegram_id")},
+                'email_login_enabled':bool(account.get('password_hash'))}
 
     def issue(account, admin=False):
         # Viewing and administrative elevation have independent lifetimes.
@@ -386,6 +387,36 @@ def install_security(app, membership_checker):
             return error(str(exc), 400)
         store.change_password(account["id"], hashed)
         return issue(store.account(id=account["id"]))
+
+    @app.post('/api/auth/email-access')
+    def add_email_access():
+        body=data();account=g.identity['account']
+        if not limited('email-access:'+account['id']):
+            return error('Demasiados intentos. Espera 15 minutos.',429)
+        if not account['telegram_id'] or account['email'] or account['password_hash']:
+            return error('Esta cuenta ya tiene datos de acceso o no usa Telegram.',409)
+        try:
+            user=telegram_identity(body.get('init_data'),os.getenv('BOT_TOKEN',''))
+        except (ValueError,TypeError,KeyError):
+            return error('Para añadir tu acceso, cierra y vuelve a abrir Qué Hay desde el bot de Telegram.',401)
+        if user['id']!=account['telegram_id']:
+            return error('Verifica la misma cuenta de Telegram con la que iniciaste sesión.',403)
+        email=str(body.get('email','')).strip().lower()
+        if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):
+            return error('Revisa tu correo electrónico.',400)
+        if body.get('password')!=body.get('password_confirmation'):
+            return error('Las contraseñas no coinciden.',400)
+        try:
+            hashed=password_hash(body.get('password'))
+            if not store.add_email_credentials(account['id'],user['id'],email,hashed):
+                return error('Los datos de acceso cambiaron. Actualiza tu cuenta.',409)
+        except ValueError as exc:
+            return error(str(exc),400)
+        except IntegrityError:
+            return error('No se pudo añadir ese correo. Usa otro que sea tuyo; no se fusionan cuentas.',409)
+        # Email is a login identifier, not a verified recovery address. No new
+        # account, membership, admin elevation or email-based merging is created.
+        return issue(store.account(id=account['id']))
 
     def admin_login():
         body = data()
