@@ -60,18 +60,14 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        MobileInsets.configureWindow(getWindow());
         root = new FrameLayout(this); root.setBackgroundColor(Color.rgb(8,15,25)); setContentView(root);
         web = new WebView(this); web.setBackgroundColor(Color.rgb(8,15,25));
         root.addView(web,new FrameLayout.LayoutParams(-1,-1));
         progress = new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
         root.addView(progress,new FrameLayout.LayoutParams(-1,6,Gravity.TOP));
-        root.setOnApplyWindowInsetsListener((v,insets)->{
-            if (android.os.Build.VERSION.SDK_INT >= 30) {
-                var safe=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
-                root.setPadding(safe.left,safe.top,safe.right,safe.bottom);
-            } else root.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
-            return insets;
-        });
+        root.setOnApplyWindowInsetsListener(MobileInsets::apply);
+        root.requestApplyInsets();
         WebSettings settings=web.getSettings();
         settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false); settings.setAllowContentAccess(false);
@@ -177,7 +173,7 @@ public final class MainActivity extends Activity {
         if(android.os.Build.VERSION.SDK_INT>=30){
             var controller=getWindow().getInsetsController();
             if(controller!=null){controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);if(value)controller.hide(WindowInsets.Type.systemBars());else controller.show(WindowInsets.Type.systemBars());}
-        }else root.setSystemUiVisibility(value ? View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY : View.SYSTEM_UI_FLAG_VISIBLE);
+        }else root.setSystemUiVisibility(MobileInsets.LEGACY_LAYOUT_FLAGS | (value ? View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY : 0));
         setRequestedOrientation(value ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
     }
     private void hideCustom(){if(customView!=null){root.removeView(customView);customView=null;customCallback.onCustomViewHidden();customCallback=null;applyImmersive(expanded);}}

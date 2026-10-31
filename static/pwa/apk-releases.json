@@ -3,13 +3,13 @@
   "published": true,
   "releases": {
     "android": {
-      "version": "0.5.0",
-      "versionCode": 5,
+      "version": "0.5.1",
+      "versionCode": 6,
       "package": "live.quehay.app.preview",
-      "filename": "QueHay-Android-0.5.0.apk",
-      "url": "https://quehay.live/apps/QueHay-Android-0.5.0.apk",
-      "bytes": 36907,
-      "sha256": "31c219bc782095049f11aa916c4014a14b08987fd6cb0e504190567f988bad73",
+      "filename": "QueHay-Android-0.5.1.apk",
+      "url": "https://quehay.live/apps/QueHay-Android-0.5.1.apk",
+      "bytes": 37423,
+      "sha256": "5cb68c591461e19a6f7cc39878e6b5b714c9c8fd19713408eb4002c2496a95e0",
       "signerSha256": "8b9eb1ea50e568ea54ba1dd1859fcef647edd3f78a4dd88abc0928508decf681",
       "minAndroid": 8
     },

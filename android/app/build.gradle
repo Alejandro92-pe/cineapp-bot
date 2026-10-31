@@ -7,12 +7,12 @@ android {
     sourceSets.main.res.srcDir('../../android-common/src/main/res')
     sourceSets.androidTest.java.srcDir('../../android-common/src/androidTest/java')
     defaultConfig {
-        testInstrumentationRunner 'live.quehay.startup.StartupChecks'
+        testInstrumentationRunner providers.gradleProperty('mobileInsetsCheck').getOrElse('false') == 'true' ? 'live.quehay.app.MobileInsetsChecks' : 'live.quehay.startup.StartupChecks'
         applicationId startupCheck ? 'live.quehay.app.startupcheck' : 'live.quehay.app.preview'
         minSdk 26
         targetSdk 35
-        versionCode 5
-        versionName '0.5.0'
+        versionCode 6
+        versionName '0.5.1'
         buildConfigField 'String', 'APP_ORIGIN', startupCheck ? '"http://127.0.0.1:5031"' : '"https://app.quehay.live"'
     }
     buildFeatures { buildConfig true }
