@@ -229,6 +229,13 @@ def install_security(app, membership_checker):
             "worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://web.telegram.org")
         if app.config.get('VIDEOAPI_ENABLED'):
             response.headers['Content-Security-Policy'] = response.headers['Content-Security-Policy'].replace('frame-src ', 'frame-src https://videoapi.la ')
+        # Consent-gated analytics belongs only to these public web surfaces.
+        # Keep admin, APIs and TV on their existing restrictive policy.
+        if request.path in ('/', '/cuenta', '/membresia', '/instalar'):
+            policy = response.headers['Content-Security-Policy']
+            policy = policy.replace("script-src 'self'", "script-src https://www.googletagmanager.com 'self'")
+            policy = policy.replace("connect-src 'self'", "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com")
+            response.headers['Content-Security-Policy'] = policy
         if not local:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.path.startswith("/api/") or request.path in ADMIN_PATHS | USER_PATHS:

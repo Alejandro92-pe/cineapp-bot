@@ -46,6 +46,7 @@
    $('player-retry').hidden=true;
    $('player-title').textContent=item.titulo+(selection.episode?` · T${selection.season.numero} E${selection.episode.numero}`:'');
    AccountLibrary.opened(item,selection);
+   root.QueHayAnalytics?.event('playback_open',{content_id:String(item.id),content_type:item.tipo});
   }catch(error){if(token!==revision)return;$('inline-player').hidden=false;$('modalDetalle').classList.add('has-player');$('player-status').textContent=error.message;$('player-retry').hidden=false;$('player-next').hidden=true;}
  }
  async function next(){const item=current,token=revision;if(!item||nextBusy)return;nextBusy=true;const button=$('player-next');button.disabled=true;try{const selected=await EpisodeBrowser.next();if(current!==item||revision!==token)return;if(selected)await start(item);else{$('player-status').textContent='Llegaste al último episodio disponible.';$('player-status').hidden=false;}}catch(error){if(revision===token){$('player-status').textContent=error.message;$('player-status').hidden=false;button.disabled=false;}}finally{nextBusy=false;}}

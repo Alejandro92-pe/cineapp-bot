@@ -117,6 +117,7 @@
       if(!append){offset=0;grid.replaceChildren();more.hidden=true;}
       try{
         const result=await request(payload(offset));if(token!==revision||id!==requestId)return;
+        if(!append)root.QueHayAnalytics?.filter({content_type:state.type,has_query:Boolean(state.query.trim()),result_count:result.total});
         offset+=result.data.length;grid.append(...result.data.map(card));status.textContent=`${result.total} ${result.total===1?'título encontrado':'títulos encontrados'}`;
         if(!offset)grid.append(empty('No encontramos ese título.','Prueba otro nombre o limpia los filtros.'));
         more.hidden=offset>=result.total||result.data.length===0;
@@ -130,6 +131,7 @@
   async function mount(view,options={}){
     disposeHero();disposeHero=()=>{};
     clearTimeout(timer);const token=++revision;currentView=view;
+    root.QueHayAnalytics?.view(view);
     if(options.type)state.type=options.type;
     const container=document.getElementById('contenido');container.className='cine-main';
     document.querySelectorAll('[data-cine-view]').forEach(n=>{const active=n.dataset.cineView===(view==='buscar'?'explorar':view);n.classList.toggle('active',active);if(active)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});

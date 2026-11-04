@@ -28,10 +28,11 @@
     $('guest-note').hidden=AccountSession.state.authenticated;
   }
   async function start(method, button, existing=null) {
+    window.QueHayAnalytics?.event('select_payment_method',{payment_method:method.id});
     if(!AccountSession.state.authenticated){location.href='/cuenta?next=membership';return;}
     if(permanentAccess){$('payment-feedback').textContent='Tu acceso de propietario es permanente. No necesitas comprar.';return;}
     button.disabled=true;$('payment-feedback').textContent='';
-    try { const result=existing?{order:existing,local:configuration.local}:await api('/api/payments/orders',{method:method.id});showCheckout(method,result);await refresh(); }
+    try { const result=existing?{order:existing,local:configuration.local}:await api('/api/payments/orders',{method:method.id});showCheckout(method,result);if(!existing)window.QueHayAnalytics?.event('begin_checkout',{payment_method:method.id,value:method.amount_minor/100,currency:method.currency});await refresh(); }
     catch(error){$('payment-feedback').textContent=error.message;}finally{button.disabled=false;}
   }
   function showCheckout(method,result) {
@@ -47,7 +48,7 @@
       else{
         if(!result.checkout_url)throw new Error('El enlace de compra todavía no está configurado.');
         const link=node('a','Ir al pago único de US$1.50','primary-action');link.href=result.checkout_url;link.target='_blank';link.rel='noopener noreferrer';
-        link.onclick=event=>{if(window.Telegram?.WebApp?.initData){event.preventDefault();Telegram.WebApp.openLink(link.href,{try_instant_view:false});}};content.append(link);
+        link.onclick=event=>{window.QueHayAnalytics?.event('checkout_redirect',{payment_method:'bmc'});if(window.Telegram?.WebApp?.initData){event.preventDefault();Telegram.WebApp.openLink(link.href,{try_instant_view:false});}};content.append(link);
       }
     }else{
       content.append(node('p','Destinatario: '+method.recipient));
@@ -58,7 +59,7 @@
       const form=document.createElement('form');
       [['reference','Número de operación / ID del pago','text'],['payer','Nombre del titular que pagó','text'],['paid_date','Fecha del pago','date']].forEach(([name,label,type])=>{const field=node('label',label);const input=document.createElement('input');input.name=name;input.type=type;input.required=true;input.maxLength=name==='payer'?80:100;if(type==='date')input.value=new Date().toLocaleDateString('en-CA');field.append(input);form.append(field);});
       const submit=node('button','Registrar pago para revisión','primary-action');submit.type='submit';form.append(submit);
-      form.onsubmit=async event=>{event.preventDefault();submit.disabled=true;try{await api(`/api/payments/orders/${order.id}/report`,Object.fromEntries(new FormData(form)));$('checkout-feedback').textContent='Solicitud enviada. Verificaremos el ingreso antes de activar tus 30 días.';$('checkout-feedback').className='success';form.remove();await refresh();}catch(error){$('checkout-feedback').textContent=error.message;submit.disabled=false;}};
+      form.onsubmit=async event=>{event.preventDefault();submit.disabled=true;try{await api(`/api/payments/orders/${order.id}/report`,Object.fromEntries(new FormData(form)));window.QueHayAnalytics?.event('payment_submitted',{payment_method:method.id});$('checkout-feedback').textContent='Solicitud enviada. Verificaremos el ingreso antes de activar tus 30 días.';$('checkout-feedback').className='success';form.remove();await refresh();}catch(error){$('checkout-feedback').textContent=error.message;submit.disabled=false;}};
       content.append(form,node('p','Registrar la operación no activa el acceso inmediatamente. Espera la aprobación del administrador.'));
     }
     if(!$('payment-dialog').open)$('payment-dialog').showModal();

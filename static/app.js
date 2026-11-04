@@ -1515,6 +1515,7 @@ async function abrirModalContenido(item) {
   _resetTemporadas();
 
   contenidoSeleccionado = item;
+  window.QueHayAnalytics?.event('view_content',{content_id:String(item.id),content_name:item.titulo,content_type:item.tipo});
 
   const bgEl = document.getElementById('detalleHeroBg');
   if (bgEl) CatalogArtwork.detail(bgEl, {backdrop_url: item.backdrop_url ? safeImageSrc(item.backdrop_url) : '', imagen_url:safeImageSrc(item.imagen_url)});
