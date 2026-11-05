@@ -102,9 +102,32 @@
   function init(){
     if(!allowed)return;
     const link=document.createElement('button');link.type='button';link.className='qh-measure-settings';link.textContent='Estadísticas';link.setAttribute('aria-label','Personalizar cookies y estadísticas');link.onclick=preferences;
-    let footer=document.querySelector('footer');
-    if(!footer){footer=document.createElement('footer');footer.className='qh-measure-footer';footer.setAttribute('aria-label','Información de cookies y estadísticas');document.body.append(footer);}
-    footer.append(link);    if(navigator.globalPrivacyControl===true)return;
+    function installSettingsLink(){
+      const footer=section==='app'
+        ? (document.querySelector('.cine-page-footer') || (location.pathname!=='/' ? document.querySelector('footer:not(.qh-measure-footer)') : null))
+        : (document.querySelector('footer.footer') || document.querySelector('footer:not(.qh-measure-footer)'));
+      if(!footer)return false;
+      if(footer.contains(link))return true;
+      if(section==='app'){
+        const membership=[...footer.querySelectorAll('a')].find(a=>a.textContent.trim().toLowerCase()==='descubre la membresía')
+          || footer.querySelector('a[href="/membresia"]');
+        if(membership)footer.insertBefore(link,membership);else footer.append(link);
+      }else{
+        const nav=footer.querySelector('nav[aria-label="Información"]');
+        (nav||footer).append(link);
+      }
+      return true;
+    }
+    if(!installSettingsLink() && document.body){
+      const observer=new MutationObserver(records=>{
+        const hasFooter=records.some(record=>[...record.addedNodes].some(node=>
+          node.nodeType===1 && (node.matches?.('.cine-page-footer') || node.querySelector?.('.cine-page-footer'))
+        ));
+        if(hasFooter)installSettingsLink();
+      });
+      observer.observe(document.body,{childList:true,subtree:true});
+    }
+    if(navigator.globalPrivacyControl===true)return;
     if(choice()==='yes')start();else if(choice()!=='no')preferences();
     document.addEventListener('click',e=>{
       const a=e.target.closest?.('a[href]');if(!a)return;
