@@ -4,7 +4,8 @@
   if (root.QueHayAnalytics) return;
   const ID='G-NQWW6WCBR2', KEY='qh_analytics_v1';
   const live=location.protocol==='https:' && ['quehay.live','www.quehay.live','app.quehay.live'].includes(location.hostname);
-  const allowed=live && ['/', '/membresia', '/cuenta', '/instalar'].includes(location.pathname);
+  const preview=location.protocol==='http:' && ['127.0.0.1','localhost'].includes(location.hostname) && location.pathname.endsWith('/consent-preview.html') && new URLSearchParams(location.search).get('qhAnalyticsPreview')==='1';
+  const allowed=preview || (live && ['/', '/membresia', '/cuenta', '/instalar'].includes(location.pathname));
   let enabled=false, loaded=false, banner, lastView='', filterTimer;
   const surface=()=>/QueHayAndroid\//.test(navigator.userAgent)?'android':root.Telegram?.WebApp?.initData?'telegram':root.matchMedia?.('(display-mode: standalone)').matches?'pwa':'web';
   const section=location.hostname==='app.quehay.live'?'app':'landing';
@@ -20,7 +21,7 @@
   };
   function choice(){return document.cookie.split('; ').find(v=>v.startsWith(KEY+'='))?.split('=')[1]||'';}
   function event(name, data={}) {
-    if(!enabled || !fields[name])return;
+    if(preview || !enabled || !fields[name])return;
     const clean={site_section:section,client_surface:surface(),page_location:page,page_referrer:referrer};
     for(const key of fields[name]){
       const value=data[key];
@@ -31,6 +32,7 @@
     root.gtag('event',name,clean);
   }
   function start(){
+    if(preview)return;
     if(!allowed || enabled || navigator.globalPrivacyControl===true)return;
     enabled=true;root['ga-disable-'+ID]=false;
     if(!loaded){
@@ -47,7 +49,7 @@
     if(lastView)event('catalog_view',{screen_name:lastView});
   }
   function choose(value){
-    document.cookie=KEY+'='+value+'; Path=/; Domain=quehay.live; Max-Age=15552000; SameSite=Lax; Secure';
+    if(!preview)document.cookie=KEY+'='+value+'; Path=/; Domain=quehay.live; Max-Age=15552000; SameSite=Lax; Secure';
     banner?.remove();banner=null;
     if(value==='yes')start();
     else{
@@ -61,16 +63,37 @@
   }
   function preferences(){
     if(banner || !allowed)return;
-    banner=document.createElement('section');banner.className='qh-measure-choice';banner.setAttribute('aria-label','Preferencias de estadísticas');
-    const title=document.createElement('strong');title.textContent='Ayúdanos a mejorar Qué Hay';
-    const text=document.createElement('p');text.textContent='Con tu permiso usamos Google Analytics para conocer las visitas y los botones que se usan. Puedes cambiar tu elección en «Estadísticas».';
-    const actions=document.createElement('div');
-    for(const [label,value] of [['Aceptar estadísticas','yes'],['Ahora no','no']]){
-      const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>choose(value);actions.append(button);
-    }
-    banner.append(title,text,actions);document.body.append(banner);
-  }
-  function view(name){
+    banner=document.createElement('section');banner.className='qh-measure-choice';banner.setAttribute('aria-label','Preferencias de cookies');
+    const render=customizing=>{
+      banner.replaceChildren();
+      const title=document.createElement('strong');title.textContent=customizing?'Personalizar cookies':'Preferencias de cookies';
+      const text=document.createElement('p');
+      if(customizing){
+        text.textContent='Elige si permites las estadísticas de Google Analytics. Puedes cambiar esta opción cuando quieras desde el pie de página.';
+      }else{
+        text.append(document.createTextNode('Este sitio utiliza cookies para ayudar a mejorar su experiencia de usuario. Obtenga más información sobre cómo usamos las cookies en nuestro '));
+        const policy=document.createElement('a');policy.href='https://quehay.live/politicas-de-privacidad/';policy.textContent='Aviso sobre cookies';policy.rel='noopener noreferrer';
+        text.append(policy,document.createTextNode('.'));
+      }
+      banner.append(title,text);
+      const actions=document.createElement('div');
+      if(customizing){
+        const label=document.createElement('label');label.className='qh-measure-toggle';
+        const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=choice()==='yes';
+        label.append(checkbox,document.createTextNode('Permitir estadísticas de visitas y uso de botones'));
+        banner.append(label);
+        const save=document.createElement('button');save.type='button';save.textContent='Guardar preferencias';save.onclick=()=>choose(checkbox.checked?'yes':'no');actions.append(save);
+        const back=document.createElement('button');back.type='button';back.textContent='Volver';back.onclick=()=>render(false);actions.append(back);
+      }else{
+        for(const [label,value] of [['OK','yes'],['Personalizar Cookies',null]]){
+          const button=document.createElement('button');button.type='button';button.textContent=label;
+          button.onclick=value?()=>choose(value):()=>render(true);actions.append(button);
+        }
+      }
+      banner.append(actions);
+    };
+    render(false);document.body.append(banner);
+  }  function view(name){
     if(!['inicio','explorar','buscar','guardados'].includes(name) || lastView===name)return;
     lastView=name;event('catalog_view',{screen_name:name});
   }
@@ -78,9 +101,10 @@
   root.QueHayAnalytics={event,view,filter,preferences};
   function init(){
     if(!allowed)return;
-    const link=document.createElement('button');link.type='button';link.className='qh-measure-settings';link.textContent='Estadísticas';link.onclick=preferences;
-    document.body.append(link);
-    if(navigator.globalPrivacyControl===true)return;
+    const link=document.createElement('button');link.type='button';link.className='qh-measure-settings';link.textContent='Estadísticas';link.setAttribute('aria-label','Personalizar cookies y estadísticas');link.onclick=preferences;
+    let footer=document.querySelector('footer');
+    if(!footer){footer=document.createElement('footer');footer.className='qh-measure-footer';footer.setAttribute('aria-label','Información de cookies y estadísticas');document.body.append(footer);}
+    footer.append(link);    if(navigator.globalPrivacyControl===true)return;
     if(choice()==='yes')start();else if(choice()!=='no')preferences();
     document.addEventListener('click',e=>{
       const a=e.target.closest?.('a[href]');if(!a)return;
