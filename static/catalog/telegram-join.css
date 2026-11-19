@@ -1,0 +1,10 @@
+/* "Únete a Telegram" in the header. Web only: hidden in the Android app (.quehay-android). */
+.cine-telegram{--tg:#229ed9;display:inline-flex;align-items:center;gap:8px;padding:8px 14px 8px 10px;border-radius:999px;background:var(--tg);color:#fff;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:0 0 0 0 rgba(34,158,217,.55);animation:cine-tg-pulse 2.4s ease-out infinite}
+.cine-telegram[hidden],.quehay-android .cine-telegram{display:none!important}
+.cine-telegram:hover{background:#1b8ec5}
+.cine-telegram:focus-visible{outline:2px solid #bfe6ff;outline-offset:3px}
+.cine-telegram svg{width:18px;height:18px;flex:none}
+@keyframes cine-tg-pulse{0%{box-shadow:0 0 0 0 rgba(34,158,217,.55)}70%{box-shadow:0 0 0 10px rgba(34,158,217,0)}100%{box-shadow:0 0 0 0 rgba(34,158,217,0)}}
+@media (prefers-reduced-motion:reduce){.cine-telegram{animation:none}}
+/* Narrow header: a round icon keeps the name, access link and account visible. */
+@media (max-width:700px){.cine-telegram{width:36px;height:36px;padding:0;justify-content:center}.cine-telegram span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.cine-telegram svg{width:19px;height:19px;margin-left:-2px}}

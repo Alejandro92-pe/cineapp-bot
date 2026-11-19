@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="/static/pwa/platforms.css?v=1">
 <script src="/static/pwa/install.js?v=2" defer></script>
 <link rel="stylesheet" href="/static/profile/profile.css">
+<link rel="stylesheet" href="/static/catalog/telegram-join.css?v=1">
 <link rel="stylesheet" href="/static/catalog/detail.css?v=videoapi-1">
 <link rel="stylesheet" href="/static/catalog/hero.css">
 <link rel="stylesheet" href="/static/catalog/episode-compact.css">
@@ -45,7 +46,7 @@
     <button type="button" data-cine-view="explorar" onclick="cambiarVista('explorar')">Catálogo</button>
     <button type="button" data-cine-view="guardados" onclick="cambiarVista('guardados')">Mi lista</button>
   </nav>
-  <div class="cine-header-actions"><a class="cine-membership-link" href="/membresia">Acceso mensual</a>
+  <div class="cine-header-actions"><a class="cine-telegram" id="telegramJoin" href="https://t.me/quehaylive" target="_blank" rel="noopener noreferrer" hidden aria-label="Únete a nuestro canal de Telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.6 3.2 2.9 10.4c-1.1.4-1.1 1.6 0 1.9l4.7 1.5 1.8 5.6c.3.8 1.2 1 1.8.4l2.6-2.4 4.9 3.6c.8.6 1.9.1 2.1-.9l3.1-14.6c.3-1.3-.9-2.3-2.3-1.9zm-3.2 4.2-8.6 7.8-.4 3.3-1.4-4.6 9.7-6.2c.5-.3.9.3.7.7z"/></svg><span>Únete a Telegram</span></a><a class="cine-membership-link" href="/membresia">Acceso mensual</a>
     <a href="/cuenta" class="user-chip" id="userChip" aria-label="Mi cuenta"><span class="uc-avatar" id="ucAvatar"></span><span class="uc-info"><span class="uc-name" id="ucName">Mi cuenta</span><span class="uc-badge" id="ucBadge">Tu espacio</span></span></a>
   </div>
 </header>
@@ -66,7 +67,7 @@
 <script src="/static/catalog/hero.js?v=3" defer></script>
 <script src="/static/catalog/browse.js?v=apps1" defer></script>
 <script src="/static/profile/sync.js" defer></script><script src="/static/profile/avatars.js" defer></script><script src="/static/profile/library.js" defer></script>
-<script src="/static/catalog/detail-loader.js?v=password-1" defer></script><script src="/static/catalog/share.js?v=1" defer></script><script src="/static/app.js?v=synopsis-1" defer></script><script src="/static/catalog/identity.js?v=1" defer></script>
+<script src="/static/catalog/telegram-join.js?v=1" defer></script><script src="/static/catalog/detail-loader.js?v=password-1" defer></script><script src="/static/catalog/share.js?v=1" defer></script><script src="/static/app.js?v=synopsis-1" defer></script><script src="/static/catalog/identity.js?v=1" defer></script>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>window.Telegram?.WebApp?.ready());
