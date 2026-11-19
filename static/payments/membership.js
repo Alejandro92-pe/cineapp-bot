@@ -1,7 +1,7 @@
 (function () {
   const $ = id => document.getElementById(id);
   let configuration, currentOrders = [], permanentAccess = false;
-  const labels = {draft:'Falta registrar tu pago',pending_provider:'Esperando confirmación de Buy Me a Coffee',pending_review:'En revisión manual',approved:'Acceso activado',rejected:'No aprobado'};
+  const labels = {draft:'Falta registrar tu pago',pending_provider:'Esperando el pago en Buy Me a Coffee',pending_review:'En revisión manual',approved:'Acceso activado',rejected:'No aprobado'};
   function amount(method) { return (method.currency === 'PEN' ? 'S/' : method.currency === 'USD' ? 'US$' : '') + (method.amount_minor/100).toFixed(2) + (method.currency === 'USDT' ? ' USDT' : ''); }
   async function api(path, body) {
     const response = await fetch(path, body === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -17,12 +17,12 @@
     const container = $('payment-methods'); container.replaceChildren();
     configuration.methods.forEach(method => {
       const card = node('article',null,'method-card'+(method.id === 'bmc'?' recommended':''));
-      card.append(node('span',method.id === 'bmc'?'RECOMENDADO · CONFIRMACIÓN AUTOMÁTICA':'CONFIRMACIÓN MANUAL','method-label'));
+      card.append(node('span',method.id === 'bmc'?'RECOMENDADO · MEMBRESÍA IMAX':'PAGO ÚNICO · CONFIRMACIÓN MANUAL','method-label'));
       const heading = node('div',null,'method-heading'); const icon=node('span',null,'method-icon'); icon.setAttribute('aria-hidden','true');
       icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+icons[method.id]+'</svg>';
-      heading.append(icon,node('h3',method.label));card.append(heading,node('div',amount(method),'method-price'));
-      card.append(node('p',method.id === 'bmc'?'Compra el acceso como un pago único. Al confirmar el pago, se activa en tu cuenta.':method.id === 'yape_plin'?'Escanea el QR con Yape o Plin y registra tu operación. Revisaremos el ingreso para activar tu acceso.':'Usa Binance Pay con USDT y registra el ID de la operación. Activamos el acceso después de revisar el ingreso.','method-desc'));
-      const button=node('button',!method.available?'Pendiente de habilitar':method.id === 'bmc'?'Continuar con Buy Me a Coffee':'Pagar con '+method.label);button.type='button';button.disabled=!method.available;
+      heading.append(icon,node('h3',method.label));card.append(heading,node('div',amount(method)+(method.recurring?' al mes':''),'method-price'));
+      card.append(node('p',method.id === 'bmc'?'Únete a la membresía IMAX. Se activa sola al confirmarse el pago y se renueva cada mes; cancelas cuando quieras.':method.id === 'yape_plin'?'Escanea el QR con Yape o Plin y registra tu operación. Revisaremos el ingreso para activar tu acceso.':'Usa Binance Pay con USDT y registra el ID de la operación. Activamos el acceso después de revisar el ingreso.','method-desc'));
+      const button=node('button',!method.available?'Pendiente de habilitar':method.id === 'bmc'?'Unirme a IMAX':'Pagar con '+method.label);button.type='button';button.disabled=!method.available;
       button.onclick=()=>start(method,button);card.append(button);container.append(card);
     });
     $('guest-note').hidden=AccountSession.state.authenticated;
@@ -32,22 +32,41 @@
     if(!AccountSession.state.authenticated){location.href='/cuenta?next=membership';return;}
     if(permanentAccess){$('payment-feedback').textContent='Tu acceso de propietario es permanente. No necesitas comprar.';return;}
     button.disabled=true;$('payment-feedback').textContent='';
+    if(method.id==='bmc'&&!existing){button.disabled=false;askEmail(method);return;}
     try { const result=existing?{order:existing,local:configuration.local}:await api('/api/payments/orders',{method:method.id});showCheckout(method,result);if(!existing)window.QueHayAnalytics?.event('begin_checkout',{payment_method:method.id,value:method.amount_minor/100,currency:method.currency});await refresh(); }
     catch(error){$('payment-feedback').textContent=error.message;}finally{button.disabled=false;}
+  }
+  // BMC memberships carry no purchase code: the payment is linked by the email used in Buy Me a Coffee.
+  function askEmail(method){
+    const content=$('checkout-content');content.replaceChildren();$('checkout-feedback').textContent='';$('checkout-feedback').className='';
+    const title=node('h2','Membresía IMAX');title.id='checkout-title';
+    content.append(title,node('p',amount(method)+' al mes','checkout-amount'),node('p','Se renueva cada mes en Buy Me a Coffee. Puedes cancelarla cuando quieras y conservas el acceso hasta el final del mes pagado.'));
+    const form=document.createElement('form');const field=node('label','Email que usarás en Buy Me a Coffee');
+    const input=document.createElement('input');input.type='email';input.name='email';input.required=true;input.maxLength=80;input.autocomplete='email';
+    input.value=AccountSession.state.user?.email||'';field.append(input);
+    form.append(field,node('p','Con este email vinculamos tu pago a tu cuenta. Escríbelo igual en Buy Me a Coffee.','field-help'));
+    const submit=node('button','Continuar','primary-action');submit.type='submit';form.append(submit);
+    form.onsubmit=async event=>{event.preventDefault();submit.disabled=true;$('checkout-feedback').textContent='';
+      try{const result=await api('/api/payments/orders',{method:'bmc',email:input.value.trim()});showCheckout(method,result);window.QueHayAnalytics?.event('begin_checkout',{payment_method:'bmc',value:method.amount_minor/100,currency:method.currency});await refresh();}
+      catch(error){$('checkout-feedback').textContent=error.message;submit.disabled=false;}};
+    content.append(form);
+    if(!$('payment-dialog').open)$('payment-dialog').showModal();
+    input.focus();
   }
   function showCheckout(method,result) {
     const order=result.order, content=$('checkout-content');content.replaceChildren();$('checkout-feedback').textContent='';
     $('checkout-feedback').className='';
-    const title=node('h2',method.label);title.id='checkout-title';content.append(title,node('p',amount(method),'checkout-amount'),node('p','30 días · un solo pago · sin renovación automática'));
+    const title=node('h2',method.label);title.id='checkout-title';content.append(title,node('p',amount(method),'checkout-amount'),node('p',method.recurring?'Membresía mensual · se renueva cada mes':'30 días · un solo pago · sin renovación automática'));
     if(order.status==='pending_review'){content.append(node('p','Tu operación ya está en revisión. No vuelvas a pagar; consulta el estado en Tus solicitudes.'));}
     else if(method.id==='bmc'){
-      content.append(node('p','Copia este código y pégalo en la pregunta «Código de compra» al pagar. Así el acceso se activa en tu cuenta.'));
-      content.append(node('code',order.code,'order-code'));
-      const copy=node('button','Copiar código','outline-action');copy.type='button';copy.onclick=async()=>{try{await navigator.clipboard.writeText(order.code);copy.textContent='Código copiado';}catch{$('checkout-feedback').textContent='Selecciona y copia el código que aparece arriba.';}};content.append(copy);
+      content.replaceChildren(title,node('p',amount(method)+' al mes','checkout-amount'));
+      content.append(node('p','Únete a IMAX en Buy Me a Coffee con este email:'),node('code',order.payer||'',"order-code"));
+      content.append(node('p','Tu acceso se activa solo en unos segundos después del pago. Si usas otro email en Buy Me a Coffee, avísanos para vincularlo.'));
+      const change=node('button','Cambiar email','outline-action');change.type='button';change.onclick=()=>askEmail(method);content.append(change);
       if(result.local){content.append(node('p','Vista previa de pago: esta operación no realiza ningún cobro.'));}
       else{
-        if(!result.checkout_url)throw new Error('El enlace de compra todavía no está configurado.');
-        const link=node('a','Ir al pago único de US$1.50','primary-action');link.href=result.checkout_url;link.target='_blank';link.rel='noopener noreferrer';
+        if(!result.checkout_url)throw new Error('El enlace de la membresía todavía no está configurado.');
+        const link=node('a','Unirme a IMAX · US$2 al mes','primary-action');link.href=result.checkout_url;link.target='_blank';link.rel='noopener noreferrer';
         link.onclick=event=>{window.QueHayAnalytics?.event('checkout_redirect',{payment_method:'bmc'});if(window.Telegram?.WebApp?.initData){event.preventDefault();Telegram.WebApp.openLink(link.href,{try_instant_view:false});}};content.append(link);
       }
     }else{
@@ -55,7 +74,7 @@
       if(configuration.local)content.append(node('p','Vista previa de pago: no realices transferencias. La confirmación de esta operación es de demostración.'));
       const img=document.createElement('img');img.src=method.qr;img.alt='QR de '+method.label;img.className='payment-qr';content.append(img);
       const download=node('a','Guardar QR para abrirlo en mi billetera','qr-download');download.href=method.qr;download.download=method.id+'-qr';content.append(download);
-      content.append(node('p',method.id==='binance'?'Escanea desde Binance Pay y comprueba el receptor, 1.50 USDT y el total antes de confirmar.':'Escanea desde Yape o Plin y comprueba el receptor y S/5.50 antes de confirmar.'));
+      content.append(node('p',method.id==='binance'?'Escanea desde Binance Pay y comprueba el receptor, '+amount(method)+' y el total antes de confirmar.':'Escanea desde Yape o Plin y comprueba el receptor y '+amount(method)+' antes de confirmar.'));
       const form=document.createElement('form');
       [['reference','Número de operación / ID del pago','text'],['payer','Nombre del titular que pagó','text'],['paid_date','Fecha del pago','date']].forEach(([name,label,type])=>{const field=node('label',label);const input=document.createElement('input');input.name=name;input.type=type;input.required=true;input.maxLength=name==='payer'?80:100;if(type==='date')input.value=new Date().toLocaleDateString('en-CA');field.append(input);form.append(field);});
       const submit=node('button','Registrar pago para revisión','primary-action');submit.type='submit';form.append(submit);

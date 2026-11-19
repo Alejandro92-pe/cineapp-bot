@@ -70,9 +70,9 @@ class QueHayBot:
                   self.link('🎬 Ver catálogo') if status['active'] else self.link('🎟 Conocer el acceso', '/membresia')))
 
     def membership(self, chat_id):
-        self.send(chat_id, '🎟 <b>Un solo acceso · 30 días</b>\n\n'
-                  '• Buy Me a Coffee: <b>US$1.50</b>\n• Yape / Plin: <b>S/5.50</b>\n• Binance Pay: <b>1.50 USDT</b>\n\n'
-                  'Un pago, sin renovación automática. Buy Me a Coffee confirma automáticamente; los pagos con QR se revisan manualmente.\n\n'
+        self.send(chat_id, '🎟 <b>Acceso al catálogo</b>\n\n'
+                  '• Buy Me a Coffee · membresía IMAX: <b>US$2 al mes</b>\n• Yape / Plin: <b>S/7.50</b> por 30 días\n• Binance Pay: <b>2 USDT</b> por 30 días\n\n'
+                  'La membresía IMAX se activa sola y se renueva cada mes; la cancelas cuando quieras. Yape/Plin y Binance son un pago único, sin renovación automática, y se revisan manualmente.\n\n'
                   'Empieza desde la página de acceso para asociar el pago a tu cuenta. Allí puedes consultar su estado.',
                   self.keyboard(self.link('Conocer el acceso mensual', '/membresia')))
 

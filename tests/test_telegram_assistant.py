@@ -58,7 +58,7 @@ def test_actual_dispatch_new_six_button_menu(assistant, system):
 @pytest.mark.parametrize('text', ['/membresia', '/start planes', '/start pago_copper', '💰 Cómo pagar', '⭐ Testimonios'])
 def test_old_payment_buttons_open_only_current_monthly_flow(assistant, text):
     response = process(assistant, text)
-    assert all(value in response['text'] for value in ('US$1.50', 'S/5.50', '1.50 USDT', 'sin renovación automática'))
+    assert all(value in response['text'] for value in ('US$2 al mes', 'S/7.50', '2 USDT', 'sin renovación automática'))
     assert buttons(response)['inline_keyboard'][0][0]['web_app']['url'].endswith('/membresia')
     assert not any(old in response['text'] for old in ('50%', 'copper', 'tutorial', 'PayPal'))
 
@@ -139,7 +139,7 @@ def test_old_callback_cannot_cancel_or_grant_payment(assistant, system):
         assistant.callback(SimpleNamespace(id='cb', data=data, message=message(), from_user=message().from_user))
     assert len(assistant.bot.answers) == 3
     assert system.supabase_service.rows == before
-    assert all('US$1.50' in row['text'] for row in assistant.bot.sent)
+    assert all('US$2 al mes' in row['text'] for row in assistant.bot.sent)
 
 
 def test_publish_owner_only_and_available(assistant, system):

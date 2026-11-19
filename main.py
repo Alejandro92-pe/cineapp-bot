@@ -428,12 +428,29 @@ def account_legacy_expiry(account_id):
     account = security_store.account(id=account_id)
     return legacy_access_expiry(account.get("telegram_id")) if account else 0
 
+
+def legacy_active_users():
+    """Old bot subscriptions still running, for the admin people list (one query, not one per account)."""
+    rows = supabase_service.table("usuarios").select("telegram_id,fecha_vencimiento").eq("membresia_activa", True).execute().data or []
+    out = []
+    for row in rows:
+        try:
+            parsed = datetime.fromisoformat(str(row["fecha_vencimiento"]).replace("Z", "+00:00"))
+            out.append({"telegram_id": row["telegram_id"],
+                        "expires": (parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).timestamp()})
+        except (ValueError, TypeError, KeyError):
+            continue
+    return out
+
 security_store = install_security(app, acceso_vigente)
 from billing.store import BillingStore
 from billing.config import PLAN
 from routes.payments import payment_routes
 billing_store = BillingStore(security_store)
-app.register_blueprint(payment_routes(billing_store, security_store, account_legacy_expiry))
+def content_titles(ids):
+    rows = supabase_service.table("contenido").select("id,titulo").in_("id", list(ids)[:50]).execute().data or []
+    return {row["id"]: row["titulo"] for row in rows}
+app.register_blueprint(payment_routes(billing_store, security_store, account_legacy_expiry, legacy_active_users, content_titles))
 from routes.pwa import pwa_routes
 app.register_blueprint(pwa_routes())
 from providers.vimeus import VimeusClient, ImportFailure
@@ -1038,7 +1055,7 @@ def api_playback(contenido_id):
         episode_id = request.args.get('episodio_id', type=int)
         if 'episodio_id' in request.args and (episode_id is None or episode_id < 1):
             return jsonify(error='Episodio inválido.'), 400
-        selected = videoapi_playback(app, supabase_service, item, episode_id, explicit=provider == 'videoapi')
+        selected = videoapi_playback(app, supabase_service, item, episode_id, explicit=provider == 'videoapi', skin=request.args.get('skin'))
         if selected is not None:
             payload, status = selected
             if status == 200 and request.method == 'POST' and not g.identity.get('admin'):

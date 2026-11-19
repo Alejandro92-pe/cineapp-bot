@@ -16,7 +16,7 @@
   const eyebrow=node('p','CONTIGO, LA FUNCIÓN CONTINÚA','support-eyebrow');
   const title=node('h2','Nos falta un protagonista: tú.');title.id='support-title';
   const description=node('p',kind==='guest'?'Crea tu cuenta gratis o inicia sesión. Para ver y descargar, necesitas un acceso activo. Tu apoyo nos ayuda a seguir compartiendo historias.':'Tu cuenta sigue aquí. Activa o renueva tu acceso y vuelve a disfrutar de las historias que te gustan. Tu apoyo nos ayuda a mantener QueHay.');description.id='support-description';
-  const price=node('p','US$1.50 · 30 días · sin renovación automática','support-price');
+  const price=node('p','Desde US$2 al mes · membresía IMAX o pago único con QR','support-price');
   const support=node('a','Quiero apoyar y ver','support-primary');support.href='/membresia';
   const account=node('a',kind==='guest'?'Iniciar sesión o crear mi cuenta':'Ya apoyé · Revisar mi cuenta','support-secondary');account.href=kind==='guest'?'/cuenta?next=membership':'/cuenta';
   const later=node('button','Seguir explorando','support-later');later.type='button';later.onclick=()=>dialog.close();

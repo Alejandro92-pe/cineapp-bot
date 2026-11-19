@@ -2,6 +2,9 @@
 (function(root){
  let revision=0,current=null,nextBusy=false,provider='videoapi',manualProvider=false;
  const $=id=>document.getElementById(id);
+ // Skin to try on this device: ?skin=netflix in the address remembers it; ?skin=default clears it.
+ const SKINS=['netflix','disney','prime','cinematic','vidzilla'];
+ function playerSkin(){let value=null;try{const asked=new URLSearchParams(location.search).get('skin');if(asked!==null){value=asked.toLowerCase();if(SKINS.includes(value))localStorage.setItem('qh-player-skin',value);else localStorage.removeItem('qh-player-skin');}return localStorage.getItem('qh-player-skin');}catch{return SKINS.includes(value)?value:null;}}
  function close(){++revision;current=null;root.PlayerScreen?.close();const frame=$('iframeReproductor');frame.onload=null;frame.removeAttribute('src');$('inline-player').hidden=true;$('modalDetalle').classList.remove('has-player');}
  async function start(item){
   if(current?.id!==item.id){provider='videoapi';manualProvider=false;}
@@ -22,6 +25,7 @@
    const params=new URLSearchParams();
    if(selection.episode)params.set('episodio_id',selection.episode.id);
    if(item.videoapi_enabled&&manualProvider)params.set('provider',provider);
+   const skin=playerSkin();if(skin)params.set('skin',skin);
    const query=params.toString()?'?'+params.toString():'';
    const response=await fetch(`/api/playback/${item.id}${query}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const payload=await response.json();
    if(token!==revision)return;
@@ -29,7 +33,7 @@
    if(!response.ok)throw Error(payload.error||'No pudimos autorizar la reproducción.');
    if(!payload.embed)throw Error('Este título todavía no tiene reproducción integrada. Sus enlaces de descarga se conservan.');
    const url=new URL(payload.url);const okru=url.origin==='https://ok.ru'&&/^\/videoembed\/[1-9][0-9]{0,19}$/.test(url.pathname);
-   const videoapi=item.videoapi_enabled&&provider==='videoapi'&&payload.provider==='videoapi'&&url.origin==='https://videoapi.la'&&/^\/e\/(movie\/[1-9][0-9]*|(tv|anime)\/[1-9][0-9]*\/[0-9]+\/[1-9][0-9]*)$/.test(url.pathname)&&[...url.searchParams].every(([key,value])=>['primary_color','secondary_color','icon_color'].includes(key)&&/^[0-9a-f]{6}$/i.test(value))&&!url.hash;
+   const videoapi=item.videoapi_enabled&&provider==='videoapi'&&payload.provider==='videoapi'&&url.origin==='https://videoapi.la'&&/^\/e\/(movie\/[1-9][0-9]*|(tv|anime)\/[1-9][0-9]*\/[0-9]+\/[1-9][0-9]*)$/.test(url.pathname)&&[...url.searchParams].every(([key,value])=>(['primary_color','secondary_color','icon_color'].includes(key)&&/^[0-9a-f]{6}$/i.test(value))||(key==='skin'&&SKINS.includes(value)))&&!url.hash;
    if(!okru&&!videoapi&&!['https://vimeus.com','https://www.vimeus.com'].includes(url.origin))throw Error('Reproductor no permitido.');
    if(url.username||url.password)throw Error('Reproductor no permitido.');
    if(item.videoapi_enabled)$('player-provider').value=videoapi?'videoapi':'vimeus';

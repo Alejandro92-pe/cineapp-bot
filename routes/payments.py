@@ -10,13 +10,13 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from flask import Blueprint, jsonify, request, g, current_app, Response, send_from_directory
 from PIL import Image
-from billing.config import PLAN, METHODS, checkout_url
+from billing.config import PLAN, METHODS, checkout_url, membership_level_id
 from billing.store import PaymentError
 from billing.webhook import process_bmc
 from security import owner_access
 
 
-def payment_routes(store, security_store, legacy_expiry):
+def payment_routes(store, security_store, legacy_expiry, legacy_active=None, title_lookup=None):
     bp = Blueprint("payments", __name__)
     default_qr = Path(__file__).resolve().parents[1]/"static"/"qr-yape.png"
 
@@ -86,7 +86,13 @@ def payment_routes(store, security_store, legacy_expiry):
         account_id = g.identity["account"]["id"]
         if not security_store.allow_attempt("checkout:"+account_id, 30):
             return jsonify(error="Demasiados intentos. Espera unos minutos."), 429
-        row = store.create(account_id, method)
+        payer = None
+        if method == "bmc":
+            # The membership is linked by the email used in Buy Me a Coffee.
+            payer = str((request.json or {}).get("email") or g.identity["account"].get("email") or "").strip().lower()
+            if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", payer) or len(payer) > 80:
+                return jsonify(error="Escribe el email que usarás en Buy Me a Coffee.", code="email_required"), 400
+        row = store.create(account_id, method, payer=payer)
         return jsonify(order=public_order(row), checkout_url=checkout_url() if method == "bmc" and not store.local else None, local=store.local)
 
     @bp.post("/api/payments/orders/<order_id>/report")
@@ -132,6 +138,86 @@ def payment_routes(store, security_store, legacy_expiry):
         except PaymentError as error:
             return jsonify(error=str(error)), 409
 
+    # ---------------------------------------------------------------- admin: people and BMC
+
+    def legacy_index():
+        """Telegram ids with an active subscription in the old bot tables, in one query."""
+        try:
+            rows = legacy_active() if legacy_active else []
+        except Exception:
+            rows = []
+        return {int(r["telegram_id"]): r["expires"] for r in rows if r.get("telegram_id")}
+
+    def describe(row, legacy):
+        now = time.time()
+        paid = row.get("expires_at") or 0
+        old = legacy.get(row.get("telegram_id") or 0, 0)
+        owner = owner_access(row)
+        until = max(paid, old)
+        state = "propietario" if owner else "activo" if until > now else "vencido" if until else "sin_pago"
+        return {**{k: row.get(k) for k in ("id", "name", "email", "telegram_id", "created_at", "orders", "last_order_at", "titles")},
+                "last_play_day": date.fromordinal(row["last_day"]).isoformat() if row.get("last_day") else None,
+                "access": state, "access_until": until or None, "legacy_until": old or None, "last_order": row.get("last_order")}
+
+    @bp.get("/api/admin/accounts")
+    def admin_accounts():
+        query = str(request.args.get("q", ""))[:80]
+        rows, total = store.accounts_overview(query or None)
+        legacy = legacy_index()
+        people = [describe(r, legacy) for r in rows]
+        counts = {}
+        for person in people:
+            counts[person["access"]] = counts.get(person["access"], 0) + 1
+        return jsonify(accounts=people, total=total, counts=counts, shown=len(people))
+
+    @bp.get("/api/admin/accounts/<account_id>")
+    def admin_account(account_id):
+        detail = store.account_detail(account_id)
+        if not detail:
+            return jsonify(error="Cuenta no encontrada."), 404
+        legacy = legacy_expiry(account_id)
+        detail["legacy_until"] = legacy or None
+        detail["orders"] = [public_order(o) for o in detail["orders"]]
+        try:
+            titles = title_lookup(sorted({p["content_id"] for p in detail["plays"]})) if title_lookup and detail["plays"] else {}
+        except Exception:
+            titles = {}
+        detail["plays"] = [{"content_id": p["content_id"], "title": titles.get(p["content_id"]),
+                            "day": date.fromordinal(p["day"]).isoformat()} for p in detail["plays"]]
+        detail["owner"] = owner_access(detail["account"])
+        return jsonify(detail)
+
+    @bp.get("/api/admin/bmc")
+    def admin_bmc():
+        return jsonify(memberships=store.memberships(), events=store.events(), level_id=membership_level_id(),
+                       checkout_url=checkout_url())
+
+    @bp.get("/api/admin/bmc/events/<event_id>")
+    def admin_bmc_event(event_id):
+        data = store.event_payload(event_id)
+        return (jsonify(payload=data), 200) if data is not None else (jsonify(error="Evento no encontrado."), 404)
+
+    @bp.post("/api/admin/bmc/memberships/<membership_id>/link")
+    def admin_link(membership_id):
+        body = request.json or {}
+        member = store.membership(membership_id)
+        if not member:
+            return jsonify(error="Membresía no encontrada."), 404
+        account_id = str(body.get("account_id", ""))
+        if not security_store.account(id=account_id):
+            return jsonify(error="Elige una cuenta de la lista."), 400
+        if body.get("confirmed") is not True:
+            return jsonify(error="Confirma que esta membresía pertenece a esa cuenta."), 400
+        active = member["status"] == "active" and not member["canceled"] and (member["period_end"] or 0) > time.time() - 86400
+        if str(member["level_id"]) != membership_level_id() or not active:
+            return jsonify(error="Solo se puede vincular una membresía IMAX activa."), 409
+        expires = store.grant_membership(membership_id, account_id, member["period_end"], baseline=legacy_expiry(account_id),
+                                         reviewer=g.identity["account"]["id"], link_method="admin")
+        store.log_event("link-"+membership_id+"-"+str(int(time.time())), "admin.link", "activado",
+                        f"Vinculada a mano por el administrador. Acceso hasta el {datetime.fromtimestamp(expires, timezone.utc).date().isoformat()}.",
+                        object_id=membership_id, email=member["email"], name=member["name"], account_id=account_id)
+        return jsonify(success=True, expires_at=expires)
+
     @bp.post("/api/admin/payments/qr")
     def upload_qr():
         body = request.json
@@ -160,6 +246,16 @@ def payment_routes(store, security_store, legacy_expiry):
         if not row or row["method"] != "bmc":
             return jsonify(error="Solicitud BMC no encontrada."), 404
         from billing.config import product_id
+        if (request.json or {}).get("kind") == "membership":
+            payload = {"type": "membership.started", "live_mode": True, "event_id": "sim-"+order_id, "created": int(time.time()), "data": {
+                "id": int(hashlib.sha256(order_id.encode()).hexdigest()[:10], 16), "membership_level_id": int(membership_level_id()),
+                "membership_level_name": "IMAX", "status": "active", "canceled": "false", "paused": "false",
+                "supporter_email": row["payer"], "supporter_name": "Simulación", "amount": 2, "currency": "USD",
+                "current_period_start": int(time.time()), "current_period_end": int(time.time()) + 30*86400}}
+            raw = json.dumps(payload).encode()
+            signature = hmac.new(os.environ["BMC_WEBHOOK_SECRET"].encode(), raw, hashlib.sha256).hexdigest()
+            result, status = process_bmc(raw, signature, store, legacy_expiry)
+            return jsonify(**result, simulated=True), status
         payload = {"type": "extra_purchase.created", "live_mode": True, "created": int(time.time()), "data": {
             "id": int(hashlib.sha256(order_id.encode()).hexdigest()[:12],16), "status": "succeeded", "refunded": "false",
             "amount": 1.50, "currency": "USD", "extras": [{"id": int(product_id()), "amount": "1.50", "currency": "USD", "quantity": 1, "question_answers": [row["code"]]}]}}

@@ -42,10 +42,10 @@ def approve(admin, order, auth):
 
 def test_single_plan_three_fixed_prices_and_missing_binance_qr(client):
     plans=send(client,'/api/planes',method='GET').json
-    assert len(plans)==1 and plans[0]['precio_dolares']==1.5 and plans[0]['precio_soles']==5.5
+    assert len(plans)==1 and plans[0]['precio_dolares']==2.0 and plans[0]['precio_soles']==7.5
     assert plans[0]['duracion_dias']==30 and plans[0]['renovacion_automatica'] is False
     config=send(client,'/api/payments/config',method='GET').json
-    assert [(m['id'],m['amount_minor'],m['currency']) for m in config['methods']] == [('bmc',150,'USD'),('yape_plin',550,'PEN'),('binance',150,'USDT')]
+    assert [(m['id'],m['amount_minor'],m['currency']) for m in config['methods']] == [('bmc',200,'USD'),('yape_plin',750,'PEN'),('binance',200,'USDT')]
     assert config['methods'][1]['available'] and not config['methods'][2]['available']
 
 
@@ -65,7 +65,7 @@ def test_pending_requests_survive_history_limit(client, system):
 def test_prices_days_and_user_identity_cannot_be_overridden(client, system):
     order,_=create_order(client,'yape_plin',amount_minor=1,currency='USD',days=365,account_id='someone-else',plan='diamond')
     stored=system.billing_store.get(order['id'])
-    assert stored['amount_minor']==550 and stored['currency']=='PEN' and stored['days']==30
+    assert stored['amount_minor']==750 and stored['currency']=='PEN' and stored['days']==30
     assert stored['account_id']==system.security_store.account(email='person@example.test')['id']
 
 
@@ -196,7 +196,7 @@ def test_signed_purchase_preserves_fixed_price_with_small_settlement_variance(cl
     result=webhook(client,data)
     assert result.json['success']
     stored=system.billing_store.get(order['id'])
-    assert stored['amount_minor']==150 and stored['currency']=='USD'
+    assert stored['amount_minor']==200 and stored['currency']=='USD'
     assert webhook(client,data).json['duplicate'] is True
 
 
@@ -224,11 +224,11 @@ def test_email_only_or_wrong_order_code_is_never_matched(client):
 
 
 @pytest.mark.parametrize('kind',['membership.started','recurring_donation.started','extra_purchase.refunded'])
-def test_subscriptions_and_refunds_do_not_extend_access(client, system, kind):
+def test_shop_payload_under_other_event_types_does_not_extend_access(client, system, kind):
     order,_=create_order(client);data=payload(order);data['type']=kind
     assert webhook(client,data).json['activated'] is False
     assert send(client,'/api/payments/mine',method='GET').json['active'] is False
-    assert system.billing_store.reviews()
+    assert system.billing_store.events()[0]['outcome'] in ('revisar','ignorado')
 
 
 def test_provider_payment_cannot_be_reused_for_another_account(client, system):
@@ -249,7 +249,7 @@ def test_renewal_adds_exactly_30_days_and_expiry_blocks_playback(client, system)
 
 
 def test_existing_telegram_time_is_preserved(client, system):
-    auth=tg_login(client);order,_=create_order(client,auth=auth)
+    auth=tg_login(client);order,_=create_order(client,auth=auth,email='tg@example.test')
     baseline=system.legacy_access_expiry(900000001)
     webhook(client,payload(order))
     assert system.billing_store.get(order['id'])['expires_at']==baseline+30*86400

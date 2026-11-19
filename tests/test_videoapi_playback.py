@@ -112,3 +112,14 @@ def test_transient_probe_failure_keeps_explicit_selection(client, videoapi, monk
     monkeypatch.setattr('services.videoapi_playback.available', lambda *a: None)
     assert send(client, '/api/playback/1?provider=videoapi', method='GET').json['provider']=='videoapi'
     assert send(client, '/api/playback/1', method='GET').json['provider']=='videoapi'
+
+
+def test_player_skin_from_request_or_env(monkeypatch):
+    from urllib.parse import urlparse, parse_qs
+    monkeypatch.delenv('VIDEOAPI_SKIN', raising=False)
+    assert 'skin' not in parse_qs(urlparse(embed_url('pelicula', 77)).query)
+    assert parse_qs(urlparse(embed_url('pelicula', 77, skin='Netflix')).query)['skin'] == ['netflix']
+    assert 'skin' not in parse_qs(urlparse(embed_url('pelicula', 77, skin='evil&x=1')).query)
+    monkeypatch.setenv('VIDEOAPI_SKIN', 'prime')
+    assert parse_qs(urlparse(embed_url('pelicula', 77)).query)['skin'] == ['prime']
+    assert 'skin' not in parse_qs(urlparse(embed_url('pelicula', 77, skin='default')).query)

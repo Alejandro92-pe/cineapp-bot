@@ -1,6 +1,7 @@
 """Public VideoAPI embeds. No credentials, catalog writes or provider HTML."""
 from providers.vimeus import integer
 from collections import OrderedDict
+import os
 import threading
 import time
 import requests
@@ -18,10 +19,26 @@ def embed_path(kind, tmdb, season=None, episode=None):
     return path
 
 
-def embed_url(kind, tmdb, season=None, episode=None):
+# Public skins accepted by /api/v1/public/validate-embed. 'default' sends no parameter.
+SKINS = ('default', 'netflix', 'disney', 'prime', 'cinematic', 'vidzilla')
+
+
+def player_skin(requested=None):
+    """A requested skin (only for testing) wins over VIDEOAPI_SKIN; anything unknown is ignored."""
+    for value in (requested, os.getenv('VIDEOAPI_SKIN')):
+        value = str(value or '').strip().lower()
+        if value in SKINS:
+            return value
+    return 'default'
+
+
+def embed_url(kind, tmdb, season=None, episode=None, skin=None):
     # Public presentation options only. Never request paid/VIP or ad controls.
-    return 'https://videoapi.la' + embed_path(kind, tmdb, season, episode) + '?' + urlencode({
-        'primary_color': '78b7fb', 'secondary_color': '111d30', 'icon_color': 'edf5ff'})
+    params = {'primary_color': '78b7fb', 'secondary_color': '111d30', 'icon_color': 'edf5ff'}
+    chosen = player_skin(skin)
+    if chosen != 'default':
+        params['skin'] = chosen
+    return 'https://videoapi.la' + embed_path(kind, tmdb, season, episode) + '?' + urlencode(params)
 
 
 class Availability:

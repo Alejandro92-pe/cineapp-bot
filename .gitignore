@@ -7,3 +7,6 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Videos de TikTok generados (audio, imágenes y MP4)
+tiktok/videos/

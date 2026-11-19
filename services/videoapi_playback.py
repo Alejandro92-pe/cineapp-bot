@@ -17,7 +17,7 @@ def eligible(app, item):
     return True
 
 
-def playback(app, database, item, episode_id, explicit=False):
+def playback(app, database, item, episode_id, explicit=False, skin=None):
     """None requests the existing Vimeus path; invalid episode IDs never fall back."""
     if not eligible(app, item):
         return {'error': 'Reproductor no disponible para este título.'}, 404
@@ -41,4 +41,4 @@ def playback(app, database, item, episode_id, explicit=False):
         return None
     # A timed-out availability check is unknown, not proof of absence. Let the
     # selected embed load; never silently undo a person's manual selection.
-    return {'url': embed_url(item.get('videoapi_kind') or item['tipo'], item['tmdb_id'], season, episode), 'embed': True, 'provider': 'videoapi'}, 200
+    return {'url': embed_url(item.get('videoapi_kind') or item['tipo'], item['tmdb_id'], season, episode, skin), 'embed': True, 'provider': 'videoapi'}, 200

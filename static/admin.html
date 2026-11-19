@@ -638,6 +638,8 @@
 <script src="/static/admin/vimeus.js" defer></script>
 <link rel="stylesheet" href="/static/admin/payments.css">
 <script src="/static/admin/payments.js" defer></script>
+<link rel="stylesheet" href="/static/admin/people.css">
+<script src="/static/admin/people.js" defer></script>
 <link rel="stylesheet" href="/static/admin/okru.css">
 <script src="/static/admin/okru.js" defer></script>
 </head>
@@ -740,11 +742,14 @@
 
   <!-- USUARIOS -->
   <div class="panel" id="panel-usuarios">
+    <div id="people-root"></div>
+    <details class="pp-legacy" id="legacy-users"><summary>Usuarios del bot antiguo de Telegram (tabla «usuarios»)</summary>
     <div class="stats-grid" id="usuarios-stats" style="display:none">
       <div class="stat-card"><div class="stat-label">Total usuarios</div><div class="stat-value" id="stat-total-usr">—</div></div>
       <div class="stat-card"><div class="stat-label">Con membresía</div><div class="stat-value" id="stat-activos-usr">—</div></div>
     </div>
     <div id="usuarios-list"></div>
+    </details>
   </div>
 
   <!-- MARKETING -->
@@ -889,7 +894,12 @@ function switchTab(tab) {
   if (tab === 'pagos') cargarPagos();
   else if (tab === 'okru') OKAdmin.mount(document.getElementById('panel-okru'));
   else if (tab === 'pedidos') cargarPedidos();
-  else if (tab === 'usuarios') cargarUsuarios();
+  else if (tab === 'usuarios') {
+    const peopleRoot = document.getElementById('people-root');
+    if (!peopleRoot.childElementCount) PeopleAdmin.mount(peopleRoot);
+    const legacy = document.getElementById('legacy-users');
+    if (!legacy.dataset.ready) { legacy.dataset.ready = '1'; legacy.addEventListener('toggle', () => { if (legacy.open) cargarUsuarios(); }); }
+  }
   else if (tab === 'marketing') cargarMarketing();
   else if (tab === 'catalogo') { catalogoOffset = 0; cargarCatalogo(); }
 }
