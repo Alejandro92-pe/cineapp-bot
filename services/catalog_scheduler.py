@@ -20,7 +20,10 @@ def run_batch(queue, store, database, *, videoapi_enabled=False, vimeus_key='', 
         # The extra 60-second floor prevents bursts across adjacent boundaries.
         boundary = (int(now)//INTERVAL_SECONDS+1)*INTERVAL_SECONDS
         queue.set_setting('scheduler_after', max(now+60, boundary))
-    # While Vimeus is down its turn goes to VideoAPI, so its series/anime wait instead of failing.
-    if PROVIDER_CYCLE[turn % len(PROVIDER_CYCLE)] == 'videoapi' or not vimeus_key or not vimeus_alive():
+    if PROVIDER_CYCLE[turn % len(PROVIDER_CYCLE)] == 'videoapi' or not vimeus_key:
         return {'provider': 'videoapi', **run_videoapi_batch(VideoAPIQueue(store), database, tmdb_key)}
+    # While Vimeus is down its turn stays idle: its series/anime wait instead of failing, and
+    # VideoAPI keeps its usual 4-of-5 share instead of absorbing this turn too (rate limits).
+    if not vimeus_alive():
+        return {'provider': 'vimeus', 'skipped': 'Vimeus no disponible'}
     return {'provider': 'vimeus', **run_production_batch(queue, database, vimeus_key, tmdb_key)}

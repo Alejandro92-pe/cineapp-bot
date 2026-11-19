@@ -18,6 +18,9 @@ jobs = Table('videoapi_jobs', metadata,
     Column('created_at', Float, nullable=False), Column('note', String(300)))
 
 
+VIDEOAPI_PACE = 2.0  # seconds between requests (was 1.5); gentler on VideoAPI's rate limits
+
+
 class VideoAPIQueue(DurableQueue):
     pending_states = ('pending', 'refresh_pending')
     running_states = {'running': 'pending', 'refresh_running': 'refresh_pending'}
@@ -139,7 +142,7 @@ class VideoAPIQueue(DurableQueue):
 def run_videoapi_batch(queue, database, tmdb_key):
     if not tmdb_key:
         raise ImportFailure('Falta la clave de TMDB.')
-    transport = CachedTransport(queue, seconds=1.5, max_seconds=18)
+    transport = CachedTransport(queue, seconds=VIDEOAPI_PACE, max_seconds=18)
     provider, tmdb = VideoAPICatalog(transport), TMDBClient(tmdb_key, transport)
     def publish(doc):
         result = database.rpc('importar_videoapi', {'documento': doc}).execute().data
@@ -177,7 +180,7 @@ def import_now(store, database, tmdb_key, kind, tmdb, seconds=20):
             else:
                 c.execute(update(jobs).where(target).values(ready=queue.clock(), created_at=0.0))
             row = dict(c.execute(select(jobs).where(target)).mappings().one())
-        transport = CachedTransport(queue, seconds=1.5, max_seconds=seconds)
+        transport = CachedTransport(queue, seconds=VIDEOAPI_PACE, max_seconds=seconds)
         provider, client = VideoAPICatalog(transport), TMDBClient(tmdb_key, transport)
         try:
             doc, warnings = queue.manifest(provider, row, client.get)

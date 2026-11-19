@@ -10,16 +10,19 @@ from services.videoapi_jobs import VideoAPIQueue, jobs, import_now
 from test_videoapi_import import metadata, Provider
 
 
-def test_vimeus_turn_goes_to_videoapi_while_vimeus_is_down(system, monkeypatch):
+def test_vimeus_turn_stays_idle_while_vimeus_is_down(system, monkeypatch):
     from services import catalog_scheduler as scheduler
     q = DurableQueue(system.security_store, clock=lambda: 900); calls = []
     monkeypatch.setattr(scheduler, 'run_videoapi_batch', lambda *a: calls.append('videoapi') or {'imported': 1})
     monkeypatch.setattr(scheduler, 'run_production_batch', lambda *a: calls.append('vimeus') or {'imported': 1})
     args = dict(videoapi_enabled=True, vimeus_key='test', tmdb_key='test', vimeus_alive=lambda: False)
+    results = []
     for n in range(10):
         q.clock = lambda n=n: 900 + n * 300
-        assert scheduler.run_batch(q, system.security_store, None, **args)['provider'] == 'videoapi'
-    assert calls == ['videoapi'] * 10
+        results.append(scheduler.run_batch(q, system.security_store, None, **args))
+    # VideoAPI keeps its usual 4 of 5 turns; Vimeus' turn does nothing (no extra VideoAPI load).
+    assert calls == ['videoapi'] * 8
+    assert [r.get('skipped') for r in results].count('Vimeus no disponible') == 2
 
 
 class Published:
@@ -109,3 +112,8 @@ def test_rate_limited_videoapi_reports_429_and_wait(system, monkeypatch):
     with pytest.raises(BatchPause):
         t.get('https://videoapi.la/api/v1/public/exists/tv/1/1/1?key=secret')
     assert t.pause[0] == 'http_429' and t.pause[1] >= 89 and t.pause[2] == 'videoapi.la'
+
+
+def test_videoapi_is_paced_at_two_seconds():
+    from services.videoapi_jobs import VIDEOAPI_PACE
+    assert VIDEOAPI_PACE == 2.0
