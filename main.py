@@ -1093,11 +1093,11 @@ def api_playback(contenido_id):
         key = os.getenv("VIMEUS_VIEW_KEY", "")
         if not key:
             return jsonify(error="Reproductor pendiente de configuración."), 503
-        from providers.vimeus_health import vimeus_up
-        if app.config.get('VIMEUS_HEALTH', not LOCAL_MODE) and not vimeus_up():
+        from services.videoapi_playback import vimeus_alive
+        if not vimeus_alive(app):
             # Never embed a dead provider (its expired domain showed a parking page).
             return jsonify(error="Este título no está disponible en este momento. Estamos trabajando para recuperarlo.",
-                           code="provider_down", provider="vimeus"), 404  # 5xx bodies are replaced by the security layer
+                           code="provider_down", provider="vimeus"), 503
         kind = {"pelicula": "movie", "serie": "serie", "anime": "anime"}.get(item["tipo"])
         if not kind:
             return jsonify(error="Tipo no reproducible."), 400

@@ -23,13 +23,16 @@ def embed_path(kind, tmdb, season=None, episode=None):
 SKINS = ('default', 'netflix', 'disney', 'prime', 'cinematic', 'vidzilla')
 
 
+DEFAULT_SKIN = 'netflix'  # its controls hide again after pause and seek (owner's test, 19/11/2026)
+
+
 def player_skin(requested=None):
-    """A requested skin (only for testing) wins over VIDEOAPI_SKIN; anything unknown is ignored."""
+    """A requested skin (only for testing) wins over VIDEOAPI_SKIN, then Netflix; unknown values are ignored."""
     for value in (requested, os.getenv('VIDEOAPI_SKIN')):
         value = str(value or '').strip().lower()
         if value in SKINS:
             return value
-    return 'default'
+    return DEFAULT_SKIN
 
 
 def embed_url(kind, tmdb, season=None, episode=None, skin=None):

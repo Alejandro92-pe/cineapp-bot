@@ -58,7 +58,18 @@ def test_playback_refuses_dead_vimeus_instead_of_embedding_it(client, system, mo
     monkeypatch.setitem(system.app.config, 'VIMEUS_HEALTH', True)
     monkeypatch.setattr('providers.vimeus_health.vimeus_up', lambda: False)
     result = send(user, f'/api/playback/{cid}', method='GET')
-    assert result.status_code == 404, result.json
+    assert result.status_code == 503, result.json
     assert result.json.get('code') == 'provider_down' and 'url' not in result.json, result.json
     monkeypatch.setattr('providers.vimeus_health.vimeus_up', lambda: True)
     assert 'vimeus.com/e/anime' in send(user, f'/api/playback/{cid}', method='GET').json['url']
+
+
+def test_security_layer_keeps_coded_errors_but_hides_anything_else(system):
+    from flask import jsonify
+    from security import deliberate_error
+    with system.app.test_request_context():
+        assert deliberate_error(jsonify(error='Reproductor caído.', code='provider_down', provider='vimeus'))
+        assert not deliberate_error(jsonify(error='Algo falló.'))                      # no code: generic message
+        assert not deliberate_error(jsonify(error='x', code='y', trace='stack'))       # extra fields never pass
+        assert not deliberate_error(jsonify(error='x' * 301, code='y'))
+        assert not deliberate_error(jsonify(error='x', code='y', provider='https://evil'))

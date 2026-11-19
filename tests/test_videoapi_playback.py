@@ -24,7 +24,7 @@ def test_membership_csrf_and_owner_still_required(client, videoapi):
     assert result.status_code == 200
     assert urlsplit(result.json['url']).path == '/e/movie/1'
     assert parse_qs(urlsplit(result.json['url']).query) == {
-        'primary_color': ['78b7fb'], 'secondary_color': ['111d30'], 'icon_color': ['edf5ff']}
+        'primary_color': ['78b7fb'], 'secondary_color': ['111d30'], 'icon_color': ['edf5ff'], 'skin': ['netflix']}
 
 
 def test_default_and_manual_fallback_preserve_catalog_and_downloads(client, videoapi, monkeypatch):
@@ -43,6 +43,7 @@ def test_production_ignores_local_allowlist_and_supports_kill_switch(client, vid
     owner_login(client)
     monkeypatch.setitem(videoapi.app.config, 'SECURITY_LOCAL', False)
     monkeypatch.setitem(videoapi.app.config, 'VIDEOAPI_PILOT', {})
+    monkeypatch.setitem(videoapi.app.config, 'VIMEUS_HEALTH', False)  # no network in tests
     assert send(client, '/api/playback/1', method='GET').json['provider'] == 'videoapi'
     assert send(client, '/api/contenido', {'id': 1}).json['data'][0]['videoapi_enabled'] is True
     assert 'frame-src https://videoapi.la ' in client.get('/').headers['Content-Security-Policy']
@@ -117,9 +118,23 @@ def test_transient_probe_failure_keeps_explicit_selection(client, videoapi, monk
 def test_player_skin_from_request_or_env(monkeypatch):
     from urllib.parse import urlparse, parse_qs
     monkeypatch.delenv('VIDEOAPI_SKIN', raising=False)
-    assert 'skin' not in parse_qs(urlparse(embed_url('pelicula', 77)).query)
+    assert parse_qs(urlparse(embed_url('pelicula', 77)).query)['skin'] == ['netflix']
     assert parse_qs(urlparse(embed_url('pelicula', 77, skin='Netflix')).query)['skin'] == ['netflix']
-    assert 'skin' not in parse_qs(urlparse(embed_url('pelicula', 77, skin='evil&x=1')).query)
+    assert parse_qs(urlparse(embed_url('pelicula', 77, skin='evil&x=1')).query)['skin'] == ['netflix']
     monkeypatch.setenv('VIDEOAPI_SKIN', 'prime')
     assert parse_qs(urlparse(embed_url('pelicula', 77)).query)['skin'] == ['prime']
     assert 'skin' not in parse_qs(urlparse(embed_url('pelicula', 77, skin='default')).query)
+
+
+def test_series_without_chosen_chapter_uses_videoapi_when_picked_or_vimeus_is_down(client, videoapi, monkeypatch):
+    """It used to fall back to Vimeus' own chapter selector even when VideoAPI had the series."""
+    videoapi.supabase_service.rows['contenido'][0].update(tipo='serie')
+    owner_login(client)
+    monkeypatch.setitem(videoapi.app.config, 'VIMEUS_HEALTH', True)
+    monkeypatch.setattr('providers.vimeus_health.vimeus_up', lambda: True)
+    assert send(client, '/api/playback/1', method='GET').json['provider'] == 'vimeus'  # unchanged while Vimeus works
+    picked = send(client, '/api/playback/1?provider=videoapi', method='GET').json
+    assert picked['provider'] == 'videoapi' and urlsplit(picked['url']).path == '/e/tv/1/1/1'
+    monkeypatch.setattr('providers.vimeus_health.vimeus_up', lambda: False)
+    default = send(client, '/api/playback/1', method='GET').json
+    assert default['provider'] == 'videoapi' and urlsplit(default['url']).path == '/e/tv/1/1/1'

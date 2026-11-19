@@ -91,6 +91,16 @@ def trusted_origins(origin, aliases='', local=False):
     return result
 
 
+def deliberate_error(response):
+    """A 5xx the app wrote on purpose: only error/code/provider, a short message and a code.
+    Crashes go through safe_exception (no code), so their details are still never shown."""
+    payload = response.get_json(silent=True)
+    return (isinstance(payload, dict) and set(payload) <= {"error", "code", "provider"}
+            and isinstance(payload.get("code"), str) and len(payload["code"]) <= 40
+            and isinstance(payload.get("error"), str) and len(payload["error"]) <= 300
+            and payload.get("provider") in (None, "vimeus", "videoapi", "okru"))
+
+
 def install_security(app, membership_checker):
     local = os.getenv("APP_MODE") == "local"
     preview = local and os.getenv("TELEGRAM_PREVIEW") == "true"
@@ -268,7 +278,7 @@ def install_security(app, membership_checker):
                 for row in payload.get("temporadas", []):
                     row.pop("enlace", None)
                 response.set_data(app.json.dumps(payload))
-        if response.status_code >= 500 and response.is_json:
+        if response.status_code >= 500 and response.is_json and not deliberate_error(response):
             response.set_data(app.json.dumps({"error":"Servicio temporalmente no disponible. Intenta de nuevo."}))
         return response
 
