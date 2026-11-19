@@ -181,8 +181,13 @@ def test_legacy_approval_retired_and_marketing_does_not_target_new_paid_account(
         {'id': 2, 'telegram_id': OWNER_ID, 'membresia_activa': False},
         {'id': 3, 'telegram_id': 900000005, 'membresia_activa': False}])
     account = system.security_store.create_account('Paid', telegram_id=900000005)
-    monkeypatch.setattr(system.billing_store, 'expiry', lambda aid: time.time() + 1000 if aid == account['id'] else 0)
+    from billing.schema import access
+    with system.security_store.engine.begin() as c:
+        c.execute(access.insert().values(account_id=account['id'], expires_at=time.time() + 1000))
     assert marketing.obtener_usuarios_sin_pago() == []
+    with system.security_store.engine.begin() as c:
+        c.execute(access.update().values(expires_at=time.time() - 1))
+    assert [u['telegram_id'] for u in marketing.obtener_usuarios_sin_pago()] == [900000005]
 
 
 def test_deployment_menu_configuration_is_explicit_and_offline():
@@ -206,3 +211,19 @@ def test_webhook_dispatches_real_menu_and_owner_account(client, system, assistan
         assert response.status_code==200
     assert buttons(assistant.bot.sent[0])['is_persistent'] is True
     assert 'Acceso permanente' in assistant.bot.sent[-1]['text']
+
+
+def test_marketing_list_never_checks_access_one_user_at_a_time(system, monkeypatch):
+    """A per-user lookup over ~800 bot users froze all four web threads in production (19/11/2026)."""
+    import marketing, main
+    system.supabase_service.rows['usuarios'].extend(
+        {'id': 100 + i, 'telegram_id': 910000000 + i, 'membresia_activa': False} for i in range(300))
+    def forbidden(*args, **kwargs):
+        raise AssertionError('per-user access lookup')
+    monkeypatch.setattr(main, 'legacy_access_expiry', forbidden)
+    monkeypatch.setattr(main.telegram_assistant, 'access', forbidden)
+    monkeypatch.setattr(system.billing_store, 'expiry', forbidden)
+    assert len(marketing.obtener_usuarios_sin_pago()) >= 300
+    marketing._cache.update(at=0.0, rows=None)
+    first = marketing.usuarios_sin_pago_cacheados()
+    assert marketing.usuarios_sin_pago_cacheados() is first

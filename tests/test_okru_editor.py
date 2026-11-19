@@ -85,3 +85,14 @@ def test_admin_catalog_search_pagination_and_episode_pages(client,system,tmp_pat
     assert len(first['episodes'])==50 and first['has_next']
     assert len(send(client,'/api/admin/okru/421?page=2',method='GET').json['episodes'])==2
     assert send(client,'/api/admin/okru/1',method='GET').status_code==404
+
+
+def test_admin_list_marks_titles_with_video_and_filters_without_leaking_links(client,system,tmp_path):
+    db=seed(system,tmp_path);csrf=owner_login(client).json['csrf_token']
+    db.table('contenido').insert({'id':422,'tipo':'biblico','titulo':'Bíblico sin vídeo','disponible':True}).execute()
+    assert send(client,'/api/admin/okru/421',{'scope':'title','url':URL},csrf).status_code==200
+    rows={r['id']:r for r in send(client,'/api/admin/okru?q=Bíblico',method='GET').json['data']}
+    assert rows[421]['has_video'] is True and rows[422]['has_video'] is False
+    assert all('playback_url' not in r for r in rows.values())
+    assert [r['id'] for r in send(client,'/api/admin/okru?q=Bíblico&estado=sin',method='GET').json['data']]==[422]
+    assert [r['id'] for r in send(client,'/api/admin/okru?q=Bíblico&estado=con',method='GET').json['data']]==[421]

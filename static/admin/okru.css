@@ -1,2 +1,47 @@
 .okru-admin{color:#e4edf8}.okru-admin header{margin-bottom:28px}.okru-admin h2{font-size:28px;letter-spacing:-.7px;margin:10px 0}.okru-admin p{color:#a8bbd3;line-height:1.7;font-size:13px}.okru-admin .okru-eyebrow{letter-spacing:2px;font-size:10px;color:#e6c587}.okru-layout{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:26px}.okru-admin label{display:grid;gap:9px;font-size:12px;color:#b4c6db}.okru-admin input{min-width:0;width:100%;box-sizing:border-box;padding:12px;border:1px solid #3a506d;border-radius:8px;background:#0b1523;color:#eef5ff;font:inherit;font-size:16px}.okru-admin button{padding:11px 14px;min-height:42px;border:1px solid #486481;border-radius:8px;background:#1b3048;color:#e2eeff;cursor:pointer;font:inherit;font-size:12px}.okru-admin button:disabled{opacity:.45;cursor:default}.okru-admin :focus-visible{outline:2px solid #b3d7ff;outline-offset:3px}.okru-admin h3{font-size:23px;margin:0 0 12px}.okru-admin h4{font-size:17px;margin:14px 0}.okru-editor{padding:24px;border:1px solid #2c4058;border-radius:16px;background:#101c2b;min-width:0}.okru-editor>a{font-size:12px;color:#b8d9ff}.okru-form{display:grid;gap:15px;padding:20px 0;border-bottom:1px solid #2b4058}.okru-form>button{background:#bddaff;color:#13283c;font-weight:600}.okru-numbers{display:grid;grid-template-columns:1fr 1fr;gap:14px}.okru-search{display:grid;gap:12px;margin-bottom:16px}.okru-titles,.okru-chapters{display:grid;gap:8px}.okru-title{text-align:left}.okru-title[aria-pressed=true]{border-color:#b9d8f9;background:#2b4563}.okru-pages,.okru-season-shortcuts{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0;align-items:center}.okru-pages span{font-size:11px}.okru-chapters>button{text-align:left}.okru-status{min-height:20px;overflow-wrap:anywhere}.okru-episodes{margin-top:28px}
 @media(max-width:700px){.okru-layout{grid-template-columns:1fr}.okru-editor{padding:18px}.okru-admin h2{font-size:23px}.okru-titles{max-height:300px;overflow:auto}.okru-admin input{max-width:100%}}
+/* v2: quick editing */
+.okx-header h2{margin-bottom:6px}
+.okx-aside{display:grid;gap:12px;align-content:start}
+.okx-search{min-width:0;width:100%;box-sizing:border-box;padding:12px;border:1px solid #3a506d;border-radius:10px;background:#0b1523;color:#eef5ff;font:inherit;font-size:16px}
+.okx-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.okru-admin .okx-chip{min-height:36px;padding:7px 13px;border-radius:999px;background:#112033;border-color:#36506e}
+.okru-admin .okx-chip.on{background:#e6c587;border-color:#e6c587;color:#1a1408;font-weight:700}
+.okx-summary{margin:0;font-size:12px!important;color:#93a8c2!important}
+.okx-empty{color:#93a8c2!important}
+.okru-admin .okru-title{display:grid;gap:6px;text-align:left;padding:12px 14px}
+.okx-title-name{font-size:13px;color:#eaf2fd;line-height:1.35}
+.okx-tags{display:flex;gap:6px;flex-wrap:wrap}
+.okx-tag{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700}
+.okx-tag.ok{background:rgba(76,175,125,.16);color:#7ddba6}.okx-tag.warn{background:rgba(230,197,135,.16);color:#e6c587}.okx-tag.muted{background:rgba(255,255,255,.07);color:#a9b8ca}
+.okx-editor-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+.okx-editor-head a{font-size:12px;color:#b8d9ff}
+.okx-card{display:grid;gap:14px;padding:18px;margin-top:16px;border:1px solid #2b4058;border-radius:14px;background:#0d1826}
+.okx-card h4{margin:0!important}
+.okx-field{display:grid;gap:8px;font-size:12px;color:#b4c6db}
+.okx-link-row{display:grid;gap:6px}
+.okx-check{font-size:12px;min-height:16px}.okx-check.ok{color:#7ddba6}.okx-check.bad{color:#f39a94}
+.okx-actions{display:flex;flex-wrap:wrap;gap:10px}
+.okru-admin .okx-primary{background:#bddaff;color:#13283c;font-weight:700;border-color:#bddaff}
+.okru-admin .okx-ghost{background:transparent}
+.okx-preview{display:grid;gap:10px}
+.okx-preview iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000}
+.okx-row{display:grid;grid-template-columns:140px 1fr;gap:12px}
+.okx-number input{max-width:140px}
+.okx-season-input{width:80px!important;min-height:36px;padding:6px 10px!important;font-size:14px!important}
+.okx-add-season{display:flex;gap:6px;align-items:center}
+.okx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
+.okru-admin .okx-ep{min-height:40px;padding:0;font-weight:700;font-size:13px;border-radius:8px}
+.okru-admin .okx-ep.ok{background:rgba(76,175,125,.18);border-color:#3f8c66;color:#bff0d3}
+.okru-admin .okx-ep.missing{background:#141f2e;border-color:#3a4a5e;color:#9fb0c4}
+.okru-admin .okx-ep.hidden{opacity:.5;border-style:dashed}
+.okru-admin .okx-ep.on{outline:2px solid #e6c587;outline-offset:1px}
+.okx-legend{display:flex;gap:14px;flex-wrap:wrap;margin:0;font-size:11px!important}
+.okx-legend .ok{color:#7ddba6}.okx-legend .missing{color:#9fb0c4}.okx-legend .hidden{color:#7d8ea3}
+.okx-form{display:grid;gap:14px;padding-top:14px;border-top:1px solid #23364b}
+.okx-bulk{border-top:1px solid #23364b;padding-top:12px}
+.okx-bulk summary{cursor:pointer;font-size:13px;color:#d6e4f5}
+.okx-bulk[open]{display:grid;gap:12px}
+.okx-bulk textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #3a506d;border-radius:8px;background:#0b1523;color:#eef5ff;font:13px/1.5 ui-monospace,monospace}
+.okx-bulk-log p{margin:4px 0;font-size:12px}.okx-bulk-log .ok{color:#7ddba6}.okx-bulk-log .bad{color:#f39a94}
+@media(max-width:700px){.okx-row{grid-template-columns:1fr}.okx-number input{max-width:none}}

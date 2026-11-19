@@ -478,8 +478,20 @@ def publicar_desde_bot(item):
 
 telegram_assistant = QueHayBot(bot, supabase_service, security_store, billing_store,
     legacy_access_expiry, MINIAPP_URL, publicar_desde_bot).register()
-init_marketing(supabase_service, bot, ADMIN_IDS, BOT_USERNAME,
-               active_access=lambda tid: telegram_assistant.access(tid)['active'])
+def active_telegram_ids():
+    """Telegram ids with access right now, in two queries (never one lookup per user)."""
+    from sqlalchemy import select
+    from billing.schema import access
+    from security_store import accounts
+    now = time.time()
+    with security_store.engine.connect() as c:
+        paid = {int(r[0]) for r in c.execute(select(accounts.c.telegram_id).join(access, access.c.account_id == accounts.c.id)
+                                             .where(access.c.expires_at > now, accounts.c.telegram_id.isnot(None)))}
+    legacy = {int(r["telegram_id"]) for r in legacy_active_users() if r["expires"] > now}
+    return paid | legacy | {int(OWNER_ID)}
+
+
+init_marketing(supabase_service, bot, ADMIN_IDS, BOT_USERNAME, active_ids=active_telegram_ids)
 
 @app.route("/")
 def serve_miniapp():

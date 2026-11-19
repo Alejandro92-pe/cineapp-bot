@@ -11,6 +11,7 @@ Endpoints:
 
 import os
 import smtplib
+import threading
 import time
 import traceback
 from email.mime.multipart import MIMEMultipart
@@ -25,7 +26,9 @@ _supabase     = None
 _bot          = None
 _ADMIN_IDS    = set()
 _BOT_USERNAME = None
-_active_access = None
+_active_ids = None
+_cache = {'at': 0.0, 'rows': None}
+_cache_lock = threading.Lock()
 
 GMAIL_USER      = os.getenv("GMAIL_USER", "")
 GMAIL_PASSWORD  = os.getenv("GMAIL_PASSWORD", "")
@@ -34,13 +37,13 @@ GMAIL_FROM_NAME = "QueHay"
 marketing_bp = Blueprint("marketing", __name__)
 
 
-def init_marketing(supabase_client, bot_instance, admin_ids, bot_username: str, active_access=None):
+def init_marketing(supabase_client, bot_instance, admin_ids, bot_username: str, active_ids=None):
     """Llamar desde main.py justo después de crear la app Flask.
 
     admin_ids puede ser un solo int o un iterable de ints (varios admins).
     """
-    global _supabase, _bot, _ADMIN_IDS, _BOT_USERNAME, _active_access
-    _active_access = active_access
+    global _supabase, _bot, _ADMIN_IDS, _BOT_USERNAME, _active_ids
+    _active_ids = active_ids
     _supabase     = supabase_client
     _bot          = bot_instance
     if isinstance(admin_ids, (set, list, tuple)):
@@ -152,8 +155,9 @@ def obtener_usuarios_sin_pago() -> list:
     print(f"DEBUG marketing: total usuarios en tabla = {len(todos)}")
 
     # Excluir solo TRUE explícito — NULL y False son "sin membresía"
-    sin_pago = [u for u in todos if u.get("telegram_id") and not (
-        _active_access(u["telegram_id"]) if _active_access else u.get("membresia_activa") is True)]
+    # One bulk lookup. A per-user check made ~1,600 Supabase calls and froze every web thread for minutes.
+    activos = _active_ids() if _active_ids else {int(u["telegram_id"]) for u in todos if u.get("telegram_id") and u.get("membresia_activa") is True}
+    sin_pago = [u for u in todos if u.get("telegram_id") and int(u["telegram_id"]) not in activos]
     print(f"DEBUG marketing: usuarios sin membresía activa = {len(sin_pago)}")
 
     # Enriquecer con último pago en lote
@@ -177,6 +181,16 @@ def obtener_usuarios_sin_pago() -> list:
     return sin_pago
 
 
+def usuarios_sin_pago_cacheados(max_age=90):
+    """Repeated clicks share one computation instead of stacking slow requests on the web threads."""
+    with _cache_lock:
+        if _cache['rows'] is not None and time.time() - _cache['at'] < max_age:
+            return _cache['rows']
+        rows = obtener_usuarios_sin_pago()
+        _cache.update(at=time.time(), rows=rows)
+        return rows
+
+
 def recordatorio_pagos_pendientes():
     """Retired: old pending orders do not represent current account payments."""
     return {"enabled": False, "reason": "legacy_payment_reminders_retired"}
@@ -197,7 +211,7 @@ def api_usuarios_sin_pago():
     if not _check_admin(data):
         return jsonify({"error": "No autorizado", "recibido": data.get("admin_id"), "esperados": list(_ADMIN_IDS)}), 403
     try:
-        usuarios = obtener_usuarios_sin_pago()
+        usuarios = usuarios_sin_pago_cacheados()
         return jsonify({"usuarios": usuarios, "total": len(usuarios)}), 200
     except Exception as e:
         print(f"❌ usuarios_sin_pago: {traceback.format_exc()}")

@@ -12,11 +12,16 @@ def okru_routes(database):
         try:page=integer(request.args.get('page','1'),1)
         except ImportFailure as error:return jsonify(error=str(error)),400
         if page>1000:return jsonify(error='Página inválida.'),400
-        query=database.table('contenido').select('id,titulo,disponible',count='exact').eq('tipo','biblico')
+        query=database.table('contenido').select('id,titulo,disponible,playback_url',count='exact').eq('tipo','biblico')
         text=request.args.get('q','').strip()[:100]
         if text:query=query.ilike('titulo','%'+text+'%')
+        state=request.args.get('estado')
+        if state=='sin':query=query.is_('playback_url','null')
+        elif state=='con':query=query.not_.is_('playback_url','null')
         rows=query.order('id',desc=True).limit(25).offset((page-1)*25).execute()
-        return jsonify(data=rows.data,page=page,has_next=page*25<rows.count)
+        # The list says whether each title already plays, without sending the link itself.
+        data=[{'id':r['id'],'titulo':r['titulo'],'disponible':r.get('disponible'),'has_video':bool(r.get('playback_url'))} for r in rows.data]
+        return jsonify(data=data,page=page,has_next=page*25<rows.count,total=rows.count)
 
     @bp.route('/api/admin/okru/<int:content_id>',methods=['GET','POST'])
     def edit(content_id):
