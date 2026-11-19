@@ -12,3 +12,13 @@ for(const episode of [false,true])for(const status of [401,403,200])test(`${epis
  if(episode)await window.EpisodeDownloads.download(1,2);else await context.prepararDescarga(1);
  assert.equal(alerts.length,0);assert.equal(links.length,status===200?1:0);assert.equal(supports.length,status===200?0:1);
 });
+test('the download notice shows the archive password with a copy button, and nothing when there is none',()=>{
+ const made=[];const make=tag=>{const n={tag,style:{},children:[],textContent:'',append(...c){this.children.push(...c);},remove(){},showModal(){},close(){}};made.push(n);return n;};
+ const body={append(){}};const context={window:{},URL,navigator:{clipboard:{writeText:async()=>{}}},document:{createElement:make,getElementById:()=>null,body}};
+ vm.createContext(context);vm.runInContext(fs.readFileSync('static/downloads.js','utf8'),context);
+ context.mostrarEnlaceExterno('https://www.mediafire.com/file/x/file',undefined,'cc');
+ const dialog=made.find(n=>n.tag==='dialog');const text=n=>[n.textContent,...n.children.map(text)].join(' ');
+ assert.match(text(dialog),/Contraseña para abrir el archivo/);assert.match(text(dialog),/\bcc\b/);assert.match(text(dialog),/Copiar contraseña/);
+ made.length=0;context.mostrarEnlaceExterno('https://megaup.net/x',undefined,'');
+ assert.doesNotMatch(text(made.find(n=>n.tag==='dialog')),/Contraseña/);
+});

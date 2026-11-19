@@ -1042,7 +1042,7 @@ def enlace_externo_seguro(value):
         return None
 
 from routes.episode_downloads import episode_download_routes
-app.register_blueprint(episode_download_routes(supabase_service, acceso_vigente, enlace_externo_seguro))
+app.register_blueprint(episode_download_routes(supabase_service, acceso_vigente, enlace_externo_seguro, lambda link: download_password(link)))
 from routes.okru import okru_routes
 app.register_blueprint(okru_routes(supabase_service))
 
@@ -1140,7 +1140,28 @@ def api_download(contenido_id):
     link = enlace_externo_seguro(result.data[0].get("descarga")) if result.data else None
     if not link:
         return jsonify(error="Este contenido no tiene un enlace de descarga válido."), 404
-    return jsonify(url=link, host=urlsplit(link).hostname)
+    return jsonify(url=link, host=urlsplit(link).hostname, password=download_password(link))
+
+
+def download_password(link):
+    """Archive password for this host ('' = none). Rules are edited in the admin."""
+    from services.download_passwords import load, password_for
+    try:
+        return password_for(link, load(security_store.engine))
+    except Exception:
+        app.logger.warning('Download password rules unavailable')
+        return ''
+
+
+@app.route('/api/admin/download-passwords', methods=['GET', 'POST'])
+def admin_download_passwords():
+    from services.download_passwords import load, save
+    if request.method == 'GET':
+        return jsonify(load(security_store.engine))
+    try:
+        return jsonify(save(security_store.engine, security_store.local, request.get_json(silent=True)))
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
 
 @app.route("/api/tendencias", methods=["GET"])
 def api_tendencias():

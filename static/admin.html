@@ -642,6 +642,7 @@
 <script src="/static/admin/people.js" defer></script>
 <link rel="stylesheet" href="/static/admin/okru.css">
 <script src="/static/admin/okru.js" defer></script>
+<script src="/static/admin/download-passwords.js" defer></script>
 </head>
 <body>
 
@@ -901,7 +902,11 @@ function switchTab(tab) {
     if (!legacy.dataset.ready) { legacy.dataset.ready = '1'; legacy.addEventListener('toggle', () => { if (legacy.open) cargarUsuarios(); }); }
   }
   else if (tab === 'marketing') cargarMarketing();
-  else if (tab === 'catalogo') { catalogoOffset = 0; cargarCatalogo(); }
+  else if (tab === 'catalogo') {
+    const panel = document.getElementById('panel-catalogo');
+    if (!panel.dataset.passwords) { panel.dataset.passwords = '1'; DownloadPasswords.mount(panel); }
+    catalogoOffset = 0; cargarCatalogo();
+  }
 }
 
 // ── CATÁLOGO ──

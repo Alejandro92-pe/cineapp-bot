@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 from flask import Blueprint, jsonify, request, g
 
 
-def episode_download_routes(database, entitlement, safe_url):
+def episode_download_routes(database, entitlement, safe_url, password_of=lambda link: ''):
     bp = Blueprint('episode_downloads', __name__)
 
     def find(content_id, episode_id):
@@ -20,7 +20,7 @@ def episode_download_routes(database, entitlement, safe_url):
         episode=find(content_id,episode_id)
         link=safe_url(episode.get('descarga') or episode.get('provider_download_url')) if episode else None
         if not link:return jsonify(error='Este episodio no tiene una descarga disponible.'),404
-        return jsonify(url=link,host=urlsplit(link).hostname)
+        return jsonify(url=link,host=urlsplit(link).hostname,password=password_of(link))
 
     @bp.route('/api/admin/episode-download/<int:content_id>/<int:episode_id>',methods=['GET','POST'])
     def edit(content_id,episode_id):

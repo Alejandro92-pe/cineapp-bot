@@ -1,8 +1,8 @@
 /* Load playback and episode controls only when a title is opened. */
 (() => {
   const resources = [
-    '/static/downloads.js', '/static/catalog/episodes.js?v=synopsis-1', '/static/catalog/synopsis.js?v=1',
-    '/static/catalog/episode-downloads.js', '/static/catalog/trailers.js',
+    '/static/downloads.js?v=password-1', '/static/catalog/episodes.js?v=synopsis-1', '/static/catalog/synopsis.js?v=1',
+    '/static/catalog/episode-downloads.js?v=password-1', '/static/catalog/trailers.js',
     '/static/catalog/player-screen.js?v=2', '/static/catalog/playback.js?v=unavailable-1'
   ];
   const loaded = new Map();

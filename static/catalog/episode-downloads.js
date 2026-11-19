@@ -1,6 +1,6 @@
 /* Download URLs are released only by an authenticated server route. */
 (function(root){
- async function download(contentId,episodeId){try{const r=await fetch(`/api/episode-download/${contentId}/${episodeId}`);const data=await r.json();if(root.AccessSupport.handle(r,data))return;if(!r.ok)throw Error(data.error||'Descarga no disponible.');mostrarEnlaceExterno(data.url);}catch(error){alert(error.message);}}
+ async function download(contentId,episodeId){try{const r=await fetch(`/api/episode-download/${contentId}/${episodeId}`);const data=await r.json();if(root.AccessSupport.handle(r,data))return;if(!r.ok)throw Error(data.error||'Descarga no disponible.');mostrarEnlaceExterno(data.url,undefined,data.password||'');}catch(error){alert(error.message);}}
  async function edit(contentId,episode,onSave){
   const dialog=document.createElement('dialog');dialog.className='episode-download-editor';
   const title=document.createElement('h2');title.textContent=`Descarga · Episodio ${episode.numero}`;

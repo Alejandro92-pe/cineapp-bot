@@ -1,0 +1,21 @@
+/* Admin · archive password shown before each download, chosen by the file's site. */
+(function(root){
+ 'use strict';
+ const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined&&text!==null)n.textContent=String(text);if(cls)n.className=cls;return n;};
+ async function api(body){const r=await fetch('/api/admin/download-passwords',body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'No se pudo guardar.');return d;}
+ const css='.dp-card{margin:0 0 18px;border:1px solid #34465e;border-radius:12px;background:#0f1824}.dp-card summary{cursor:pointer;padding:14px 16px;font-size:14px;color:#e8c581;font-weight:700}.dp-body{display:grid;gap:12px;padding:0 16px 16px}.dp-body p{margin:0;font-size:12px;color:#9daec5;line-height:1.6}.dp-row{display:grid;grid-template-columns:1.4fr 1fr auto;gap:8px;align-items:center}.dp-row input{min-width:0;padding:10px;border-radius:8px;border:1px solid #3a4d68;background:#0b1420;color:#e6eef9;font:inherit;font-size:13px}.dp-row button{padding:8px 10px;border-radius:8px;border:1px solid #5a3b3b;background:#241a1f;color:#f0b4b0;cursor:pointer}.dp-head{font-size:11px;color:#7f93ad;text-transform:uppercase;letter-spacing:.06em}.dp-actions{display:flex;gap:10px;flex-wrap:wrap}.dp-actions button{padding:10px 14px;border-radius:8px;border:1px solid #3a4d68;background:#16263a;color:#e6eef9;cursor:pointer;font:inherit;font-size:13px}.dp-actions .dp-save{background:#e8c581;border-color:#e8c581;color:#1a1408;font-weight:700}.dp-status{font-size:12px;color:#e8c581;min-height:16px}@media(max-width:640px){.dp-row{grid-template-columns:1fr 1fr auto}}';
+ root.DownloadPasswords={async mount(container){
+  if(!document.getElementById('dp-style')){const s=el('style');s.id='dp-style';s.textContent=css;document.head.append(s);}
+  const card=el('details',null,'dp-card');card.append(el('summary','🔑 Contraseñas de descarga'));const body=el('div',null,'dp-body');card.append(body);container.prepend(card);
+  body.append(el('p','Al pulsar «Descargar», la web muestra la contraseña del archivo según el sitio donde está. Deja la contraseña vacía si ese sitio no usa. Escribe solo el dominio (mediafire.com) o la palabra torrent para los archivos .torrent.'));
+  const list=el('div');const status=el('p',null,'dp-status');status.setAttribute('role','status');
+  const head=el('div',null,'dp-row dp-head');head.append(el('span','Sitio'),el('span','Contraseña'),el('span',''));
+  const defaultRow=el('div',null,'dp-row');const defaultInput=document.createElement('input');defaultInput.placeholder='Sin contraseña';defaultInput.setAttribute('aria-label','Contraseña para cualquier otro sitio');defaultRow.append(el('span','Cualquier otro sitio'),defaultInput,el('span',''));
+  function addRow(rule={site:'',password:''}){const row=el('div',null,'dp-row');const site=document.createElement('input');site.value=rule.site;site.placeholder='mediafire.com';site.setAttribute('aria-label','Sitio');const pass=document.createElement('input');pass.value=rule.password;pass.placeholder='Sin contraseña';pass.setAttribute('aria-label','Contraseña');const remove=el('button','Quitar');remove.type='button';remove.onclick=()=>row.remove();row.append(site,pass,remove);list.append(row);}
+  const actions=el('div',null,'dp-actions');const add=el('button','+ Agregar sitio');add.type='button';add.onclick=()=>addRow();const save=el('button','Guardar contraseñas','dp-save');save.type='button';
+  save.onclick=async()=>{save.disabled=true;status.textContent='Guardando…';try{const rules=[...list.children].map(r=>{const [s,p]=r.querySelectorAll('input');return {site:s.value,password:p.value};});const saved=await api({rules,default:defaultInput.value});fill(saved);status.textContent='✓ Guardado. Se aplica en la próxima descarga.';}catch(e){status.textContent=e.message;}finally{save.disabled=false;}};
+  actions.append(add,save);body.append(head,list,defaultRow,actions,status);
+  function fill(data){list.replaceChildren();data.rules.forEach(addRow);defaultInput.value=data.default||'';}
+  try{fill(await api());}catch(e){status.textContent=e.message;}
+ }};
+})(window);
