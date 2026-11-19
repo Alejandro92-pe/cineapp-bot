@@ -186,8 +186,10 @@ def import_now(store, database, tmdb_key, kind, tmdb, seconds=20):
                 source = json.loads(c.execute(select(jobs.c.source).where(target)).scalar_one())
             progress = source.get('progress') or {}
             total = sum(progress.get('counts', {}).values()) or None
+            reason, wait, host = transport.pause or ('tiempo', 0, '')
             return {'pending': True, 'provider': 'videoapi', 'checked': progress.get('checked', 0), 'total': total,
-                    'titulo': (progress.get('document') or {}).get('contenido', {}).get('titulo')}
+                    'titulo': (progress.get('document') or {}).get('contenido', {}).get('titulo'),
+                    'reason': reason, 'wait': wait, 'host': host}
         except ImportFailure as error:
             with queue.engine.begin() as c:
                 c.execute(update(jobs).where(target).values(status='failed', note=str(error)[:300], ready=queue.clock()+3600))

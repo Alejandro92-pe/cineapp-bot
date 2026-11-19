@@ -207,8 +207,9 @@ class CachedTransport(PacedTransport):
         if cached is not None:
             from types import SimpleNamespace
             return SimpleNamespace(status_code=200, json=lambda: cached, headers={})
-        remaining = self.deadline-self.clock()-max(0, self.queue.get_setting('next_request')-self.clock())
-        if remaining < 3: raise BatchPause()
+        wait = max(0, self.queue.get_setting('next_request')-self.clock())
+        remaining = self.deadline-self.clock()-wait
+        if remaining < 3: raise self.paused('espera_compartida' if wait > 3 else 'tiempo', wait, url)
         kwargs['timeout'] = (min(4, remaining/2), min(8, remaining/2))
         response = super().get(url, **kwargs)
         if response.status_code == 200:

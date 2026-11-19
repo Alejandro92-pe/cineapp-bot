@@ -7,6 +7,18 @@ from services.metadata_import import build_metadata,apply_local
 from services.vimeus_import import import_title,ImportRepository
 
 
+def pause_reason(result):
+    """Plain words for why this click stopped, and when to press Import again."""
+    reason,wait,host=str(result.get('reason') or 'tiempo'),int(result.get('wait') or 0),result.get('host') or 'el proveedor'
+    name='VideoAPI' if 'videoapi' in host else 'TMDB' if 'themoviedb' in host else host
+    later=f' Vuelve a pulsar Importar en {wait} s.' if wait>3 else ' Pulsa Importar otra vez para continuar.'
+    if reason.startswith('http_429'):return f'{name} pidió esperar por demasiadas consultas (429).'+later
+    if reason.startswith('http_'):return f'{name} respondió con un error temporal ({reason[5:]}).'+later
+    if reason.startswith('sin_respuesta'):return f'{name} no respondió a tiempo.'+later
+    if reason=='espera_compartida':return 'El importador automático acaba de consultar; hay que respetar la pausa entre consultas.'+later
+    return 'Se usó el tiempo de este clic.'+later+' Si no, el importador automático la terminará.'
+
+
 def catalog_import_routes(db,provider,get,videoapi_import=None,vimeus_alive=lambda:True):
     bp=Blueprint('catalog_import',__name__)
     @bp.post('/api/admin/catalog/import')
@@ -30,8 +42,10 @@ def catalog_import_routes(db,provider,get,videoapi_import=None,vimeus_alive=lamb
                     if result.get('busy'):return jsonify(error=result['message'],code='busy'),409
                     if result.get('pending'):
                         done=f"{result['checked']} de {result['total']}" if result.get('total') else str(result['checked'])
+                        why=pause_reason(result)
                         return jsonify(pending=True,provider='videoapi',reason=reason,checked=result['checked'],total=result.get('total'),
-                            titulo=result.get('titulo'),message=f'Importando desde VideoAPI: {done} capítulos revisados. Pulsa Importar otra vez para continuar; si no, el importador automático la terminará.'),202
+                            titulo=result.get('titulo'),pause=result.get('reason'),wait=result.get('wait'),
+                            message=f'Importando desde VideoAPI: {done} capítulos revisados. {why}'),202
                     return jsonify({**result,'provider':'videoapi','reason':reason})
             if current_app.config['SECURITY_LOCAL']:
                 path=Path(current_app.config.get('METADATA_SNAPSHOT_DIR','.local/tmdb-imports'))/f'{kind}-{tmdb}.json'

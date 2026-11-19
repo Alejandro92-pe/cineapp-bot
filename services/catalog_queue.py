@@ -7,6 +7,7 @@ from datetime import timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
+import logging
 import requests
 from providers.vimeus import integer, ImportFailure
 from providers.tmdb import trailer_url, tmdb_rating
@@ -138,19 +139,27 @@ class PacedTransport:
         self.queue,self.seconds,self.session = queue,seconds,session or requests.Session()
         self.sleep,self.clock,self.deadline = sleep,clock,clock()+max_seconds
         self.requests,self.waited = 0,0
+        self.pause = None  # (reason, seconds to wait, host) of the last BatchPause
+
+    def paused(self, reason, wait, url):
+        host = url.split('/')[2] if '://' in url else url[:40]
+        self.pause = (reason, max(0, round(wait)), host)
+        # Hosts and paths only: never query strings, which can carry API keys.
+        logging.getLogger('importer').warning('Import paused: %s, wait %ss, %s', reason, self.pause[1], url.split('?')[0][-80:])
+        return BatchPause()
 
     def get(self,url,**kwargs):
         wait = max(0,self.queue.get_setting('next_request')-self.clock())
-        if self.clock()+wait>=self.deadline: raise BatchPause()
+        if self.clock()+wait>=self.deadline: raise self.paused('espera_compartida' if wait>3 else 'tiempo', wait, url)
         if wait: self.sleep(wait); self.waited+=wait
         # Reserve before request, so a crash cannot erase rate pacing.
         self.queue.set_setting('next_request',self.clock()+self.seconds)
         self.requests+=1
         try:
             response=self.session.get(url,**kwargs)
-        except requests.RequestException:
+        except requests.RequestException as error:
             self.queue.set_setting('next_request',self.clock()+30)
-            raise BatchPause() from None
+            raise self.paused('sin_respuesta:'+type(error).__name__, 30, url) from None
         if response.status_code in (429,500,502,503,504):
             delay=60
             value=response.headers.get('Retry-After','')
@@ -159,7 +168,7 @@ class PacedTransport:
                 try: delay=max(delay,parsedate_to_datetime(value).replace(tzinfo=timezone.utc).timestamp()-self.clock())
                 except (ValueError,TypeError,OverflowError): pass
             self.queue.set_setting('next_request',self.clock()+delay)
-            raise BatchPause()
+            raise self.paused(f'http_{response.status_code}', delay, url)
         return response
 
 

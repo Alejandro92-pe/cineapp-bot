@@ -86,3 +86,26 @@ def test_admin_import_falls_back_to_videoapi(monkeypatch):
     app3 = Flask('t3'); app3.config['SECURITY_LOCAL'] = False
     app3.register_blueprint(routes.catalog_import_routes(None, None, lambda *a: {}, busy, lambda: False))
     assert app3.test_client().post('/api/admin/catalog/import', json={'tmdb_id': 81499, 'tipo': 'serie'}).status_code == 409
+
+
+@pytest.mark.parametrize('pause,expected', [
+    (('http_429', 60, 'videoapi.la'), 'VideoAPI pidió esperar por demasiadas consultas (429). Vuelve a pulsar Importar en 60 s.'),
+    (('sin_respuesta:ReadTimeout', 30, 'videoapi.la'), 'VideoAPI no respondió a tiempo. Vuelve a pulsar Importar en 30 s.'),
+    (('tiempo', 0, 'api.themoviedb.org'), 'Se usó el tiempo de este clic. Pulsa Importar otra vez para continuar.'),
+])
+def test_pause_reason_tells_the_owner_what_happened(pause, expected):
+    from routes.catalog_import import pause_reason
+    assert pause_reason({'reason': pause[0], 'wait': pause[1], 'host': pause[2]}).startswith(expected)
+
+
+def test_rate_limited_videoapi_reports_429_and_wait(system, monkeypatch):
+    import requests
+    from services.catalog_queue import PacedTransport
+    q = VideoAPIQueue(system.security_store)
+    class Session:
+        def get(self, url, **kw):
+            return type('R', (), {'status_code': 429, 'headers': {'Retry-After': '90'}})()
+    t = PacedTransport(q, seconds=0, max_seconds=20, session=Session(), sleep=lambda s: None)
+    with pytest.raises(BatchPause):
+        t.get('https://videoapi.la/api/v1/public/exists/tv/1/1/1?key=secret')
+    assert t.pause[0] == 'http_429' and t.pause[1] >= 89 and t.pause[2] == 'videoapi.la'
