@@ -5,7 +5,7 @@ from services.videoapi_jobs import VideoAPIQueue, run_videoapi_batch
 INTERVAL_SECONDS = 300
 PROVIDER_CYCLE = ('videoapi', 'videoapi', 'videoapi', 'videoapi', 'vimeus')
 
-def run_batch(queue, store, database, *, videoapi_enabled=False, vimeus_key='', tmdb_key=''):
+def run_batch(queue, store, database, *, videoapi_enabled=False, vimeus_key='', tmdb_key='', vimeus_alive=lambda: True):
     if not videoapi_enabled:
         return run_production_batch(queue, database, vimeus_key, tmdb_key)
     # Move the cursor before I/O. A provider timeout cannot monopolize later calls.
@@ -20,6 +20,7 @@ def run_batch(queue, store, database, *, videoapi_enabled=False, vimeus_key='', 
         # The extra 60-second floor prevents bursts across adjacent boundaries.
         boundary = (int(now)//INTERVAL_SECONDS+1)*INTERVAL_SECONDS
         queue.set_setting('scheduler_after', max(now+60, boundary))
-    if PROVIDER_CYCLE[turn % len(PROVIDER_CYCLE)] == 'videoapi' or not vimeus_key:
+    # While Vimeus is down its turn goes to VideoAPI, so its series/anime wait instead of failing.
+    if PROVIDER_CYCLE[turn % len(PROVIDER_CYCLE)] == 'videoapi' or not vimeus_key or not vimeus_alive():
         return {'provider': 'videoapi', **run_videoapi_batch(VideoAPIQueue(store), database, tmdb_key)}
     return {'provider': 'vimeus', **run_production_batch(queue, database, vimeus_key, tmdb_key)}

@@ -43,9 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/admin/catalog/import', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({tmdb_id: Number(id.value), tipo: kind.value,content_id:kind.value.startsWith('biblico')?document.getElementById('import-target').value:null}) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'No se pudo completar. Puedes reintentar sin duplicar capítulos.');
+      if (data.pending) { status.textContent = (data.titulo ? data.titulo + ': ' : '') + data.message; return; }
       status.textContent = `${data.titulo}: ${data.temporadas ? `${data.temporadas} ${data.temporadas===1?'temporada':'temporadas'} y ${data.episodios} capítulos.` : 'Ficha de película importada.'} Descargas conservadas.`;
       if(data.metadata_only)status.append(document.createTextNode(' Los capítulos sin vídeo quedarán pendientes hasta que añadas sus enlaces en Reproductores · OK.ru.'));
       const link = document.createElement('a'); link.href = `/?contenido=${data.contenido_id}`; link.textContent = 'Ver ficha en el catálogo'; status.append(document.createElement('br'), link);
+      if (data.provider === 'videoapi') { const p = document.createElement('p'); p.textContent = `Importado desde VideoAPI (${data.reason || 'Vimeus no lo tenía'}). Solo se añadieron los capítulos que VideoAPI confirma.`; status.append(p); }
       (data.warnings || []).forEach(warning => { const p = document.createElement('p'); p.textContent = warning; status.append(p); });
     } catch (error) { status.classList.add('error'); status.textContent = error.message; }
     finally { submit.disabled = false; kind.disabled = false; id.disabled = false; status.setAttribute('aria-busy', 'false'); }

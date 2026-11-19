@@ -463,7 +463,14 @@ else:
     vimeus_provider = VimeusClient(os.getenv("VIMEUS_API_KEY", ""))
 app.register_blueprint(create_vimeus_routes(supabase_service, vimeus_provider, tmdb_get if TMDB_API_KEY else None))
 from routes.catalog_import import catalog_import_routes
-app.register_blueprint(catalog_import_routes(supabase_service,vimeus_provider,tmdb_get if TMDB_API_KEY else None))
+def admin_videoapi_import(kind, tmdb):
+    from services.videoapi_jobs import import_now
+    return import_now(security_store, supabase_service, os.getenv('TMDB_API_KEY', ''), kind, tmdb)
+def importer_vimeus_alive():
+    from services.videoapi_playback import vimeus_alive
+    return vimeus_alive(app)
+app.register_blueprint(catalog_import_routes(supabase_service,vimeus_provider,tmdb_get if TMDB_API_KEY else None,
+    admin_videoapi_import if os.getenv('VIDEOAPI_IMPORT_ENABLED') == 'true' else None, importer_vimeus_alive))
 
 app.register_blueprint(marketing_bp)
 from telegram_bot.assistant import QueHayBot
@@ -889,7 +896,8 @@ def cron_verificar_vencimientos():
             from services.catalog_scheduler import run_batch
             return jsonify(run_batch(catalog_job_store, security_store, supabase_service,
                            videoapi_enabled=os.getenv('VIDEOAPI_IMPORT_ENABLED') == 'true',
-                           vimeus_key=os.getenv('VIMEUS_API_KEY', ''), tmdb_key=os.getenv('TMDB_API_KEY', '')))
+                           vimeus_key=os.getenv('VIMEUS_API_KEY', ''), tmdb_key=os.getenv('TMDB_API_KEY', ''),
+                           vimeus_alive=importer_vimeus_alive))
         return "OK", 200
     except Exception as e:
         return "Error", 500

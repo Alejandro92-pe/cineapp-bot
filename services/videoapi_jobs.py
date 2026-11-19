@@ -146,3 +146,56 @@ def run_videoapi_batch(queue, database, tmdb_key):
         if not isinstance(result, dict) or not result.get('success'):
             raise ImportFailure('La publicación no fue confirmada.')
     return queue.run(provider, tmdb.get, publish)
+
+
+def import_now(store, database, tmdb_key, kind, tmdb, seconds=20):
+    """Admin import of one series/anime from VideoAPI (when Vimeus is down or lacks it).
+
+    Runs the same validated manifest as the automatic queue for at most `seconds` (a web
+    thread must never be held for minutes). A long series saves its progress and stays first
+    in the queue: pressing import again, or the next automatic turn, continues where it left off.
+    """
+    from services.catalog_jobs import BatchPause
+    if kind not in ('serie', 'anime'):
+        raise ImportFailure('Solo series y animes se importan desde VideoAPI aquí.')
+    if not tmdb_key:
+        raise ImportFailure('Falta la clave de TMDB.')
+    queue = VideoAPIQueue(store)
+    with queue.lock() as acquired:
+        if not acquired:
+            return {'busy': True, 'message': 'El importador automático está trabajando. Vuelve a pulsar Importar en unos segundos.'}
+        target = (jobs.c.kind == kind) & (jobs.c.tmdb == tmdb)
+        with queue.engine.begin() as c:
+            row = c.execute(select(jobs).where(target)).mappings().first()
+            if row is None:
+                c.execute(jobs.insert().values(kind=kind, tmdb=tmdb, source=json.dumps({'tmdb_id': tmdb, 'title': ''}),
+                    status='pending', attempts=0, ready=queue.clock(), created_at=0.0, note='Importación manual'))
+            elif row['status'] not in ('pending', 'refresh_pending'):
+                # done/failed/running: restart from the saved progress, if any, at the front of the queue.
+                c.execute(update(jobs).where(target).values(status='pending', attempts=0, ready=queue.clock(),
+                    created_at=0.0, note='Importación manual'))
+            else:
+                c.execute(update(jobs).where(target).values(ready=queue.clock(), created_at=0.0))
+            row = dict(c.execute(select(jobs).where(target)).mappings().one())
+        transport = CachedTransport(queue, seconds=1.5, max_seconds=seconds)
+        provider, client = VideoAPICatalog(transport), TMDBClient(tmdb_key, transport)
+        try:
+            doc, warnings = queue.manifest(provider, row, client.get)
+        except BatchPause:
+            with queue.engine.connect() as c:
+                source = json.loads(c.execute(select(jobs.c.source).where(target)).scalar_one())
+            progress = source.get('progress') or {}
+            total = sum(progress.get('counts', {}).values()) or None
+            return {'pending': True, 'provider': 'videoapi', 'checked': progress.get('checked', 0), 'total': total,
+                    'titulo': (progress.get('document') or {}).get('contenido', {}).get('titulo')}
+        except ImportFailure as error:
+            with queue.engine.begin() as c:
+                c.execute(update(jobs).where(target).values(status='failed', note=str(error)[:300], ready=queue.clock()+3600))
+            raise ImportFailure(f'VideoAPI tampoco pudo importarla: {error}') from None
+        result = database.rpc('importar_videoapi', {'documento': doc}).execute().data
+        if not isinstance(result, dict) or not result.get('success'):
+            raise ImportFailure('La publicación no fue confirmada. No se guardaron cambios.')
+        with queue.engine.begin() as c:
+            c.execute(update(jobs).where(target).values(status='done', attempts=0, ready=queue.clock()+604800,
+                note='; '.join(warnings)[:300] or 'Importación manual'))
+        return {**result, 'warnings': warnings}
